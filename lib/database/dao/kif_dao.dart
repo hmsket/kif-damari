@@ -19,34 +19,23 @@ class KifDao {
   }
 
   // 2. 新規保存（kif_id の自動採番ロジックを含む）
-  Future<void> insertKif(int tabId, String title, String kifPath) async {
+  Future<void> insertKif(KifEntity kif) async {
     final db = await _db;
 
-    // トランザクションで実行（採番の整合性を保つため）
     await db.transaction((txn) async {
-      // 現在の tab_id における最大の kif_id を取得
+      // 採番ロジック（以前と同じ）
       final result = await txn.rawQuery(
         'SELECT MAX(kif_id) as max_id FROM kif WHERE tab_id = ?',
-        [tabId],
+        [kif.tabId],
       );
       int nextKifId = (result.first['max_id'] as int? ?? 0) + 1;
 
-      // 現在の tab_id における最大の kif_order を取得
-      final orderResult = await txn.rawQuery(
-        'SELECT MAX(kif_order) as max_order FROM kif WHERE tab_id = ?',
-        [tabId],
-      );
-      int nextOrder = (orderResult.first['max_order'] as int? ?? 0) + 1;
+      // Entity を Map に変換（Entityクラスで toMap を定義しておく）
+      final kifMap = kif.toMap();
+      kifMap['kif_id'] = nextKifId; // 採番したIDを上書き
 
       // 保存実行
-      await txn.insert('kif', {
-        'tab_id': tabId,
-        'kif_id': nextKifId,
-        'title': title,
-        'kif_order': nextOrder,
-        'kif_path': kifPath,
-        // 必要に応じて他のカラムも追加
-      });
+      await txn.insert('kif', kifMap);
     });
   }
 
@@ -70,4 +59,18 @@ class KifDao {
       whereArgs: [kif.tabId, kif.kifId],
     );
   }
+
+  Future<int> getMaxKifId(int tabId) async {
+    final db = await _db;
+    final List<Map<String, Object?>> result = await db.rawQuery(
+      'SELECT MAX(kif_id) as max_id FROM kif WHERE tab_id = ?',
+      [tabId],
+    );
+    final maxId = result.first['max_id'];
+    if (maxId == null) {
+      return 0; // まだそのタブに棋譜がない場合は 0 を返す
+    }
+    return maxId as int;
+  }
+
 }
