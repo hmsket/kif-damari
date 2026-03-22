@@ -331,7 +331,15 @@ class KifListScreen extends StatelessWidget {
           itemBuilder: (context, index) {
             final kif = kifs[index];
             return Card(
-              margin: const EdgeInsets.all(8),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadiusGeometry.circular(4),
+                side: const BorderSide(
+                  color: Colors.grey, // 線の色
+                  width: 1,           // 線の太さ
+                ),
+              ),
+              margin: const EdgeInsets.all(1),
               child: ListTile(
                 leading: const Icon(Icons.description),
                 title: Text(kif.title),
