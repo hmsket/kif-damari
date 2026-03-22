@@ -43,4 +43,15 @@ class TabDao {
       whereArgs: [id],
     );
   }
+
+  // tab_orderの最大値を取得する
+  Future<int> getMaxTabOrder() async {
+    final db = await _db;
+    final result = await db.rawQuery('SELECT MAX(tab_order) as max_order FROM tab');
+    final maxOrder = result.first['max_order'];
+    if (maxOrder == null) {
+      return 0; // データが1件もない場合は0を返す
+    }    
+    return maxOrder as int;
+  }
 }

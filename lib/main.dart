@@ -18,14 +18,37 @@ class KifdamariApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+// 1. 器となるクラス
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+// 2. 実体（状態とUI）を管理するクラス
+class _HomePageState extends State<HomePage> {
+  // Javaのメンバ変数と同じ。ここに「画面の状態」を持つ。
+  late Future<List<TabEntity>> _tabsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // ライフサイクルの初期化（Androidの onCreate 相当）
+    _tabsFuture = TabDao().getAllTabs();
+  }
+
+  // 画面を更新するメソッド（Javaの notifyDataSetChanged 相当）
+  void _refresh() {
+    setState(() {
+      _tabsFuture = TabDao().getAllTabs();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 1. まずDBから全てのタブを取得する
     return FutureBuilder<List<TabEntity>>(
-      future: TabDao().getAllTabs(),
+      future: _tabsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -33,23 +56,81 @@ class HomePage extends StatelessWidget {
 
         final tabs = snapshot.data ?? [];
 
-        // 2. タブの数に合わせてコントローラーを自動設定
         return DefaultTabController(
           length: tabs.length,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Kifdamari'),
+              actions: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.add),
+                  onSelected: (value) {
+                    if (value == 'add_tab') _showAddTabDialog(context);
+                    // ここに棋譜追加の分岐も入る
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
+                    const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
+                  ],
+                ),
+              ],
               bottom: TabBar(
+                isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                isScrollable: true, // タブが多い場合に横スクロール可能に
                 tabs: tabs.map((t) => Tab(text: t.title)).toList(),
               ),
             ),
             body: TabBarView(
-              // 3. 各タブに対応するリストを表示
               children: tabs.map((t) => KifListScreen(tabId: t.id!)).toList(),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  // タブ追加ダイアログを表示するメソッド
+  void _showAddTabDialog(BuildContext context) {
+    // Javaの EditText に相当するコントローラー
+    final TextEditingController controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('タブを追加'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: "タブ名",
+              border: UnderlineInputBorder(),
+            ),
+            autofocus: true, // ダイアログが開いた瞬間にキーボードを出す
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // キャンセル（ダイアログを閉じる）
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  final maxOrder = await TabDao().getMaxTabOrder();
+                  // 1. DBに保存
+                  await TabDao().insertTab(TabEntity(
+                    title: name,
+                    tabOrder: maxOrder + 1,
+                  ));
+                  // 2. ダイアログを閉じる
+                  if (context.mounted) Navigator.pop(context);
+                  // 3. 親画面をリフレッシュ（setStateを呼ぶメソッド）
+                  _refresh(); 
+                }
+              },
+              child: const Text('追加'),
+            ),
+          ],
         );
       },
     );
