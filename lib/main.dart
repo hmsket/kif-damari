@@ -332,21 +332,76 @@ class KifListScreen extends StatelessWidget {
             final kif = kifs[index];
             return Card(
               elevation: 0,
+              clipBehavior: Clip.antiAlias, // 画像の角をCardの角丸に合わせる
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadiusGeometry.circular(4),
-                side: const BorderSide(
-                  color: Colors.grey, // 線の色
-                  width: 1,           // 線の太さ
-                ),
+                borderRadius: BorderRadius.circular(4),
+                side: const BorderSide(color: Colors.grey, width: 1),
               ),
               margin: const EdgeInsets.all(1),
-              child: ListTile(
-                leading: const Icon(Icons.description),
-                title: Text(kif.title),
-                subtitle: Text(kif.detail ?? '詳細なし'),
+              
+              // InkWell で包んでタップ反応を付ける（ListTileのonTapの代わり）
+              child: InkWell(
                 onTap: () {
                   // TODO: 将棋盤画面へ
                 },
+                
+                // ListTile の代わりに Row を使う
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    
+                    // 1. 将棋盤画像（左側）
+                    SizedBox(
+                      width: 120,  // 幅を固定
+                      height: 120, // ★ Cardの高さに合わせる                      
+                      child: Padding(
+                        padding: const EdgeInsets.all(5.0),
+                        child: Image.asset(
+                          'assets/images/initial.png', // assetsのパス
+                          
+                          // ★重要：上下左右に途切れないようにする（画像全体を表示）
+                          // Javaの ScaleType.FIT_CENTER 相当
+                          // SizedBox自体の80x80から、Padding（10px x 2 = 20px）を引いた
+                          // 60x60のエリア内で、最大サイズで表示されます。
+                          fit: BoxFit.contain, 
+                        ),
+                      ),
+                    ),
+                    
+                    // 画像とテキストの間の余白
+                    // const SizedBox(width: 4),
+
+                    // 2. テキストエリア（右側）
+                    Expanded(
+                      child: Padding(
+                        // 右側と上下に少しパディングを入れる
+                        padding: const EdgeInsets.fromLTRB(2, 8, 4, 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.max, // テキストの高さに合わせる
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start, // 左寄せ
+                          children: [
+                            // タイトル
+                            Text(
+                              kif.title,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 1, // 1行に収める
+                              overflow: TextOverflow.ellipsis, // はみ出したら '...'
+                            ),
+                            // const SizedBox(height: 4), // タイトルと詳細の隙間
+                            // 詳細
+                            Text(
+                              kif.detail ?? '詳細なし',
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              maxLines: 4, // 最大4行
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
