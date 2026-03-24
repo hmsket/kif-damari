@@ -161,6 +161,7 @@ class _HomePageState extends State<HomePage> {
                     title: name,
                     tabOrder: maxOrder + 1,
                   ));
+                  _showSuccessSnackBar("タブを追加しました");
                   // 2. ダイアログを閉じる
                   if (context.mounted) Navigator.pop(context);
                   // 3. 親画面をリフレッシュ（setStateを呼ぶメソッド）
@@ -314,6 +315,7 @@ class _HomePageState extends State<HomePage> {
                     );
 
                     await KifDao().insertKif(newKif);
+                    _showSuccessSnackBar("棋譜を追加しました");
 
                     if (context.mounted) {
                       Navigator.pop(context);
@@ -337,6 +339,43 @@ class _HomePageState extends State<HomePage> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
         child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          height: 50, // 👈 高さを指定してサイズアップ
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              Icon(Icons.check, color: Color(0xFF527D66), size: 30), // アイコンも大きく
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 16, // 👈 文字サイズを大きく
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          )
+        ),
+        backgroundColor: Color.fromARGB(255, 223, 225, 224), // 成功を表す緑色
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+
+        shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6), // 角丸
+        side: BorderSide(
+          color: Color(0xFF527D66), // 👈 枠線の色
+          width: 1.5,         // 👈 枠線の太さ（大きくすると目立ちます）
+        ),
+      ),
       ),
     );
   }
