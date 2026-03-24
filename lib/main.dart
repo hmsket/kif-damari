@@ -5,6 +5,8 @@ import 'database/entity/tab_entity.dart';
 import 'database/entity/kif_entity.dart';
 import 'package:file_picker/file_picker.dart';
 
+enum AppMode { normal, edit, delete }
+
 void main() => runApp(const KifdamariApp());
 
 class KifdamariApp extends StatelessWidget {
@@ -31,6 +33,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   // Javaのメンバ変数と同じ。ここに「画面の状態」を持つ。
   late Future<List<TabEntity>> _tabsFuture;
+  AppMode _currentMode = AppMode.normal;
 
   @override
   void initState() {
@@ -62,21 +65,53 @@ class _HomePageState extends State<HomePage> {
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Kifdamari'),
+              backgroundColor: switch(_currentMode) {
+                AppMode.edit => Colors.green[300],
+                AppMode.delete => Colors.red[300],
+                AppMode.normal => null,
+              },
               actions: [
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.add),
-                  onSelected: (value) {
-                    if (value == 'add_tab') {
-                      _showAddTabDialog(context);
-                    } else if (value == 'add_kif') {
-                      _showAddKifDialog(context);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
-                    const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
-                  ],
-                ),
+                if (_currentMode != AppMode.normal)
+                  IconButton(
+                    icon: const Icon(Icons.check, size: 30),
+                    onPressed: () {
+                      setState(() {
+                        _currentMode = AppMode.normal;
+                      });
+                    },
+                  )
+                else ...[
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.add),
+                    onSelected: (value) {
+                      if (value == 'add_tab') {
+                        _showAddTabDialog(context);
+                      } else if (value == 'add_kif') {
+                        _showAddKifDialog(context);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
+                      const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      setState(() {
+                        _currentMode = AppMode.edit;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () {
+                      setState(() {
+                        _currentMode = AppMode.delete;
+                      });
+                    },
+                  ),
+                ]
               ],
               bottom: TabBar(
                 isScrollable: true,
