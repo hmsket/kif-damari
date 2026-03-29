@@ -3,13 +3,11 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  // シングルトンパターンの実装
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init();
 
-  // DBインスタンスを取得するゲッター
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('kifdamari.db');
@@ -28,15 +26,11 @@ class DatabaseHelper {
     );
   }
 
-  // Javaの onConfigure 相当：SQLiteのオプション設定
   Future _onConfigure(Database db) async {
-    // 外部キー制aryを有効にする（CASCADEを効かせるために必須）
     await db.execute('PRAGMA foreign_keys = ON');
   }
 
-  // Javaの onCreate 相当：テーブル作成
   Future _createDB(Database db, int version) async {
-    // 1. tab テーブルの作成
     await db.execute('''
       CREATE TABLE tab (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +39,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // 2. kif テーブルの作成（複合キー制約付き）
     await db.execute('''
       CREATE TABLE kif (
         tab_id INTEGER NOT NULL,
@@ -61,7 +54,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // 初期データ（デフォルトのタブ）を入れておくと開発が楽です
+    // 初期データ
     await _insertDefaultTabs(db);
   }
 

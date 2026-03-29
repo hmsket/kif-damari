@@ -1,12 +1,12 @@
 class KifEntity {
-  final int tabId;       // 複合キー1 / Foreign Key
-  final int kifId;       // 複合キー2
-  final String title;    // 棋譜タイトル
-  final String? detail;  // 詳細メモ
-  final int kifOrder;    // タブ内での並び順
-  final String? kifPath; // KIFファイルパス
-  final String? imgPath; // 画像パス
-  final int? color;      // 表示色 (0xFF... のint値)
+  final int tabId;
+  final int kifId;
+  final String title;
+  final String? detail;
+  final int kifOrder;
+  final String? kifPath;
+  final String? imgPath;
+  final int? color;
 
   KifEntity({
     required this.tabId,
