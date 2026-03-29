@@ -213,6 +213,35 @@ void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
   );
 }
 
+void showDeleteKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefresh) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('棋譜を削除'),
+        content: Text('「${kif.title}」を削除します。\nこの操作は取り消せません。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await KifDao().deleteKif(kif.tabId, kif.kifId);
+              UiUtils.showSuccessSnackBar(context, "棋譜を削除しました");
+              if (context.mounted) {
+                Navigator.pop(context);
+                onRefresh();
+              }
+            },
+            child: const Text('削除'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 // ダイアログ内の見出し
 Widget _buildLabel(String text) {
   return Align(

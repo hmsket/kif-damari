@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kifdamari/utils/dialog_utils.dart';
 import '../database/entity/kif_entity.dart';
 import '../main.dart';
 
@@ -27,7 +28,7 @@ class KifListItem extends StatelessWidget {
       child: InkWell(
         onTap: () {
           if (mode == AppMode.delete) {
-            // TODO: 削除モードならダイアログを表示
+            showDeleteKifDialog(context, kif, onRefresh);
           } else {
             // TODO: 将棋盤画面へ
           }
@@ -68,6 +69,11 @@ class KifListItem extends StatelessWidget {
                 ),
               ),
             ),
+            if (mode == AppMode.delete)
+              const Padding(
+                padding: EdgeInsets.all(6.0),
+                child: Icon(Icons.cancel, color: Colors.red),
+              ),
           ],
         ),
       ),
