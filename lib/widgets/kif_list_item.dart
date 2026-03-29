@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/utils/dialog_utils.dart';
+import 'package:kifdamari/widgets/kif_item_widget.dart';
 import '../database/entity/kif_entity.dart';
 import '../main.dart';
 
@@ -33,48 +34,12 @@ class KifListItem extends StatelessWidget {
             // TODO: 将棋盤画面へ
           }
         },
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 120,
-              height: 120,
-              child: Padding(
-                padding: const EdgeInsets.all(5.0),
-                child: Image.asset(
-                  'assets/images/initial.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(2, 8, 4, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      kif.title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      kif.detail ?? '詳細なし',
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (mode == AppMode.delete)
-              const Padding(
-                padding: EdgeInsets.all(6.0),
-                child: Icon(Icons.cancel, color: Colors.red),
-              ),
-          ],
+        child: KifItemWidget(
+          title: kif.title,
+          detail: kif.detail,
+          trailing: mode == AppMode.delete 
+              ? const Icon(Icons.cancel, color: Colors.red) 
+              : null,
         ),
       ),
     );
