@@ -116,7 +116,33 @@ class _HomePageState extends State<HomePage> {
               bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                tabs: tabs.map((t) => Tab(text: t.title)).toList(),
+                tabs: tabs.map((t) {
+                  return Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_currentMode == AppMode.delete)
+                          GestureDetector(
+                            // 👈 ここが重要！
+                            onTap: () {
+                              _showDeleteTabDialog(context, t);
+                            },
+                            // アイコンの周りに少し余白を持たせてタップしやすくする
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(0, 4, 8, 4), 
+                              child: Icon(
+                                Icons.cancel,
+                                size: 20, 
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        Text(t.title),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                // 👈 onTap は書かない（または通常通りの切り替えを邪魔しない）
               ),
             ),
             body: TabBarView(
@@ -327,6 +353,36 @@ class _HomePageState extends State<HomePage> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  // タブ削除ダイアログを表示するメソッド
+  void _showDeleteTabDialog(BuildContext context, TabEntity tab) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('タブを削除'),         
+          content: Text('「' + tab.title + '」を削除します。\nこの操作は取り消せません。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // キャンセル（ダイアログを閉じる）
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await TabDao().deleteTab(tab.id!);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _refresh(); // 👈 これで FutureBuilder が再実行され、最新のDB状態になる
+                  _showSuccessSnackBar('タブを削除しました');
+                }
+              },
+              child: const Text('削除'),
+            ),
+          ],
         );
       },
     );
