@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/widgets/kif_list_widget.dart';
 import 'database/dao/tab_dao.dart';
 import 'database/entity/tab_entity.dart';
@@ -15,7 +16,10 @@ class KifdamariApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: const HomePage(),
-      theme: ThemeData(useMaterial3: true),
+      theme: ThemeData(
+        useMaterial3: true,
+        textTheme: GoogleFonts.notoSansJpTextTheme(),
+      ),
     );
   }
 }
