@@ -47,6 +47,41 @@ void showAddTabDialog(BuildContext context, VoidCallback onRefresh) {
   );
 }
 
+Future<void> showEditTabDialog(BuildContext context, TabEntity tab, VoidCallback onRefresh) async {
+  final controller = TextEditingController(text: tab.title);
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('タブ名の編集'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: "タブ名"),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (controller.text.isNotEmpty) {
+                final updatedTab = TabEntity(id: tab.id, title: controller.text, tabOrder: tab.tabOrder);
+                await TabDao().updateTab(updatedTab);
+                UiUtils.showSuccessSnackBar(context, "タブ名を更新しました");
+                if (context.mounted) Navigator.pop(context);
+                onRefresh();
+              }
+            },
+            child: const Text('更新'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 void showDeleteTabDialog(BuildContext context, TabEntity tab, VoidCallback onRefresh) {
   showDialog(
     context: context,

@@ -16,6 +16,16 @@ class TabDao {
     return await db.insert('tab', tab.toMap());
   }
 
+  Future<int> updateTab(TabEntity tab) async {
+    final db = await _db;
+    return await db.update(
+      'tab',
+      tab.toMap(),
+      where: 'id = ?',
+      whereArgs: [tab.id],
+    );
+  }
+  
   Future<int> deleteTab(int id) async {
     final db = await _db;
     return await db.delete(

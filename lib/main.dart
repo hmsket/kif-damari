@@ -134,6 +134,14 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                           ),
+                        if (_currentMode == AppMode.edit)
+                          GestureDetector(
+                            onTap: () => showEditTabDialog(context, t, _refresh), // 2で作成する関数
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                              child: Icon(Icons.edit, size: 20, color: Colors.green),
+                            ),
+                          ),
                         Text(t.title),
                       ],
                     ),
