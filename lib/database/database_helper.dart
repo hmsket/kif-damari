@@ -41,6 +41,7 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE kif (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         tab_id INTEGER NOT NULL,
         kif_id INTEGER NOT NULL,
         title TEXT NOT NULL,
@@ -49,7 +50,6 @@ class DatabaseHelper {
         kif_path TEXT,
         img_path TEXT,
         color INTEGER,
-        PRIMARY KEY (tab_id, kif_id),
         FOREIGN KEY (tab_id) REFERENCES tab (id) ON DELETE CASCADE
       )
     ''');

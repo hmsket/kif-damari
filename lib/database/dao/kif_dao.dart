@@ -39,13 +39,13 @@ class KifDao {
     );
   }
 
-  Future<int> updateKif(KifEntity kif) async {
-    final db = await _db;
-    return await db.update(
+  Future<void> updateKif(KifEntity kif) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.update(
       'kif',
       kif.toMap(),
-      where: 'tab_id = ? AND kif_id = ?',
-      whereArgs: [kif.tabId, kif.kifId],
+      where: 'id = ?',
+      whereArgs: [kif.id],
     );
   }
 

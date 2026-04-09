@@ -30,6 +30,8 @@ class KifListItem extends StatelessWidget {
         onTap: () {
           if (mode == AppMode.delete) {
             showDeleteKifDialog(context, kif, onRefresh);
+          } else if (mode == AppMode.edit) {
+            showEditKifDialog(context, kif, onRefresh);
           } else {
             // TODO: 将棋盤画面へ
           }
@@ -37,9 +39,11 @@ class KifListItem extends StatelessWidget {
         child: KifItemWidget(
           title: kif.title,
           detail: kif.detail,
-          trailing: mode == AppMode.delete 
-              ? const Icon(Icons.cancel, color: Colors.red) 
-              : null,
+          trailing: switch (mode) {
+            AppMode.delete => const Icon(Icons.cancel, color: Colors.red),
+            AppMode.edit => const Icon(Icons.edit, color: Colors.green),
+            AppMode.normal => null,
+          },
         ),
       ),
     );

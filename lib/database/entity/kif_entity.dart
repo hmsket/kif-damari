@@ -1,4 +1,5 @@
 class KifEntity {
+  final int? id;
   final int tabId;
   final int kifId;
   final String title;
@@ -9,6 +10,7 @@ class KifEntity {
   final int? color;
 
   KifEntity({
+    this.id,
     required this.tabId,
     required this.kifId,
     required this.title,
@@ -21,6 +23,7 @@ class KifEntity {
 
   factory KifEntity.fromMap(Map<String, dynamic> map) {
     return KifEntity(
+      id: map['id'] as int?,
       tabId: map['tab_id'] as int,
       kifId: map['kif_id'] as int,
       title: map['title'] as String,
@@ -34,6 +37,7 @@ class KifEntity {
 
   Map<String, dynamic> toMap() {
     return {
+      if (id != null) 'id': id,
       'tab_id': tabId,
       'kif_id': kifId,
       'title': title,

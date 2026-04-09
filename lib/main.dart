@@ -150,7 +150,14 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             body: TabBarView(
-              children: tabs.map((t) => KifListWidget(tabId: t.id!, mode: _currentMode, onRefresh: _refresh,)).toList(),
+              children: tabs.map((t) {
+                return KifListWidget(
+                  key: ValueKey('kif_list_${t.id}'),
+                  tabId: t.id!,
+                  mode: _currentMode,
+                  onRefresh: _refresh,
+                );
+              }).toList(),
             ),
           ),
         );
