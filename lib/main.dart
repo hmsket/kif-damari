@@ -31,20 +31,46 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Future<List<TabEntity>> _tabsFuture;
   AppMode _currentMode = AppMode.normal;
+  TabController? _tabController; 
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _loadTabs();
+  }
+
+  void _loadTabs() {
     _tabsFuture = TabDao().getAllTabs();
   }
 
-  void _refresh() {
+  void _syncTabIndex() {
+    if (_tabController != null) {
+      _currentTabIndex = _tabController!.index;
+    }
+  }
+
+  void _updateMode(AppMode mode) {
+    _syncTabIndex();
     setState(() {
-      _tabsFuture = TabDao().getAllTabs();
+      _currentMode = mode;
     });
+  }
+
+  void _refresh() {
+    _syncTabIndex();
+    setState(() {
+      _loadTabs();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -52,114 +78,118 @@ class _HomePageState extends State<HomePage> {
     return FutureBuilder<List<TabEntity>>(
       future: _tabsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && _tabController == null) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
         final tabs = snapshot.data ?? [];
 
-        return DefaultTabController(
-          length: tabs.length,
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Kifdamari'),
-              backgroundColor: switch(_currentMode) {
-                AppMode.edit => Colors.green[300],
-                AppMode.delete => Colors.red[300],
-                AppMode.normal => null,
-              },
-              actions: [
-                if (_currentMode != AppMode.normal)
-                  IconButton(
-                    icon: const Icon(Icons.check, size: 30),
-                    onPressed: () {
-                      setState(() {
-                        _currentMode = AppMode.normal;
-                      });
-                    },
-                  )
-                else ...[
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.add),
-                    onSelected: (value) {
-                      if (value == 'add_tab') {
-                        showAddTabDialog(context, _refresh);
-                      } else if (value == 'add_kif') {
-                        showAddKifDialog(context, _refresh);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
-                      const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () {
-                      setState(() {
-                        _currentMode = AppMode.edit;
-                      });
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      setState(() {
-                        _currentMode = AppMode.delete;
-                      });
-                    },
-                  ),
-                ]
-              ],
-              bottom: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: tabs.map((t) {
-                  return Tab(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_currentMode == AppMode.delete)
-                          GestureDetector(
-                            onTap: () {
-                              showDeleteTabDialog(context, t, _refresh);
-                            },
-                            // アイコンの周りに少し余白を持たせてタップしやすくする
-                            child: const Padding(
-                              padding: EdgeInsets.fromLTRB(0, 4, 8, 4), 
-                              child: Icon(
-                                Icons.cancel,
-                                size: 20, 
-                                color: Colors.red,
+        if (_tabController == null || _tabController!.length != tabs.length) {
+          _tabController?.dispose();
+          
+          if (_currentTabIndex >= tabs.length) {
+            _currentTabIndex = tabs.isEmpty ? 0 : tabs.length - 1;
+          }
+
+          _tabController = TabController(
+            length: tabs.length,
+            vsync: this,
+            initialIndex: _currentTabIndex,
+          );
+
+          _tabController!.addListener(() {
+            if (!_tabController!.indexIsChanging) {
+              _currentTabIndex = _tabController!.index;
+            }
+          });
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Kifdamari'),
+            backgroundColor: switch (_currentMode) {
+              AppMode.edit => Colors.green[300],
+              AppMode.delete => Colors.red[300],
+              AppMode.normal => null,
+            },
+            actions: [
+              if (_currentMode != AppMode.normal)
+                IconButton(
+                  icon: const Icon(Icons.check, size: 30),
+                  onPressed: () => _updateMode(AppMode.normal),
+                )
+              else ...[
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.add),
+                  onSelected: (value) {
+                    if (value == 'add_tab') {
+                      showAddTabDialog(context, _refresh);
+                    } else if (value == 'add_kif') {
+                      showAddKifDialog(context, _refresh);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
+                    const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _updateMode(AppMode.edit),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () => _updateMode(AppMode.delete),
+                ),
+              ]
+            ],
+            bottom: tabs.isEmpty
+                ? null
+                : TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    tabs: tabs.map((t) {
+                      return Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_currentMode == AppMode.delete)
+                              GestureDetector(
+                                onTap: () => showDeleteTabDialog(context, t, _refresh),
+                                child: const Padding(
+                                  padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                  child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                                ),
                               ),
-                            ),
-                          ),
-                        if (_currentMode == AppMode.edit)
-                          GestureDetector(
-                            onTap: () => showEditTabDialog(context, t, _refresh), // 2で作成する関数
-                            child: const Padding(
-                              padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                              child: Icon(Icons.edit, size: 20, color: Colors.green),
-                            ),
-                          ),
-                        Text(t.title),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            body: TabBarView(
-              children: tabs.map((t) {
-                return KifListWidget(
-                  key: ValueKey('kif_list_${t.id}'),
-                  tabId: t.id!,
-                  mode: _currentMode,
-                  onRefresh: _refresh,
-                );
-              }).toList(),
-            ),
+                            if (_currentMode == AppMode.edit)
+                              GestureDetector(
+                                onTap: () => showEditTabDialog(context, t, _refresh),
+                                child: const Padding(
+                                  padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                  child: Icon(Icons.edit, size: 20, color: Colors.green),
+                                ),
+                              ),
+                            Text(t.title),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
           ),
+          body: tabs.isEmpty
+              ? const Center(child: Text("タブを追加してください"))
+              : TabBarView(
+                  controller: _tabController,
+                  children: tabs.map((t) {
+                    return KifListWidget(
+                      key: ValueKey('kif_list_${t.id}'),
+                      tabId: t.id!,
+                      mode: _currentMode,
+                      onRefresh: _refresh,
+                    );
+                  }).toList(),
+                ),
         );
       },
     );
