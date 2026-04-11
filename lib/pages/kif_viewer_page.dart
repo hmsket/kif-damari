@@ -169,20 +169,21 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
-  // --- その他のUI部品 ---
-
   Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      // 駒が大きくなるので、高さを少し広げる（例: 50〜60px程度）
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: Row(
         children: [
           if (!isSente) ...[
             _buildNameLabel(playerName, isSente),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
           ],
+          // 駒台を Expanded で広げる
           Expanded(child: _buildPieceStand(isSente)),
           if (isSente) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             _buildNameLabel(playerName, isSente),
           ],
         ],
@@ -190,18 +191,62 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
+  Widget _buildPieceStand(bool isSente) {
+    final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
+    final assetPrefix = isSente ? "b" : "w";
+
+    if (hand.isEmpty || hand.values.every((count) => count == 0)) {
+      return Align(
+        alignment: isSente ? Alignment.centerLeft : Alignment.centerRight,
+        child: Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+      );
+    }
+
+    return Wrap(
+      alignment: isSente ? WrapAlignment.start : WrapAlignment.end,
+      spacing: 1.0, 
+      runSpacing: 1.0,
+      children: hand.entries.where((e) => e.value > 0).map((entry) {
+        return Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            // 駒の画像（22 * 1.4 ≒ 31）
+            Image.asset(
+              'assets/images/pieces/$assetPrefix${entry.key}.png',
+              width: 31,
+              height: 31,
+              fit: BoxFit.contain,
+            ),
+            // 枚数バッジ
+            if (entry.value > 1)
+              Positioned(
+                right: -2, // 少し外側に出すと駒が見えやすくなります
+                bottom: -2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red, width: 0.5),
+                  ),
+                  child: Text(
+                    '${entry.value}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildNameLabel(String name, bool isSente) {
     return Text("${isSente ? '▲' : '△'}$name",
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
-  }
-
-  Widget _buildPieceStand(bool isSente) {
-    // ここで state.senteHand / goteHand を使って表示するように拡張可能
-    return Row(
-      mainAxisAlignment: isSente ? MainAxisAlignment.start : MainAxisAlignment.end,
-      children: [
-        Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-      ],
-    );
   }
 }
