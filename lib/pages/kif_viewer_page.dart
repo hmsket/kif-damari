@@ -1,44 +1,119 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:charset_converter/charset_converter.dart';
+import 'package:kifdamari/logic/kif_parser.dart'; // パスを確認
+import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 
-class KifViewerPage extends StatelessWidget {
+class KifViewerPage extends StatefulWidget {
   final String? kifPath;
 
   const KifViewerPage({super.key, required this.kifPath});
 
   @override
+  State<KifViewerPage> createState() => _KifViewerPageState();
+}
+
+class _KifViewerPageState extends State<KifViewerPage> {
+  KifTree? kifTree; // ロード完了までnullを許容
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initKifData();
+  }
+
+/// ファイルの読み込みと解析
+  Future<void> _initKifData() async {
+    // パスがない場合は初期盤面を表示
+    if (widget.kifPath == null) {
+      setState(() {
+        kifTree = KifTree.initial();
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final file = File(widget.kifPath!);
+      if (await file.exists()) {
+        // 1. バイナリとして読み込む
+        final bytes = await file.readAsBytes();
+        
+        // 2. Shift_JIS(CP932)でデコード（charset_converterパッケージを使用）
+        final content = await CharsetConverter.decode("Shift_JIS", bytes);
+
+        // 3. パーサーで解析してツリーを生成
+        final tree = KifParser.decode(content);
+
+        setState(() {
+          kifTree = tree;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception("ファイルが見つかりません");
+      }
+    } catch (e) {
+      debugPrint("KIF解析エラー: $e");
+      // エラー時は初期盤面を表示してユーザーに知らせる
+      setState(() {
+        kifTree = KifTree.initial();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // ロード中はインジケーターを表示（late初期化エラー防止）
+    if (_isLoading || kifTree == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: Colors.orange[50],
       body: SafeArea(
         child: Column(
           children: [
-            _buildPlayerAndKomaDai(playerName: "渡辺 明", isSente: false),
+            // --- 後手エリア ---
+            _buildPlayerAndKomaDai(playerName: "後手", isSente: false),
+
+            // --- 将棋盤エリア ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: AspectRatio(
-                aspectRatio: 0.93, // 盤の縦横比
-                child: const KifBoard(),
+                aspectRatio: 0.93,
+                child: KifBoard(state: kifTree!.currentNode.state),
               ),
             ),
-            _buildPlayerAndKomaDai(playerName: "藤井 聡太", isSente: true),
+
+            // --- 先手エリア ---
+            _buildPlayerAndKomaDai(playerName: "先手", isSente: true),
+
+            // --- 棋譜コメントエリア ---
             Expanded(
               child: Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                 padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.white.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.brown[200]!),
                 ),
-                child: const SingleChildScrollView(
+                child: SingleChildScrollView(
                   child: Text(
-                    "【棋譜コメント】\nここに指し手の解説や、分岐などの情報を表示します。\n124手で藤井聡太竜王の勝ち。",
-                    style: TextStyle(fontSize: 14, height: 1.5),
+                    "【${kifTree!.currentNode.moveNumber}手目】 ${kifTree!.currentNode.moveLabel ?? '開始局面'}\n\n${kifTree!.currentNode.comment}",
+                    style: const TextStyle(fontSize: 14, height: 1.5),
                   ),
                 ),
               ),
             ),
+
+            // --- 操作パネル ---
             _buildControlPanel(),
           ],
         ),
@@ -46,16 +121,65 @@ class KifViewerPage extends StatelessWidget {
     );
   }
 
+  Widget _buildControlPanel() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      color: Colors.brown[50],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.first_page),
+            onPressed: () => setState(() {
+              while (kifTree!.currentNode.parent != null) {
+                kifTree!.stepBack();
+              }
+            }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            iconSize: 36,
+            onPressed: () => setState(() {
+              kifTree!.stepBack();
+            }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            iconSize: 36,
+            onPressed: () => setState(() {
+              kifTree!.stepNext();
+            }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.last_page),
+            onPressed: () => setState(() {
+              while (kifTree!.currentNode.nextNodes.isNotEmpty) {
+                kifTree!.stepNext();
+              }
+            }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.cached),
+            onPressed: () {
+              // 盤面反転フラグなどの管理をここでする予定
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- その他のUI部品 ---
+
   Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-      color: Colors.brown[50], 
       child: Row(
         children: [
           if (!isSente) ...[
             _buildNameLabel(playerName, isSente),
             const SizedBox(width: 12),
-          ],          
+          ],
           Expanded(child: _buildPieceStand(isSente)),
           if (isSente) ...[
             const SizedBox(width: 12),
@@ -67,69 +191,17 @@ class KifViewerPage extends StatelessWidget {
   }
 
   Widget _buildNameLabel(String name, bool isSente) {
-    return Text(
-      "${isSente ? '▲' : '△'}$name",
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
-      ),
-    );
+    return Text("${isSente ? '▲' : '△'}$name",
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
   }
 
   Widget _buildPieceStand(bool isSente) {
+    // ここで state.senteHand / goteHand を使って表示するように拡張可能
     return Row(
       mainAxisAlignment: isSente ? MainAxisAlignment.start : MainAxisAlignment.end,
       children: [
-        // 本当はコマの画像を並べる
         Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
       ],
     );
   }
-}
-
-Widget _buildControlPanel() {
-  return Container(
-    padding: const EdgeInsets.symmetric(vertical: 8.0),
-    color: Colors.brown[50], // 下部エリアを少し色分け
-    child: 
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.first_page),
-            onPressed: () {
-              // 初期盤面に戻る
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            iconSize: 36, // メインのボタンは少し大きく
-            onPressed: () {
-              // 一手戻る
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            iconSize: 36,
-            onPressed: () {
-              // 一手進む
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.last_page),
-            onPressed: () {
-              // 最終局面まで進む
-            },
-          ),
-          // 盤面反転ボタン
-          IconButton(
-            icon: const Icon(Icons.cached),
-            onPressed: () {
-              // 盤面を180度回転させる
-            },
-          ),
-        ],
-      ),
-  );
 }

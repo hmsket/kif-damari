@@ -1,25 +1,17 @@
 import 'package:flutter/material.dart';
-
-const Map<String, String> initialPosition = {
-  "9,1": "wya", "8,1": "wke", "7,1": "wgi", "6,1": "wki", "5,1": "wgy",
-  "4,1": "wki", "3,1": "wgi", "2,1": "wke", "1,1": "wya",
-  "8,2": "whi", "2,2": "wka",
-  "9,3": "wfu", "8,3": "wfu", "7,3": "wfu", "6,3": "wfu", "5,3": "wfu",
-  "4,3": "wfu", "3,3": "wfu", "2,3": "wfu", "1,3": "wfu",
-  "9,7": "bfu", "8,7": "bfu", "7,7": "bfu", "6,7": "bfu", "5,7": "bfu",
-  "4,7": "bfu", "3,7": "bfu", "2,7": "bfu", "1,7": "bfu",
-  "8,8": "bka", "2,8": "bhi",
-  "9,9": "bya", "8,9": "bke", "7,9": "bgi", "6,9": "bki", "5,9": "bgy",
-  "4,9": "bki", "3,9": "bgi", "2,9": "bke", "1,9": "bya",
-};
+import '../models/board_state.dart'; // パスは環境に合わせて調整してください
 
 class KifBoard extends StatelessWidget {
-  const KifBoard({super.key});
+  // 外部（Page）から現在の局面を受け取る
+  final BoardState state;
+
+  const KifBoard({super.key, required this.state});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // ... パディングやサイズ計算のロジックはそのまま ...
         final double paddingRate = 0.0125; 
         final double boardWidth = constraints.maxWidth * (1 - paddingRate * 2);
         final double boardHeight = constraints.maxHeight * (1 - paddingRate * 2);
@@ -28,45 +20,45 @@ class KifBoard extends StatelessWidget {
         final double offsetX = constraints.maxWidth * paddingRate;
         final double offsetY = constraints.maxHeight * paddingRate;
 
+        List<Widget> pieces = [];
+
+        // state.grid (9x9の二次元配列) を走査して駒を配置
+        for (int y = 0; y < 9; y++) {
+          for (int x = 0; x < 9; x++) {
+            final String? pieceName = state.grid[y][x];
+            if (pieceName != null) {
+              // 将棋の座標系（右上が1,1）に合わせて描画位置を計算
+              // 配列のインデックス y(0-8) は 1段目〜9段目に対応
+              // 配列のインデックス x(0-8) は 9筋〜1筋に対応
+              pieces.add(
+                Positioned(
+                  // x=0(9筋)なら一番左, x=8(1筋)なら一番右
+                  left: offsetX + x * cellSizeW, 
+                  top: offsetY + y * cellSizeH,
+                  width: cellSizeW,
+                  height: cellSizeH,
+                  child: Padding(
+                    padding: const EdgeInsets.all(2.0),
+                    child: Image.asset(
+                      'assets/images/pieces/$pieceName.png', 
+                      fit: BoxFit.contain
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+        }
+
         return Stack(
           children: [
             Positioned.fill(
               child: Image.asset('assets/images/board.png', fit: BoxFit.fill),
             ),
-            ...initialPosition.entries.map((entry) {
-              final coords = entry.key.split(',');
-              final int x = int.parse(coords[0]);
-              final int y = int.parse(coords[1]);
-              return Positioned(
-                left: offsetX + (9 - x) * cellSizeW,
-                top: offsetY + (y - 1) * cellSizeH,
-                width: cellSizeW,
-                height: cellSizeH,
-                child: Padding(
-                  padding: const EdgeInsets.all(2.0),
-                  child: Image.asset('assets/images/pieces/${entry.value}.png', fit: BoxFit.contain),
-                ),
-              );
-            }),
+            ...pieces,
           ],
         );
       },
-    );
-  }
-
-  Widget _buildPiece(int x, int y, String name, double w, double h) {
-    return Positioned(
-      left: (9 - x) * w,
-      top: (y - 1) * h,
-      width: w,
-      height: h,
-      child: Padding(
-        padding: const EdgeInsets.all(2.0),
-        child: Image.asset(
-          'assets/images/pieces/$name.png',
-          fit: BoxFit.contain,
-        ),
-      ),
     );
   }
 }
