@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kifdamari/pages/kif_viewer_page.dart';
 import 'package:kifdamari/utils/dialog_utils.dart';
 import 'package:kifdamari/widgets/kif_item_widget.dart';
 import '../database/entity/kif_entity.dart';
@@ -33,7 +34,12 @@ class KifListItem extends StatelessWidget {
           } else if (mode == AppMode.edit) {
             showEditKifDialog(context, kif, onRefresh);
           } else {
-            // TODO: 将棋盤画面へ
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => KifViewerPage(kifPath: kif.kifPath),
+              ),
+            );
           }
         },
         child: KifItemWidget(
