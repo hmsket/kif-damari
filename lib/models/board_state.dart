@@ -114,7 +114,7 @@ class BoardState {
   String _getRawPieceType(String code) {
     switch (code) {
       case 'to': return 'fu';
-      case 'ny': return 'ky';
+      case 'ny': return 'ya';
       case 'nk': return 'ke';
       case 'ng': return 'gi';
       case 'um': return 'ka';
