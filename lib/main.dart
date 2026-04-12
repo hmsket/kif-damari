@@ -105,12 +105,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
 
         return Scaffold(
+          backgroundColor: const Color(0XFFF1F1F5),
           appBar: AppBar(
-            title: const Text('Kifdamari'),
+            title: const Text('棋譜だまり'),
             backgroundColor: switch (_currentMode) {
               AppMode.edit => Colors.green[300],
               AppMode.delete => Colors.red[300],
-              AppMode.normal => null,
+              AppMode.normal => Color(0XFFFFFFFF),
             },
             actions: [
               if (_currentMode != AppMode.normal)
@@ -145,38 +146,53 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ],
             bottom: tabs.isEmpty
                 ? null
-                : TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    tabs: tabs.map((t) {
-                      return Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_currentMode == AppMode.delete)
-                              GestureDetector(
-                                onTap: () => showDeleteTabDialog(context, t, _refresh),
-                                child: const Padding(
-                                  padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                  child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                : PreferredSize(
+                  // TabBarの標準的な高さ（48.0）を指定
+                  preferredSize: const Size.fromHeight(48.0),
+                  child: ColoredBox(
+                    color: const Color(0XFFFFFFFF), // ここにTabBar専用の背景色を指定
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      
+                      indicatorColor: const Color(0xFF1E88E5), 
+                      labelColor: Colors.black, 
+                      unselectedLabelColor: Colors.grey[600], 
+                      
+                      labelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.bold),
+                      unselectedLabelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.normal),
+
+                      tabs: tabs.map((t) {
+                        return Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_currentMode == AppMode.delete)
+                                GestureDetector(
+                                  onTap: () => showDeleteTabDialog(context, t, _refresh),
+                                  child: const Padding(
+                                    padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                    child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                                  ),
                                 ),
-                              ),
-                            if (_currentMode == AppMode.edit)
-                              GestureDetector(
-                                onTap: () => showEditTabDialog(context, t, _refresh),
-                                child: const Padding(
-                                  padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                  child: Icon(Icons.edit, size: 20, color: Colors.green),
+                              if (_currentMode == AppMode.edit)
+                                GestureDetector(
+                                  onTap: () => showEditTabDialog(context, t, _refresh),
+                                  child: const Padding(
+                                    padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                    child: Icon(Icons.edit, size: 20, color: Colors.green),
+                                  ),
                                 ),
-                              ),
-                            Text(t.title),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                              Text(t.title),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-          ),
+                ),
+              ),
           body: tabs.isEmpty
               ? const Center(child: Text("タブを追加してください"))
               : TabBarView(

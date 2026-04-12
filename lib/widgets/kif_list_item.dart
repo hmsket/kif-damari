@@ -20,13 +20,14 @@ class KifListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color:Color(0XFFFFFFFF),
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-        side: const BorderSide(color: Colors.grey, width: 1),
+        borderRadius: BorderRadius.circular(12),
+        // side: const BorderSide(color: Colors.grey, width: 1),
       ),
-      margin: const EdgeInsets.all(1),
+      margin: EdgeInsets.fromLTRB(12, 4, 12, 2),
       child: InkWell(
         onTap: () {
           if (mode == AppMode.delete) {

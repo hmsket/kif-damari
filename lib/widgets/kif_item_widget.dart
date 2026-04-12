@@ -23,7 +23,7 @@ class KifItemWidget extends StatelessWidget {
             SizedBox(
               width: 120, height: 120,
               child: Padding(
-                padding: const EdgeInsets.all(5.0),
+                padding: const EdgeInsets.all(8.0),
                 child: Image.asset('assets/images/initial.png', fit: BoxFit.contain),
               ),
             ),
