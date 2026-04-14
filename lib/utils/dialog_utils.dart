@@ -117,7 +117,7 @@ void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
   final tabs = await TabDao().getAllTabs();
   
   int selectedTabId = tabs.isNotEmpty ? tabs.first.id! : -1;
-  int selectedColor = 0xFF8FBC8F;
+  int selectedColor = 0XFFFFFFFF;
   String? kfilePath;
   String fileNameDisplay = "未選択";
 
@@ -195,12 +195,54 @@ void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
                           DropdownButton<int>(
                             value: selectedColor,
                             isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 0xFF8FBC8F, child: Text("緑")),
-                              DropdownMenuItem(value: 0xFFBC8F8F, child: Text("茶")),
-                            ],
-                            onChanged: (value) => setDialogState(() => selectedColor = value!),
-                          ),
+                            padding: EdgeInsets.zero, 
+                            underline: Container(), 
+                            items: [
+                              {'value': 0xFFFFFFFF, 'name': 'white'},
+                              {'value': 0xFFF7D6D3, 'name': 'red'},
+                              {'value': 0xFFFFE6C7, 'name': 'orange'},
+                              {'value': 0xFFFFF6CC, 'name': 'yellow'},
+                              {'value': 0xFFE6F5D6, 'name': 'green'},
+                              {'value': 0xFFDFF5EE, 'name': 'teal'},
+                              {'value': 0xFFE3F1F8, 'name': 'blue'},
+                              {'value': 0xFFE0E9FB, 'name': 'dark_blue'},
+                              {'value': 0xFFE9DDF8, 'name': 'violet'},
+                              {'value': 0xFFF9DDEA, 'name': 'pink'},
+                              {'value': 0xFFEEE4D6, 'name': 'brown'},
+                              {'value': 0xFFEFF1F4, 'name': 'gray'},
+                            ].map((data) {
+                              final int colorValue = data['value'] as int;
+                              final String colorName = data['name'] as String;
+                              return DropdownMenuItem<int>(
+                                value: colorValue,
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return Container(
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      color: Color(colorValue),
+                                      alignment: Alignment.centerLeft,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Text(
+                                        colorName,
+                                        style: TextStyle(
+                                          color: colorValue == 0xFFFFFFFF ? Colors.black : Colors.black87,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (int? value) {
+                              if (value != null) {
+                                setDialogState(() {
+                                  selectedColor = value;
+                                });
+                              }
+                            },
+                          )
                         ],
                       ),
                     ),
@@ -335,11 +377,25 @@ Future<void> showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback
                           DropdownButton<int>(
                             value: selectedColor,
                             isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 0xFF8FBC8F, child: Text("緑")),
-                              DropdownMenuItem(value: 0xFFBC8F8F, child: Text("茶")),
+                            items: [
+                              DropdownMenuItem<int>(value: 0xFFFFFFFF, child: Text("white")),
+                              DropdownMenuItem<int>(value: 0xFFF7D6D3, child: Text("red")),
+                              DropdownMenuItem<int>(value: 0xFFFFE6C7, child: Text("orange")),
+                              DropdownMenuItem<int>(value: 0xFFFFF6CC, child: Text("yellow")),
+                              DropdownMenuItem<int>(value: 0xFFE6F5D6, child: Text("green")),
+                              DropdownMenuItem<int>(value: 0xFFDFF5EE, child: Text("teal")),
+                              DropdownMenuItem<int>(value: 0xFFE3F1F8, child: Text("blue")),
+                              DropdownMenuItem<int>(value: 0xFFE0E9FB, child: Text("dark_blue")),
+                              DropdownMenuItem<int>(value: 0xFFE9DDF8, child: Text("violet")),
+                              DropdownMenuItem<int>(value: 0xFFF9DDEA, child: Text("pink")),
+                              DropdownMenuItem<int>(value: 0xFFEEE4D6, child: Text("brown")),
+                              DropdownMenuItem<int>(value: 0xFFEFF1F4, child: Text("gray")),
                             ],
-                            onChanged: (value) => setDialogState(() => selectedColor = value!),
+                            onChanged: (int? value) {
+                              if (value != null) {
+                                setDialogState(() => selectedColor = value);
+                              }
+                            },
                           ),
                         ],
                       ),
