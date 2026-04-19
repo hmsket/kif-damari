@@ -183,6 +183,58 @@ class _KifViewerPageState extends State<KifViewerPage> {
               // 盤面反転フラグなどの管理をここでする予定
             },
           ),
+          PopupMenuButton<String>(
+            // 1. アイコンの設定
+            icon: const Icon(Icons.more_vert),
+            
+            // 2. 表示位置の調整（ボタンの「上」に出るようにマイナスの値を指定）
+            // 項目数に合わせて数値を調整してください（例: 3項目なら -160 くらい）
+            offset: const Offset(0, -160), 
+            
+            // 3. メニューの外観（プルダウンらしい装飾）
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 8,
+            
+            onSelected: (String value) {
+              // タップされた時の処理
+              switch (value) {
+                case 'reverse': /* 反転処理 */ break;
+                case 'copy':    /* コピー処理 */ break;
+                case 'share':   /* 共有処理 */ break;
+              }
+            },
+            
+            // 4. リストの中身（ずらっと並べる項目）
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(
+                value: 'reverse',
+                child: ListTile(
+                  leading: Icon(Icons.cached, size: 20),
+                  title: Text('盤面を反転'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'copy',
+                child: ListTile(
+                  leading: Icon(Icons.copy, size: 20),
+                  title: Text('棋譜をコピー'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'share',
+                child: ListTile(
+                  leading: Icon(Icons.share, size: 20),
+                  title: Text('棋譜を共有'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          )
         ],
       ),
     );
