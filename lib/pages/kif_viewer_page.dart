@@ -86,7 +86,26 @@ class _KifViewerPageState extends State<KifViewerPage> {
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: AspectRatio(
                 aspectRatio: 0.93,
-                child: KifBoard(state: kifTree!.currentNode.state),
+                child: GestureDetector(
+                  // 盤面がタップされた時の処理
+                  onTapUp: (details) {
+                    // RenderBoxを使って、将棋盤の中での相対的な位置を取得
+                    final box = context.findRenderObject() as RenderBox?;
+                    if (box == null) return;
+                    
+                    final localPos = details.localPosition;
+                    final halfWidth = box.size.width / 2;
+
+                    setState(() {
+                      if (localPos.dx > halfWidth) {
+                        kifTree!.stepNext(); // 右側なら進む
+                      } else {
+                        kifTree!.stepBack(); // 左側なら戻る
+                      }
+                    });
+                  },
+                  child: KifBoard(state: kifTree!.currentNode.state),
+                ),
               ),
             ),
 
