@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 触覚フィードバック用
 import 'package:charset_converter/charset_converter.dart';
-import 'package:kifdamari/logic/kif_parser.dart'; // パスを確認
+import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 
@@ -15,8 +16,11 @@ class KifViewerPage extends StatefulWidget {
 }
 
 class _KifViewerPageState extends State<KifViewerPage> {
-  KifTree? kifTree; // ロード完了までnullを許容
+  KifTree? kifTree;
   bool _isLoading = true;
+  bool _isSeeking = false; // 長押しシーク中フラグ
+  double _dragStartX = 0.0; // ドラッグ開始時の指の位置
+  int _dragStartMoveNumber = 0; // ドラッグ開始時の手数
 
   @override
   void initState() {
@@ -24,9 +28,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
     _initKifData();
   }
 
-/// ファイルの読み込みと解析
+  /// ファイルの読み込みと解析
   Future<void> _initKifData() async {
-    // パスがない場合は初期盤面を表示
     if (widget.kifPath == null) {
       setState(() {
         kifTree = KifTree.initial();
@@ -38,13 +41,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
     try {
       final file = File(widget.kifPath!);
       if (await file.exists()) {
-        // 1. バイナリとして読み込む
         final bytes = await file.readAsBytes();
-        
-        // 2. Shift_JIS(CP932)でデコード（charset_converterパッケージを使用）
         final content = await CharsetConverter.decode("Shift_JIS", bytes);
-
-        // 3. パーサーで解析してツリーを生成
         final tree = KifParser.decode(content);
 
         setState(() {
@@ -56,7 +54,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
       }
     } catch (e) {
       debugPrint("KIF解析エラー: $e");
-      // エラー時は初期盤面を表示してユーザーに知らせる
       setState(() {
         kifTree = KifTree.initial();
         _isLoading = false;
@@ -66,7 +63,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
   @override
   Widget build(BuildContext context) {
-    // ロード中はインジケーターを表示（late初期化エラー防止）
     if (_isLoading || kifTree == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -81,30 +77,60 @@ class _KifViewerPageState extends State<KifViewerPage> {
             // --- 後手エリア ---
             _buildPlayerAndKomaDai(playerName: "後手", isSente: false),
 
-            // --- 将棋盤エリア ---
+            // --- 将棋盤エリア（Stackでシークバーを重ねる） ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: AspectRatio(
                 aspectRatio: 0.93,
-                child: GestureDetector(
-                  // 盤面がタップされた時の処理
-                  onTapUp: (details) {
-                    // RenderBoxを使って、将棋盤の中での相対的な位置を取得
-                    final box = context.findRenderObject() as RenderBox?;
-                    if (box == null) return;
-                    
-                    final localPos = details.localPosition;
-                    final halfWidth = box.size.width / 2;
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    GestureDetector(
+                      onLongPressStart: (details) {
+                        HapticFeedback.mediumImpact();
+                        setState(() {
+                          _isSeeking = true;
+                          // 1. 開始時の指の位置と現在の手数を記録
+                          _dragStartX = details.localPosition.dx;
+                          _dragStartMoveNumber = kifTree!.currentNode.moveNumber;
+                        });
+                      },
+                      onLongPressMoveUpdate: (details) {
+                        // 2. 指がどれくらい動いたか（距離）を計算
+                        double deltaX = details.localPosition.dx - _dragStartX;
+                        
+                        // 3. 感度の調整（例：10ピクセル動くごとに1手進む）
+                        int sensitivity = 3; 
+                        int moveOffset = (deltaX / sensitivity).toInt();
+                        
+                        // 4. 開始時の手数にオフセットを足してジャンプ
+                        setState(() {
+                          kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
+                        });
+                      },
+                      // 指を離すと非表示
+                      onLongPressEnd: (_) => setState(() => _isSeeking = false),
+                      onTapUp: (details) {
+                        if (_isSeeking) return; // シーク中はタップ無効
 
-                    setState(() {
-                      if (localPos.dx > halfWidth) {
-                        kifTree!.stepNext(); // 右側なら進む
-                      } else {
-                        kifTree!.stepBack(); // 左側なら戻る
-                      }
-                    });
-                  },
-                  child: KifBoard(state: kifTree!.currentNode.state),
+                        final box = context.findRenderObject() as RenderBox?;
+                        if (box == null) return;
+                        final halfWidth = box.size.width / 2;
+
+                        setState(() {
+                          if (details.localPosition.dx > halfWidth) {
+                            kifTree!.stepNext();
+                          } else {
+                            kifTree!.stepBack();
+                          }
+                        });
+                      },
+                      child: KifBoard(state: kifTree!.currentNode.state),
+                    ),
+
+                    // 長押し中だけ表示されるフローティングシークバー
+                    if (_isSeeking) _buildFloatingSeekBar(),
+                  ],
                 ),
               ),
             ),
@@ -140,6 +166,62 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
+/// 長押し時に出現するシークバー（白透過デザイン）
+  Widget _buildFloatingSeekBar() {
+    final int total = kifTree!.totalMoveCount;
+    final int current = kifTree!.currentNode.moveNumber;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      width: MediaQuery.of(context).size.width * 0.85,
+      decoration: BoxDecoration(
+        // ★ ここを白の透過に変更（0.3〜0.5くらいがお好み）
+        color: Colors.white.withOpacity(0.4), 
+        borderRadius: BorderRadius.circular(40),
+        // 少し影をつけると、白い盤面の上でも境界がはっきりします
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 2,
+          )
+        ],
+        // 枠線を少し入れるとさらに高級感が出ます
+        border: Border.all(color: Colors.white.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          // ★ 文字色を黒系に
+          Text(
+            "$current", 
+            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)
+          ),
+          Expanded(
+            child: Slider(
+              value: current.toDouble().clamp(0, total.toDouble()),
+              min: 0,
+              max: total.toDouble(),
+              activeColor: Colors.orange[700], // スライダーの色を少し濃いめに
+              inactiveColor: Colors.black12,   // 背景スライダーは薄い黒
+              onChanged: (value) {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  kifTree!.jumpTo(value.toInt());
+                });
+              },
+            ),
+          ),
+          // ★ 文字色を黒系に
+          Text(
+            "$total", 
+            style: const TextStyle(color: Colors.black54, fontSize: 12)
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildControlPanel() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -149,62 +231,36 @@ class _KifViewerPageState extends State<KifViewerPage> {
         children: [
           IconButton(
             icon: const Icon(Icons.first_page),
-            onPressed: () => setState(() {
-              while (kifTree!.currentNode.parent != null) {
-                kifTree!.stepBack();
-              }
-            }),
+            onPressed: () => setState(() => kifTree!.jumpTo(0)),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_left),
             iconSize: 36,
-            onPressed: () => setState(() {
-              kifTree!.stepBack();
-            }),
+            onPressed: () => setState(() => kifTree!.stepBack()),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right),
             iconSize: 36,
-            onPressed: () => setState(() {
-              kifTree!.stepNext();
-            }),
+            onPressed: () => setState(() => kifTree!.stepNext()),
           ),
           IconButton(
             icon: const Icon(Icons.last_page),
-            onPressed: () => setState(() {
-              while (kifTree!.currentNode.nextNodes.isNotEmpty) {
-                kifTree!.stepNext();
-              }
-            }),
+            onPressed: () => setState(() => kifTree!.jumpTo(kifTree!.totalMoveCount)),
           ),
           IconButton(
             icon: const Icon(Icons.cached),
             onPressed: () {
-              // 盤面反転フラグなどの管理をここでする予定
+              // 盤面反転フラグの実装箇所
             },
           ),
           PopupMenuButton<String>(
-            // 1. アイコンの設定
             icon: const Icon(Icons.more_vert),
-            
-            // 2. 表示位置の調整（ボタンの「上」に出るようにマイナスの値を指定）
-            // 項目数に合わせて数値を調整してください（例: 3項目なら -160 くらい）
-            offset: const Offset(0, -160), 
-            
-            // 3. メニューの外観（プルダウンらしい装飾）
+            offset: const Offset(0, -160),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 8,
-            
             onSelected: (String value) {
-              // タップされた時の処理
-              switch (value) {
-                case 'reverse': /* 反転処理 */ break;
-                case 'copy':    /* コピー処理 */ break;
-                case 'share':   /* 共有処理 */ break;
-              }
+              // 共有やコピーのロジックをここに書く
             },
-            
-            // 4. リストの中身（ずらっと並べる項目）
             itemBuilder: (BuildContext context) => [
               const PopupMenuItem(
                 value: 'reverse',
@@ -242,7 +298,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
   Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente}) {
     return Container(
-      // 駒が大きくなるので、高さを少し広げる（例: 50〜60px程度）
       constraints: const BoxConstraints(minHeight: 56),
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: Row(
@@ -251,7 +306,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
             _buildNameLabel(playerName, isSente),
             const SizedBox(width: 8),
           ],
-          // 駒台を Expanded で広げる
           Expanded(child: _buildPieceStand(isSente)),
           if (isSente) ...[
             const SizedBox(width: 8),
@@ -275,23 +329,21 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
     return Wrap(
       alignment: isSente ? WrapAlignment.start : WrapAlignment.end,
-      spacing: 1.0, 
+      spacing: 1.0,
       runSpacing: 1.0,
       children: hand.entries.where((e) => e.value > 0).map((entry) {
         return Stack(
           alignment: Alignment.bottomRight,
           children: [
-            // 駒の画像（22 * 1.4 ≒ 31）
             Image.asset(
               'assets/images/pieces/$assetPrefix${entry.key}.png',
               width: 31,
               height: 31,
               fit: BoxFit.contain,
             ),
-            // 枚数バッジ
             if (entry.value > 1)
               Positioned(
-                right: -2, // 少し外側に出すと駒が見えやすくなります
+                right: -2,
                 bottom: -2,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
