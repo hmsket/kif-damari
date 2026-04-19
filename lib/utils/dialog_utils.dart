@@ -192,56 +192,55 @@ void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
                             ],
                           ),
                           _buildLabel('色'),
-                          DropdownButton<int>(
-                            value: selectedColor,
-                            isExpanded: true,
-                            padding: EdgeInsets.zero, 
-                            underline: Container(), 
-                            items: [
-                              {'value': 0xFFFFFFFF, 'name': 'white'},
-                              {'value': 0xFFF7D6D3, 'name': 'red'},
-                              {'value': 0xFFFFE6C7, 'name': 'orange'},
-                              {'value': 0xFFFFF6CC, 'name': 'yellow'},
-                              {'value': 0xFFE6F5D6, 'name': 'green'},
-                              {'value': 0xFFDFF5EE, 'name': 'teal'},
-                              {'value': 0xFFE3F1F8, 'name': 'blue'},
-                              {'value': 0xFFE0E9FB, 'name': 'dark_blue'},
-                              {'value': 0xFFE9DDF8, 'name': 'violet'},
-                              {'value': 0xFFF9DDEA, 'name': 'pink'},
-                              {'value': 0xFFEEE4D6, 'name': 'brown'},
-                              {'value': 0xFFEFF1F4, 'name': 'gray'},
-                            ].map((data) {
-                              final int colorValue = data['value'] as int;
-                              final String colorName = data['name'] as String;
-                              return DropdownMenuItem<int>(
-                                value: colorValue,
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    return Container(
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                      color: Color(colorValue),
-                                      alignment: Alignment.centerLeft,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: Text(
-                                        colorName,
-                                        style: TextStyle(
-                                          color: colorValue == 0xFFFFFFFF ? Colors.black : Colors.black87,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (int? value) {
+                          DropdownMenu<int>(
+                            menuHeight: 300,
+                            menuStyle: MenuStyle(
+                              padding: WidgetStateProperty.all(EdgeInsets.zero),
+                            ),
+                            initialSelection: selectedColor,
+                            // 横幅を親いっぱいに広げたい場合はここを調整
+                            width: MediaQuery.of(context).size.width * 0.8, 
+                            label: const Text("Select Color"),
+                            // 入力欄の見た目設定
+                            inputDecorationTheme: const InputDecorationTheme(
+                              filled: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                              border: UnderlineInputBorder(),
+                            ),
+                            onSelected: (int? value) {
                               if (value != null) {
                                 setDialogState(() {
                                   selectedColor = value;
                                 });
                               }
                             },
+                            dropdownMenuEntries: [
+                              {'value': 0xFFFFFFFF, 'label': 'white'},
+                              {'value': 0xFFF7D6D3, 'label': 'red'},
+                              {'value': 0xFFFFE6C7, 'label': 'orange'},
+                              {'value': 0xFFFFF6CC, 'label': 'yellow'},
+                              {'value': 0xFFE6F5D6, 'label': 'green'},
+                              {'value': 0xFFDFF5EE, 'label': 'teal'},
+                              {'value': 0xFFE3F1F8, 'label': 'blue'},
+                              {'value': 0xFFE0E9FB, 'label': 'dark_blue'},
+                              {'value': 0xFFE9DDF8, 'label': 'violet'},
+                              {'value': 0xFFF9DDEA, 'label': 'pink'},
+                              {'value': 0xFFEEE4D6, 'label': 'brown'},
+                              {'value': 0xFFEFF1F4, 'label': 'gray'},
+                            ].map((data) {
+                              final int colorValue = data['value'] as int;
+                              final String colorLabel = data['label'] as String;
+
+                              return DropdownMenuEntry<int>(
+                                value: colorValue,
+                                label: colorLabel,
+                                // 💡 メニュー内の各アイテムの背景色と文字色を設定
+                                style: MenuItemButton.styleFrom(
+                                  backgroundColor: Color(colorValue),
+                                  foregroundColor: colorValue == 0xFFFFFFFF ? Colors.black : Colors.black87,
+                                ),
+                              );
+                            }).toList(),
                           )
                         ],
                       ),
