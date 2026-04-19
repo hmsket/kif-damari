@@ -18,8 +18,8 @@ class KifViewerPage extends StatefulWidget {
 class _KifViewerPageState extends State<KifViewerPage> {
   KifTree? kifTree;
   bool _isLoading = true;
-  bool _isSeeking = false; // 長押しシーク中フラグ
-  double _dragStartX = 0.0; // ドラッグ開始時の指の位置
+  bool _isSeeking = false; // シークバー表示フラグ
+  double _dragStartX = 0.0; // ドラッグ開始位置
   int _dragStartMoveNumber = 0; // ドラッグ開始時の手数
 
   @override
@@ -71,151 +71,144 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
     return Scaffold(
       backgroundColor: Colors.orange[50],
-      body: SafeArea(
-        child: Column(
-          children: [
-            // --- 後手エリア ---
-            _buildPlayerAndKomaDai(playerName: "後手", isSente: false),
+      // 1. 画面全体でジェスチャーを検知する
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent, // 背後のボタン操作などを邪魔しない
+        onLongPressStart: (details) {
+          HapticFeedback.mediumImpact(); // 起動時に軽く振動
+          setState(() {
+            _isSeeking = true;
+            _dragStartX = details.localPosition.dx;
+            _dragStartMoveNumber = kifTree!.currentNode.moveNumber;
+          });
+        },
+        onLongPressMoveUpdate: (details) {
+          if (!_isSeeking) return;
+          // スライド距離を計算
+          double deltaX = details.localPosition.dx - _dragStartX;
+          // 感度調整：ピクセルで1手（お好みで調整してください）
+          int sensitivity = 3; 
+          int moveOffset = (deltaX / sensitivity).toInt();
+          
+          setState(() {
+            kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
+          });
+        },
+        onLongPressEnd: (_) => setState(() => _isSeeking = false),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // --- 後手エリア ---
+              _buildPlayerAndKomaDai(playerName: "後手", isSente: false),
 
-            // --- 将棋盤エリア（Stackでシークバーを重ねる） ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: AspectRatio(
-                aspectRatio: 0.93,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    GestureDetector(
-                      onLongPressStart: (details) {
-                        HapticFeedback.mediumImpact();
-                        setState(() {
-                          _isSeeking = true;
-                          // 1. 開始時の指の位置と現在の手数を記録
-                          _dragStartX = details.localPosition.dx;
-                          _dragStartMoveNumber = kifTree!.currentNode.moveNumber;
-                        });
-                      },
-                      onLongPressMoveUpdate: (details) {
-                        // 2. 指がどれくらい動いたか（距離）を計算
-                        double deltaX = details.localPosition.dx - _dragStartX;
-                        
-                        // 3. 感度の調整（例：10ピクセル動くごとに1手進む）
-                        int sensitivity = 3; 
-                        int moveOffset = (deltaX / sensitivity).toInt();
-                        
-                        // 4. 開始時の手数にオフセットを足してジャンプ
-                        setState(() {
-                          kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
-                        });
-                      },
-                      // 指を離すと非表示
-                      onLongPressEnd: (_) => setState(() => _isSeeking = false),
-                      onTapUp: (details) {
-                        if (_isSeeking) return; // シーク中はタップ無効
+              // --- 将棋盤エリア ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: AspectRatio(
+                  aspectRatio: 0.93,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      GestureDetector(
+                        // 盤面部分のタップ（1手ずつ進む/戻る）
+                        onTapUp: (details) {
+                          if (_isSeeking) return; // シーク中はタップ無効
+                          final box = context.findRenderObject() as RenderBox?;
+                          if (box == null) return;
+                          final halfWidth = box.size.width / 2;
+                          setState(() {
+                            if (details.localPosition.dx > halfWidth) {
+                              kifTree!.stepNext();
+                            } else {
+                              kifTree!.stepBack();
+                            }
+                          });
+                        },
+                        child: KifBoard(state: kifTree!.currentNode.state),
+                      ),
 
-                        final box = context.findRenderObject() as RenderBox?;
-                        if (box == null) return;
-                        final halfWidth = box.size.width / 2;
-
-                        setState(() {
-                          if (details.localPosition.dx > halfWidth) {
-                            kifTree!.stepNext();
-                          } else {
-                            kifTree!.stepBack();
-                          }
-                        });
-                      },
-                      child: KifBoard(state: kifTree!.currentNode.state),
-                    ),
-
-                    // 長押し中だけ表示されるフローティングシークバー
-                    if (_isSeeking) _buildFloatingSeekBar(),
-                  ],
-                ),
-              ),
-            ),
-
-            // --- 先手エリア ---
-            _buildPlayerAndKomaDai(playerName: "先手", isSente: true),
-
-            // --- 棋譜コメントエリア ---
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.brown[200]!),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    "【${kifTree!.currentNode.moveNumber}手目】 ${kifTree!.currentNode.moveLabel ?? '開始局面'}\n\n${kifTree!.currentNode.comment}",
-                    style: const TextStyle(fontSize: 14, height: 1.5),
+                      // 長押し中だけ「ぽわっと」浮かび上がる白透過シークバー
+                      if (_isSeeking) _buildFloatingSeekBar(),
+                    ],
                   ),
                 ),
               ),
-            ),
 
-            // --- 操作パネル ---
-            _buildControlPanel(),
-          ],
+              // --- 先手エリア ---
+              _buildPlayerAndKomaDai(playerName: "先手", isSente: true),
+
+              // --- 棋譜コメントエリア ---
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.brown[200]!),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      "【${kifTree!.currentNode.moveNumber}手目】 ${kifTree!.currentNode.moveLabel ?? '開始局面'}\n\n${kifTree!.currentNode.comment}",
+                      style: const TextStyle(fontSize: 14, height: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+
+              // --- 操作パネル ---
+              _buildControlPanel(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-/// 長押し時に出現するシークバー（白透過デザイン）
+  /// 長押し時に出現する白透過シークバー
   Widget _buildFloatingSeekBar() {
     final int total = kifTree!.totalMoveCount;
     final int current = kifTree!.currentNode.moveNumber;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       width: MediaQuery.of(context).size.width * 0.85,
       decoration: BoxDecoration(
-        // ★ ここを白の透過に変更（0.3〜0.5くらいがお好み）
-        color: Colors.white.withOpacity(0.4), 
+        color: Colors.white.withOpacity(0.4), // 白透過
         borderRadius: BorderRadius.circular(40),
-        // 少し影をつけると、白い盤面の上でも境界がはっきりします
+        border: Border.all(color: Colors.white.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             spreadRadius: 2,
           )
         ],
-        // 枠線を少し入れるとさらに高級感が出ます
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
       ),
       child: Row(
         children: [
-          // ★ 文字色を黒系に
           Text(
-            "$current", 
-            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)
+            "$current",
+            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
           ),
           Expanded(
             child: Slider(
               value: current.toDouble().clamp(0, total.toDouble()),
               min: 0,
               max: total.toDouble(),
-              activeColor: Colors.orange[700], // スライダーの色を少し濃いめに
-              inactiveColor: Colors.black12,   // 背景スライダーは薄い黒
-              onChanged: (value) {
-                HapticFeedback.selectionClick();
-                setState(() {
-                  kifTree!.jumpTo(value.toInt());
-                });
+              activeColor: Colors.orange[700], // これでオレンジが復活します
+              inactiveColor: Colors.black12,
+              // onChanged を null ではなく {} にする
+              onChanged: (_) {
+                // ここでは何もしない（画面全体のドラッグで jumpTo しているため）
               },
             ),
           ),
-          // ★ 文字色を黒系に
           Text(
-            "$total", 
-            style: const TextStyle(color: Colors.black54, fontSize: 12)
+            "$total",
+            style: const TextStyle(color: Colors.black54, fontSize: 12),
           ),
         ],
       ),
