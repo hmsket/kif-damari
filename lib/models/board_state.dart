@@ -6,6 +6,8 @@ class BoardState {
   final Map<String, int> goteHand;
   final Player nextPlayer;
 
+  final int? lastMoveFromX;
+  final int? lastMoveFromY;
   final int? lastMoveToX;
   final int? lastMoveToY;
 
@@ -14,6 +16,8 @@ class BoardState {
     required this.senteHand,
     required this.goteHand,
     required this.nextPlayer,
+    this.lastMoveFromX,
+    this.lastMoveFromY,
     this.lastMoveToX,
     this.lastMoveToY,
   });
@@ -105,6 +109,8 @@ class BoardState {
       senteHand: newSenteHand,
       goteHand: newGoteHand,
       nextPlayer: nextPlayer == Player.sente ? Player.gote : Player.sente,
+      lastMoveFromX: fromX,
+      lastMoveFromY: fromY,
       lastMoveToX: toX,
       lastMoveToY: toY,
     );

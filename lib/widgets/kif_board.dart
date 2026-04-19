@@ -52,13 +52,59 @@ class KifBoard extends StatelessWidget {
 
         return Stack(
           children: [
+            // 1. 盤面画像（最背面）
             Positioned.fill(
               child: Image.asset('assets/images/board.png', fit: BoxFit.fill),
             ),
+
+            // 2. ハイライトレイヤー（中間）
+            if (state.lastMoveFromX != null && state.lastMoveFromY != null)
+              _buildHighlight(
+                x: 9 - state.lastMoveFromX!, // 座標変換
+                y: state.lastMoveFromY! - 1,
+                color: Colors.red.withOpacity(0.2), // 移動元は薄く
+                cellSizeW: cellSizeW,
+                cellSizeH: cellSizeH,
+                offsetX: offsetX,
+                offsetY: offsetY,
+              ),
+            if (state.lastMoveToX != null && state.lastMoveToY != null)
+              _buildHighlight(
+                x: 9 - state.lastMoveToX!, // 座標変換
+                y: state.lastMoveToY! - 1,
+                color: Colors.red.withOpacity(0.4), // 移動先は濃く
+                cellSizeW: cellSizeW,
+                cellSizeH: cellSizeH,
+                offsetX: offsetX,
+                offsetY: offsetY,
+              ),
+
+            // 3. 駒レイヤー（最前面）
             ...pieces,
           ],
         );
+
       },
+    );
+  }
+
+  Widget _buildHighlight({
+    required int x, required int y, required Color color,
+    required double cellSizeW, required double cellSizeH,
+    required double offsetX, required double offsetY,
+  }) {
+    return Positioned(
+      left: offsetX + x * cellSizeW,
+      top: offsetY + y * cellSizeH,
+      width: cellSizeW,
+      height: cellSizeH,
+      child: Container(
+        margin: const EdgeInsets.all(1.0),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
     );
   }
 }
