@@ -16,6 +16,7 @@ dependencies:
   google_fonts: ^6.2.1
   charset_converter: ^2.3.0
   share_plus: ^12.0.2
+  flutter_launcher_icons: ^0.13.1
 
 dev_dependencies:
   flutter_test:
@@ -28,3 +29,11 @@ flutter:
     - assets/images/board.png
     - assets/images/initial.png
     - assets/images/pieces/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/icon.png" # 用意した画像のパス
+  # # Android用のアダプティブアイコンを設定する場合（推奨）
+  # adaptive_icon_background: "#FFFFFF" # 背景色または画像
+  # adaptive_icon_foreground: "assets/images/icon_foreground.png" # 前景（駒など）
