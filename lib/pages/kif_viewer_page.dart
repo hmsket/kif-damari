@@ -1,15 +1,20 @@
 import 'dart:io';
+import 'dart:ui' as ui; // 追加
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 触覚フィードバック用
+import 'package:flutter/services.dart'; 
 import 'package:charset_converter/charset_converter.dart';
+import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
+import 'package:kifdamari/database/entity/kif_entity.dart'; // 追加
+import 'package:kifdamari/logic/diagram_generator.dart'; // 追加
+import 'package:kifdamari/logic/thumbnail_manager.dart'; // 追加
 
 class KifViewerPage extends StatefulWidget {
-  final String? kifPath;
+  final KifEntity kifEntity; // String? kifPath から変更
 
-  const KifViewerPage({super.key, required this.kifPath});
+  const KifViewerPage({super.key, required this.kifEntity});
 
   @override
   State<KifViewerPage> createState() => _KifViewerPageState();
@@ -18,9 +23,9 @@ class KifViewerPage extends StatefulWidget {
 class _KifViewerPageState extends State<KifViewerPage> {
   KifTree? kifTree;
   bool _isLoading = true;
-  bool _isSeeking = false; // シークバー表示フラグ
-  double _dragStartX = 0.0; // ドラッグ開始位置
-  int _dragStartMoveNumber = 0; // ドラッグ開始時の手数
+  bool _isSeeking = false; 
+  double _dragStartX = 0.0; 
+  int _dragStartMoveNumber = 0; 
 
   @override
   void initState() {
@@ -28,9 +33,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
     _initKifData();
   }
 
-  /// ファイルの読み込みと解析
   Future<void> _initKifData() async {
-    if (widget.kifPath == null) {
+    final String? path = widget.kifEntity.kifPath; // 変更
+    if (path == null) {
       setState(() {
         kifTree = KifTree.initial();
         _isLoading = false;
@@ -39,7 +44,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
     }
 
     try {
-      final file = File(widget.kifPath!);
+      final file = File(path); // 変更
       if (await file.exists()) {
         final bytes = await file.readAsBytes();
         final content = await CharsetConverter.decode("Shift_JIS", bytes);
@@ -61,6 +66,62 @@ class _KifViewerPageState extends State<KifViewerPage> {
     }
   }
 
+  // サムネイル生成とDB更新の実体メソッド
+  Future<void> _handleMakeThumbnail() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('サムネイル画像を生成中...'), duration: Duration(seconds: 1)),
+    );
+
+    try {
+      // 1. Canvasで画像を生成
+      // lib/pages/kif_viewer_page.dart 内の _handleMakeThumbnail
+      final uiImage = await DiagramGenerator.generate(
+        kifTree!.currentNode.state,
+      );
+
+      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
+      
+      if (byteData != null) {
+        final Uint8List pngBytes = byteData.buffer.asUint8List();
+        
+        // 2. ThumbnailManagerを使用して物理ファイルを保存
+        final savedPath = await ThumbnailManager.saveThumbnail(
+          widget.kifEntity.tabId, 
+          widget.kifEntity.kifId, 
+          pngBytes
+        );
+
+        // 3. KifEntityのimgPathを更新した新しいインスタンスを作成
+        // KifEntityにcopyWithがない場合は、全ての引数を渡して再生成します
+        final updatedKif = KifEntity(
+          id: widget.kifEntity.id,
+          tabId: widget.kifEntity.tabId,
+          kifId: widget.kifEntity.kifId,
+          title: widget.kifEntity.title,
+          detail: widget.kifEntity.detail,
+          kifOrder: widget.kifEntity.kifOrder,
+          kifPath: widget.kifEntity.kifPath,
+          imgPath: savedPath, // ここに新しいパスをセット
+          color: widget.kifEntity.color,
+        );
+
+        // 4. KifDaoを使用してデータベースを更新
+        await KifDao().updateKif(updatedKif);
+
+        debugPrint("DB更新完了: $savedPath");
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('サムネイルを更新しました')),
+        );
+      }
+    } catch (e) {
+      debugPrint("図面生成エラー: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('画像の生成に失敗しました')),
+      );
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     if (_isLoading || kifTree == null) {
@@ -71,11 +132,10 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
     return Scaffold(
       backgroundColor: Colors.orange[50],
-      // 1. 画面全体でジェスチャーを検知する
       body: GestureDetector(
-        behavior: HitTestBehavior.translucent, // 背後のボタン操作などを邪魔しない
+        behavior: HitTestBehavior.translucent,
         onLongPressStart: (details) {
-          HapticFeedback.mediumImpact(); // 起動時に軽く振動
+          HapticFeedback.mediumImpact(); 
           setState(() {
             _isSeeking = true;
             _dragStartX = details.localPosition.dx;
@@ -84,9 +144,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
         },
         onLongPressMoveUpdate: (details) {
           if (!_isSeeking) return;
-          // スライド距離を計算
           double deltaX = details.localPosition.dx - _dragStartX;
-          // 感度調整：ピクセルで1手（お好みで調整してください）
           int sensitivity = 3; 
           int moveOffset = (deltaX / sensitivity).toInt();
           
@@ -98,10 +156,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
         child: SafeArea(
           child: Column(
             children: [
-              // --- 後手エリア ---
               _buildPlayerAndKomaDai(playerName: "後手", isSente: false),
-
-              // --- 将棋盤エリア ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: AspectRatio(
@@ -110,9 +165,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
                     alignment: Alignment.bottomCenter,
                     children: [
                       GestureDetector(
-                        // 盤面部分のタップ（1手ずつ進む/戻る）
                         onTapUp: (details) {
-                          if (_isSeeking) return; // シーク中はタップ無効
+                          if (_isSeeking) return;
                           final box = context.findRenderObject() as RenderBox?;
                           if (box == null) return;
                           final halfWidth = box.size.width / 2;
@@ -126,18 +180,12 @@ class _KifViewerPageState extends State<KifViewerPage> {
                         },
                         child: KifBoard(state: kifTree!.currentNode.state),
                       ),
-
-                      // 長押し中だけ「ぽわっと」浮かび上がる白透過シークバー
                       if (_isSeeking) _buildFloatingSeekBar(),
                     ],
                   ),
                 ),
               ),
-
-              // --- 先手エリア ---
               _buildPlayerAndKomaDai(playerName: "先手", isSente: true),
-
-              // --- 棋譜コメントエリア ---
               Expanded(
                 child: Container(
                   width: double.infinity,
@@ -156,8 +204,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                   ),
                 ),
               ),
-
-              // --- 操作パネル ---
               _buildControlPanel(),
             ],
           ),
@@ -166,7 +212,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
-  /// 長押し時に出現する白透過シークバー
   Widget _buildFloatingSeekBar() {
     final int total = kifTree!.totalMoveCount;
     final int current = kifTree!.currentNode.moveNumber;
@@ -176,7 +221,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       width: MediaQuery.of(context).size.width * 0.85,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.4), // 白透過
+        color: Colors.white.withOpacity(0.4),
         borderRadius: BorderRadius.circular(40),
         border: Border.all(color: Colors.white.withOpacity(0.5)),
         boxShadow: [
@@ -198,12 +243,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
               value: current.toDouble().clamp(0, total.toDouble()),
               min: 0,
               max: total.toDouble(),
-              activeColor: Colors.orange[700], // これでオレンジが復活します
+              activeColor: Colors.orange[700],
               inactiveColor: Colors.black12,
-              // onChanged を null ではなく {} にする
-              onChanged: (_) {
-                // ここでは何もしない（画面全体のドラッグで jumpTo しているため）
-              },
+              onChanged: (_) {},
             ),
           ),
           Text(
@@ -242,19 +284,28 @@ class _KifViewerPageState extends State<KifViewerPage> {
           ),
           IconButton(
             icon: const Icon(Icons.cached),
-            onPressed: () {
-              // 盤面反転フラグの実装箇所
-            },
+            onPressed: () {},
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            offset: const Offset(0, -160),
+            offset: const Offset(0, -220), // 変更
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 8,
             onSelected: (String value) {
-              // 共有やコピーのロジックをここに書く
+              if (value == 'make_thumbnail') { // 追加
+                _handleMakeThumbnail();
+              }
             },
             itemBuilder: (BuildContext context) => [
+              const PopupMenuItem( // 追加
+                value: 'make_thumbnail',
+                child: ListTile(
+                  leading: Icon(Icons.collections, size: 20),
+                  title: Text('サムネイルにする'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
               const PopupMenuItem(
                 value: 'reverse',
                 child: ListTile(

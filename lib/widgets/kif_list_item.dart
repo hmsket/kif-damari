@@ -17,6 +17,8 @@ class KifListItem extends StatelessWidget {
     required this.onRefresh,
   });
 
+// ... 前略 ...
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -26,7 +28,7 @@ class KifListItem extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      margin: EdgeInsets.fromLTRB(12, 4, 12, 2),
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 2),
       child: InkWell(
         onTap: () {
           if (mode == AppMode.delete) {
@@ -34,17 +36,19 @@ class KifListItem extends StatelessWidget {
           } else if (mode == AppMode.edit) {
             showEditKifDialog(context, kif, onRefresh);
           } else {
+            // ★ Navigator.push の後に .then を追加して更新を検知
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => KifViewerPage(kifPath: kif.kifPath),
+                builder: (context) => KifViewerPage(kifEntity: kif),
               ),
-            );
+            ).then((_) => onRefresh()); // 戻ってきたら一覧をリロード
           }
         },
         child: KifItemWidget(
           title: kif.title,
           detail: kif.detail,
+          imgPath: kif.imgPath, // ★ ここで画像パスを渡す（KifItemWidget側の修正も必要）
           trailing: switch (mode) {
             AppMode.delete => const Icon(Icons.cancel, color: Colors.red),
             AppMode.edit => const Icon(Icons.edit, color: Colors.green),

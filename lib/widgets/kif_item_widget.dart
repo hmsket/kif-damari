@@ -1,14 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class KifItemWidget extends StatelessWidget {
   final String title;
   final String? detail;
+  final String? imgPath;
   final Widget? trailing;
 
   const KifItemWidget({
     super.key,
     required this.title,
     this.detail,
+    this.imgPath,
     this.trailing,
   });
 
@@ -19,15 +22,13 @@ class KifItemWidget extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 画像部分
             SizedBox(
               width: 120, height: 120,
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Image.asset('assets/images/initial.png', fit: BoxFit.contain),
+                child: _buildImage(),
               ),
             ),
-            // テキスト部分
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(2, 8, 4, 8),
@@ -61,5 +62,22 @@ class KifItemWidget extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  /// 画像表示ロジック
+  Widget _buildImage() {
+    // 1. imgPath があり、かつファイルが存在する場合
+    if (imgPath != null && imgPath!.isNotEmpty) {
+      final file = File(imgPath!);
+      if (file.existsSync()) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(4), // 少し角を丸くすると馴染みます
+          child: Image.file(file, fit: BoxFit.contain),
+        );
+      }
+    }
+
+    // 2. それ以外は初期画像を表示
+    return Image.asset('assets/images/initial.png', fit: BoxFit.contain);
   }
 }
