@@ -19,6 +19,7 @@ class KifdamariApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         textTheme: GoogleFonts.notoSansJpTextTheme(),
+        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF1E88E5)),
       ),
     );
   }
@@ -167,7 +168,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       isScrollable: true,
                       tabAlignment: TabAlignment.start,
                       
-                      indicatorColor: const Color(0xFF1E88E5), 
+                      // indicatorColor: const Color(0xFF1E88E5), 
                       labelColor: Colors.black, 
                       unselectedLabelColor: Colors.grey[600], 
                       
