@@ -107,12 +107,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         return Scaffold(
           backgroundColor: const Color(0XFFF1F1F5),
           appBar: AppBar(
-            title: const Text('棋譜だまり'),
-            backgroundColor: switch (_currentMode) {
-              AppMode.edit => Colors.green[300],
-              AppMode.delete => Colors.red[300],
-              AppMode.normal => Color(0XFFFFFFFF),
-            },
+            backgroundColor: const Color(0XFFFFFFFF), // 背景色は白に固定
+            title: Row(
+              children: [
+                // const Text('棋譜だまり'),
+                if (_currentMode != AppMode.normal) ...[
+                  const SizedBox(width: 8),
+                  _buildModeBadge(), // モードバッジを生成するメソッド
+                ],
+              ],
+            ),
             actions: [
               if (_currentMode != AppMode.normal)
                 IconButton(
@@ -208,6 +212,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
         );
       },
+    );
+  }
+
+  Widget _buildModeBadge() {
+    final isDelete = _currentMode == AppMode.delete;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        // 削除モードなら赤、編集モードなら緑（お好みで）
+        color: isDelete ? Colors.red[600] : Colors.green[600],
+        borderRadius: BorderRadius.circular(4), // 少し角を丸めた四角形
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            isDelete ? '削除モード' : '編集モード',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
