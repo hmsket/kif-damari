@@ -9,7 +9,12 @@ import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart'; // 追加
 import 'package:kifdamari/logic/diagram_generator.dart'; // 追加
-import 'package:kifdamari/logic/thumbnail_manager.dart'; // 追加
+import 'package:kifdamari/logic/thumbnail_manager.dart';
+import 'package:path_provider/path_provider.dart'; // 追加
+
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class KifViewerPage extends StatefulWidget {
   final KifEntity kifEntity; // String? kifPath から変更
@@ -292,9 +297,12 @@ class _KifViewerPageState extends State<KifViewerPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 8,
             onSelected: (String value) {
-              if (value == 'make_thumbnail') { // 追加
-                _handleMakeThumbnail();
-              }
+              switch (value) {
+                case 'make_thumbnail':
+                  _handleMakeThumbnail();
+                case 'share_thumbnail':
+                  _shareThumbnail();
+              };
             },
             itemBuilder: (BuildContext context) => [
               const PopupMenuItem( // 追加
@@ -302,6 +310,15 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 child: ListTile(
                   leading: Icon(Icons.collections, size: 20),
                   title: Text('サムネイルにする'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),              
+              const PopupMenuItem( // 追加
+                value: 'share_thumbnail',
+                child: ListTile(
+                  leading: Icon(Icons.share, size: 20),
+                  title: Text('共有する'),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -415,5 +432,22 @@ class _KifViewerPageState extends State<KifViewerPage> {
   Widget _buildNameLabel(String name, bool isSente) {
     return Text("${isSente ? '▲' : '△'}$name",
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
+  }
+
+  Future<void> _shareThumbnail() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      // パスは前回のものと同じ
+      final path = '${appDir.path}/thumbnails/thumb_${widget.kifEntity.tabId}_${widget.kifEntity.kifId}.png';
+      final file = File(path);
+
+      if (await file.exists()) {
+        await Share.shareXFiles([XFile(path)], text: '\n#棋譜だまり');
+      } else {
+        debugPrint("ファイルが見つかりません: $path");
+      }
+    } catch (e) {
+      debugPrint("共有失敗: $e");
+    }
   }
 }
