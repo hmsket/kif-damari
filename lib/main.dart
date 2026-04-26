@@ -107,12 +107,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         return Scaffold(
           backgroundColor: const Color(0XFFF1F1F5),
           appBar: AppBar(
+            leading: Padding(
+              padding: const EdgeInsets.fromLTRB(8.0, 0, 0, 0),
+              child: Image.asset(
+                'assets/images/appbar_icon.png',
+                fit: BoxFit.contain, // 枠内に収める
+              ),
+            ),
             backgroundColor: const Color(0XFFFFFFFF), // 背景色は白に固定
             title: Row(
               children: [
                 // const Text('棋譜だまり'),
                 if (_currentMode != AppMode.normal) ...[
-                  const SizedBox(width: 8),
+                  // const SizedBox(width: 8),
                   _buildModeBadge(), // モードバッジを生成するメソッド
                 ],
               ],
