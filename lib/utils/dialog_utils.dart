@@ -23,7 +23,7 @@ void showAddTabDialog(BuildContext context, VoidCallback onRefresh) {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
+            child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold),),
           ),
           TextButton(
             onPressed: () async {
@@ -39,7 +39,7 @@ void showAddTabDialog(BuildContext context, VoidCallback onRefresh) {
                 onRefresh(); 
               }
             },
-            child: const Text('追加'),
+            child: const Text('追加', style: TextStyle(fontWeight: FontWeight.bold),),
           ),
         ],
       );
