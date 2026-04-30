@@ -9,39 +9,63 @@ import '../widgets/kif_item_widget.dart';
 
 void showAddTabDialog(BuildContext context, VoidCallback onRefresh) {
   final TextEditingController controller = TextEditingController();
+  String? errorMessage;
 
   showDialog(
     context: context,
     builder: (context) {
-      return AlertDialog(
-        title: const Text('タブを追加'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: "タブ名"),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold),),
-          ),
-          TextButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                final maxOrder = await TabDao().getMaxTabOrder();
-                await TabDao().insertTab(TabEntity(
-                  title: name,
-                  tabOrder: maxOrder + 1,
-                ));
-                UiUtils.showSuccessSnackBar(context, "タブを追加しました");
-                if (context.mounted) Navigator.pop(context);   
-                onRefresh(); 
-              }
-            },
-            child: const Text('追加', style: TextStyle(fontWeight: FontWeight.bold),),
-          ),
-        ],
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('タブを追加'),
+            content: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: "タブ名",
+                errorText: errorMessage,
+              ),
+              autofocus: true,
+              onChanged: (value) {
+                if (errorMessage != null) {
+                  setState(() => errorMessage = null);
+                }
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final name = controller.text.trim();
+                  if (name.isEmpty) {
+                    setState(() {
+                      errorMessage = 'タブ名を入力してください';
+                    });
+                    return;
+                  }
+                  final count = await TabDao().countTabByName(name);
+                  if (count > 0) {
+                    setState(() => errorMessage = '同じタブ名が存在しています');
+                    return;
+                  }
+                  final maxOrder = await TabDao().getMaxTabOrder();
+                  await TabDao().insertTab(TabEntity(
+                    title: name,
+                    tabOrder: maxOrder + 1,
+                  ));
+                  if (context.mounted) {
+                    UiUtils.showSuccessSnackBar(context, "タブを追加しました");
+                    Navigator.pop(context);
+                  }
+                  onRefresh();
+                },
+                child: const Text('追加', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       );
     },
   );

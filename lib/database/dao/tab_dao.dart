@@ -54,4 +54,16 @@ class TabDao {
     }    
     return maxOrder as int;
   }
+
+  Future<int> countTabByName(String name) async {
+    final db = await _db;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM tab WHERE title = ?',
+      [name],
+    );
+    if (result.isNotEmpty) {
+      return result.first['count'] as int;
+    }
+    return 0;
+  }
 }
