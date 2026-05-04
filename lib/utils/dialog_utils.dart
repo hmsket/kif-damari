@@ -359,8 +359,8 @@ void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
             ),
 
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル')),
-              ElevatedButton(
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold),),),
+              TextButton(
                 onPressed: kfilePath == null ? null : () async {
                   final maxKifId = await KifDao().getMaxKifId(selectedTabId);
                   final newKif = KifEntity(
@@ -379,7 +379,7 @@ void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
                     onRefresh();
                   }
                 },
-                child: const Text('追加'),
+                child: const Text('追加', style: TextStyle(fontWeight: FontWeight.bold),),
               ),
             ],
           );
