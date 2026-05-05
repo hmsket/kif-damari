@@ -28,7 +28,7 @@ class UiUtils {
         ),
         backgroundColor: colorScheme.primaryContainer,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
           side: BorderSide(
