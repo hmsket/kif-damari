@@ -262,10 +262,14 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
-  Widget _buildControlPanel() {
+Widget _buildControlPanel() {
+    // テーマ色の取得
+    final colorScheme = Theme.of(context).colorScheme;
+    double _dragDistance = 0;
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      color: Colors.brown[50],
+      color: const Color(0XFFF1F1F5),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // 全体の余白調整
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -278,6 +282,53 @@ class _KifViewerPageState extends State<KifViewerPage> {
             iconSize: 36,
             onPressed: () => setState(() => kifTree!.stepBack()),
           ),
+          GestureDetector(
+            // ドラッグ中の処理
+            onVerticalDragUpdate: (details) {
+              // dyは移動量（上ならマイナス、下ならプラス）
+              _dragDistance += details.delta.dy;
+
+              // しきい値（10ピクセル移動するごとに1手動かす例）
+              const double threshold = 10.0;
+
+              if (_dragDistance <= -threshold) {
+                // 上に20px分ドラッグされたら一手進む
+                setState(() {
+                  kifTree!.stepNext();
+                  _dragDistance = 0; // 蓄積をリセット
+                });
+              } else if (_dragDistance >= threshold) {
+                // 下に20px分ドラッグされたら一手戻る
+                setState(() {
+                  kifTree!.stepBack();
+                  _dragDistance = 0; // 蓄積をリセット
+                });
+              }
+            },
+            // 指を離した時に蓄積をクリア（これをしないと、次に触れた瞬間に動くことがある）
+            onVerticalDragEnd: (_) => _dragDistance = 0,
+            
+            child: SizedBox(
+              width: 90,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black45, width: 1.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${kifTree!.currentNode.moveNumber}手目\n${kifTree!.currentNode.moveLabel!.replaceAll(RegExp(r'\(.*\)'), '')}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.black,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.chevron_right),
             iconSize: 36,
@@ -287,22 +338,18 @@ class _KifViewerPageState extends State<KifViewerPage> {
             icon: const Icon(Icons.last_page),
             onPressed: () => setState(() => kifTree!.jumpTo(kifTree!.totalMoveCount)),
           ),
-          IconButton(
-            icon: const Icon(Icons.cached),
-            onPressed: () {},
-          ),
+          // --- メニューボタンなどの既存ボタン群 ---
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            offset: const Offset(0, -220), // 変更
+            offset: const Offset(0, -220),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 8,
             onSelected: (String value) {
               switch (value) {
-                case 'make_thumbnail':
-                  _handleMakeThumbnail();
-                case 'share_thumbnail':
-                  _shareThumbnail();
-              };
+                case 'make_thumbnail': _handleMakeThumbnail(); break;
+                case 'share_thumbnail': _shareThumbnail(); break;
+                // 他のケースも必要に応じて追加
+              }
             },
             itemBuilder: (BuildContext context) => [
               const PopupMenuItem( // 追加
@@ -351,7 +398,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 ),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
