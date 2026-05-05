@@ -159,12 +159,12 @@ void showDeleteTabDialog(BuildContext context, TabEntity tab, VoidCallback onRef
   );
 }
 
-void showAddKifDialog(BuildContext context, VoidCallback onRefresh) async {
+void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback onRefresh) async {
   final titleController = TextEditingController();
   final detailController = TextEditingController();
   final tabs = await TabDao().getAllTabs();
 
-  int selectedTabId = tabs.isNotEmpty ? tabs.first.id! : -1;
+  int selectedTabId = tabs.isNotEmpty ? tabs[currentTabIndex].id! : -1;
   int selectedColor = 0xFFFFFFFF;
   String? kfilePath;
   String fileNameDisplay = "未選択";

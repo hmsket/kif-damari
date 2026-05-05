@@ -138,7 +138,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     if (value == 'add_tab') {
                       showAddTabDialog(context, _refresh);
                     } else if (value == 'add_kif') {
-                      showAddKifDialog(context, _refresh);
+                      showAddKifDialog(context, _currentTabIndex, _refresh);
                     }
                   },
                   itemBuilder: (context) => [
