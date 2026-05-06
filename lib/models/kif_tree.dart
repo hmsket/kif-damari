@@ -4,6 +4,7 @@ import 'game_node.dart';
 class KifTree {
   final GameNode root;
   GameNode currentNode;
+  final Map<String, String> info = {};
 
   KifTree(this.root) : currentNode = root;
 
