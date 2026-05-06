@@ -161,7 +161,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
         child: SafeArea(
           child: Column(
             children: [
-              _buildPlayerAndKomaDai(playerName: "${kifTree!.info['後手']}", isSente: false),
+              _buildPlayerAndKomaDai(playerName: kifTree!.info['後手'] ?? '後手', isSente: false),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: AspectRatio(
@@ -190,7 +190,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                   ),
                 ),
               ),
-              _buildPlayerAndKomaDai(playerName: "${kifTree!.info['先手']}", isSente: true),
+              _buildPlayerAndKomaDai(playerName: kifTree!.info['先手'] ?? '先手', isSente: true),
               Expanded(
                 child: Container(
                   width: double.infinity,
