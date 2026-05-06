@@ -435,11 +435,29 @@ Widget _buildControlPanel() {
       );
     }
 
+    // --- 修正ポイント：ベースを「弱い順」に定義 ---
+    const priorityOrder = ['fu', 'ky', 'ke', 'gi', 'ki', 'ka', 'hi']; 
+
+    // 枚数が1以上のものを抽出
+    // この時点で [fu, ky, ..., hi] の順に並ぶ
+    var sortedEntries = priorityOrder
+        .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
+        .map((key) => MapEntry(key, hand[key]!))
+        .toList();
+
+    // 後手の場合は「右側から弱い順」にするため、リストを反転させて [hi, ..., fu] にする
+    // これを WrapAlignment.end で表示すると、一番右端に 'fu' が来る
+    if (!isSente) {
+      sortedEntries = sortedEntries.reversed.toList();
+    }
+
     return Wrap(
+      // 先手は左寄せ（左端から fu, ky...）
+      // 後手は右寄せ（右端から fu, ky...）
       alignment: isSente ? WrapAlignment.start : WrapAlignment.end,
       spacing: 1.0,
       runSpacing: 1.0,
-      children: hand.entries.where((e) => e.value > 0).map((entry) {
+      children: sortedEntries.map((entry) {
         return Stack(
           alignment: Alignment.bottomRight,
           children: [
