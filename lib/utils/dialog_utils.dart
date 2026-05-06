@@ -651,6 +651,7 @@ Future<void> showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback
                       detail: detailController.text,
                       kifOrder: finalKifOrder,
                       kifPath: kfilePath,
+                      imgPath: kif.imgPath,
                       color: selectedColor,
                     );
 
