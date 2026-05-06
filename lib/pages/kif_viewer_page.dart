@@ -203,7 +203,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                   ),
                   child: SingleChildScrollView(
                     child: Text(
-                      "【${kifTree!.currentNode.moveNumber}手目】 ${kifTree!.currentNode.moveLabel ?? '開始局面'}\n\n${kifTree!.currentNode.comment}",
+                      "${kifTree!.currentNode.joinedComment}",
                       style: const TextStyle(fontSize: 14, height: 1.5),
                     ),
                   ),
