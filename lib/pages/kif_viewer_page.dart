@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui; // 追加
 import 'package:flutter/material.dart';
@@ -39,7 +40,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
   }
 
   Future<void> _initKifData() async {
-    final String? path = widget.kifEntity.kifPath; // 変更
+    final String? path = widget.kifEntity.kifPath;
     if (path == null) {
       setState(() {
         kifTree = KifTree.initial();
@@ -49,10 +50,22 @@ class _KifViewerPageState extends State<KifViewerPage> {
     }
 
     try {
-      final file = File(path); // 変更
+      final file = File(path);
       if (await file.exists()) {
         final bytes = await file.readAsBytes();
-        final content = await CharsetConverter.decode("Shift_JIS", bytes);
+        String content;
+
+        try {
+          // 1. まずは UTF-8 としてデコードを試みる
+          // allowMalformed: false にすることで、不正なバイトがある場合に例外を投げさせる
+          content = utf8.decode(bytes, allowMalformed: false);
+          debugPrint("UTF-8 で読み込みました");
+        } catch (_) {
+          // 2. UTF-8 で失敗した場合は Shift-JIS としてデコード
+          content = await CharsetConverter.decode("Shift_JIS", bytes);
+          debugPrint("Shift-JIS で読み込みました");
+        }
+
         final tree = KifParser.decode(content);
 
         setState(() {
