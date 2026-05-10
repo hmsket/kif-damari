@@ -30,6 +30,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
   KifTree? kifTree;
   bool _isLoading = true;
   bool _isSeeking = false; 
+  bool _isReversed = false;
   double _dragStartX = 0.0; 
   int _dragStartMoveNumber = 0; 
 
@@ -174,7 +175,13 @@ class _KifViewerPageState extends State<KifViewerPage> {
         child: SafeArea(
           child: Column(
             children: [
-              _buildPlayerAndKomaDai(playerName: kifTree!.info['後手'] ?? '後手', isSente: false),
+              // --- 上側のエリア ---
+              _buildPlayerAndKomaDai(
+                playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
+                isSente: _isReversed, 
+                isUpper: true, // ★ 常に上側レイアウト
+              ),
+              // --- 盤面エリア ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: AspectRatio(
@@ -188,6 +195,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
                           final box = context.findRenderObject() as RenderBox?;
                           if (box == null) return;
                           final halfWidth = box.size.width / 2;
+                          
+                          // タップ位置による進む・戻るの判定
+                          // 反転時は左右の役割を入れ替えるかどうかは好みによります
                           setState(() {
                             if (details.localPosition.dx > halfWidth) {
                               kifTree!.stepNext();
@@ -196,14 +206,22 @@ class _KifViewerPageState extends State<KifViewerPage> {
                             }
                           });
                         },
-                        child: KifBoard(state: kifTree!.currentNode.state),
+                        child: KifBoard(
+                          state: kifTree!.currentNode.state,
+                          isReversed: _isReversed, // ★ 盤面コンポーネントに渡す
+                        ),
                       ),
                       if (_isSeeking) _buildFloatingSeekBar(),
                     ],
                   ),
                 ),
               ),
-              _buildPlayerAndKomaDai(playerName: kifTree!.info['先手'] ?? '先手', isSente: true),
+              // --- 下側のエリア ---
+              _buildPlayerAndKomaDai(
+                playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
+                isSente: !_isReversed,
+                isUpper: false, // ★ 常に下側レイアウト
+              ),
               Expanded(
                 child: Container(
                   width: double.infinity,
@@ -361,6 +379,11 @@ Widget _buildControlPanel() {
               switch (value) {
                 case 'make_thumbnail': _handleMakeThumbnail(); break;
                 case 'share_thumbnail': _shareThumbnail(); break;
+                case 'reverse':
+                  setState(() {
+                    _isReversed = !_isReversed;
+                  });
+                  break;
                 // 他のケースも必要に応じて追加
               }
             },
@@ -417,18 +440,23 @@ Widget _buildControlPanel() {
     );
   }
 
-  Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente}) {
+  Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente, required bool isUpper}) {
     return Container(
       constraints: const BoxConstraints(minHeight: 56),
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: Row(
         children: [
-          if (!isSente) ...[
+          // 上側（isUpper=true）なら先に氏名を表示
+          if (isUpper) ...[
             _buildNameLabel(playerName, isSente),
             const SizedBox(width: 8),
           ],
-          Expanded(child: _buildPieceStand(isSente)),
-          if (isSente) ...[
+          
+          // 駒台（isSenteを渡して中身のデータを取得、isUpperを渡して配置を決定）
+          Expanded(child: _buildPieceStand(isSente, isUpper)),
+          
+          // 下側（isUpper=false）なら後に氏名を表示
+          if (!isUpper) ...[
             const SizedBox(width: 8),
             _buildNameLabel(playerName, isSente),
           ],
@@ -437,13 +465,13 @@ Widget _buildControlPanel() {
     );
   }
 
-  Widget _buildPieceStand(bool isSente) {
+  Widget _buildPieceStand(bool isSente, bool isUpper) {
     final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
-    final assetPrefix = isSente ? "b" : "w";
+    final assetPrefix = isUpper ? "w" : "b";
 
     if (hand.isEmpty || hand.values.every((count) => count == 0)) {
       return Align(
-        alignment: isSente ? Alignment.centerLeft : Alignment.centerRight,
+        alignment: isUpper ? Alignment.centerRight : Alignment.centerLeft,
         child: Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 11)),
       );
     }
@@ -467,7 +495,7 @@ Widget _buildControlPanel() {
     return Wrap(
       // 先手は左寄せ（左端から fu, ky...）
       // 後手は右寄せ（右端から fu, ky...）
-      alignment: isSente ? WrapAlignment.start : WrapAlignment.end,
+      alignment: isUpper ? WrapAlignment.end : WrapAlignment.start,
       spacing: 1.0,
       runSpacing: 1.0,
       children: sortedEntries.map((entry) {
