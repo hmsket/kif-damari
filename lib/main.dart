@@ -148,6 +148,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               else ...[
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.add),
+                  tooltip: '追加',
                   onSelected: (value) {
                     if (value == 'add_tab') {
                       showAddTabDialog(context, _refresh);
@@ -163,6 +164,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit),
+                  tooltip: '編集',
                   onPressed: () => _updateMode(AppMode.edit),
                 ),
                 // 並べ替えプルダウンメニュー
@@ -183,6 +185,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete),
+                  tooltip: '削除',
                   onPressed: () => _updateMode(AppMode.delete),
                 ),
               ]
