@@ -21,7 +21,7 @@ class KifListWidget extends StatefulWidget {
 }
 
 class KifListWidgetState extends State<KifListWidget> {
-  Future<List<KifEntity>>? _kifuFuture; // null許容にして安全に
+  Future<List<KifEntity>>? _kifuFuture;
   List<KifEntity>? _tempKifs;
 
   @override
@@ -30,46 +30,41 @@ class KifListWidgetState extends State<KifListWidget> {
     _loadKifu();
   }
 
-  // ★重要: タブが切り替わったときにFutureを再生成しないと、前のタブのデータを表示し続けてエラーになる
+  // ★重要: モードが切り替わった時や、タブが変わった時にデータを再取得
   @override
   void didUpdateWidget(KifListWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tabId != widget.tabId) {
-      _tempKifs = null;
+    // モードが normal に戻った時、またはタブが変わった時にリフレッシュ
+    if (oldWidget.mode != widget.mode || oldWidget.tabId != widget.tabId) {
       _loadKifu();
     }
   }
 
   void _loadKifu() {
     setState(() {
+      _tempKifs = null; // 一時リストをクリア
       _kifuFuture = KifDao().getKifsByTab(widget.tabId);
     });
   }
 
-  // HomePageのチェックボタンから呼び出す
+  // HomePageのチェックボタンから呼び出し
   Future<void> saveOrder() async {
     if (_tempKifs != null) {
       await KifDao().updateAllKifOrders(_tempKifs!);
-      _tempKifs = null;
-      _loadKifu();
+      // 保存が終わったら、Futureを更新して画面を最新にする
+      _loadKifu(); 
       widget.onRefresh();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_kifuFuture == null) return const SizedBox.shrink();
-
     return FutureBuilder<List<KifEntity>>(
       future: _kifuFuture,
       builder: (context, snapshot) {
-        // 並べ替え中のsetStateでIndicatorが出ないように制御
+        // 並べ替え中のドラッグ操作でのsetStateではIndicatorを出さない
         if (snapshot.connectionState == ConnectionState.waiting && _tempKifs == null) {
           return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(child: Text('エラーが発生しました: ${snapshot.error}'));
         }
 
         final kifs = _tempKifs ?? snapshot.data ?? [];
@@ -80,6 +75,7 @@ class KifListWidgetState extends State<KifListWidget> {
             itemCount: kifs.length,
             proxyDecorator: (child, index, animation) {
               return Material(
+                elevation: 4,
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 child: child,
@@ -88,26 +84,25 @@ class KifListWidgetState extends State<KifListWidget> {
             onReorder: (oldIndex, newIndex) {
               setState(() {
                 if (oldIndex < newIndex) newIndex -= 1;
-                // インデックスの範囲外エラーを防ぐ
-                if (oldIndex >= 0 && oldIndex < kifs.length) {
-                  final item = kifs.removeAt(oldIndex);
-                  kifs.insert(newIndex, item);
-                  _tempKifs = List.from(kifs);
-                }
+                final item = kifs.removeAt(oldIndex);
+                kifs.insert(newIndex, item);
+                _tempKifs = List.from(kifs);
               });
+              // ここでは _loadKifu は呼ばない（ドラッグ中のチラつき防止）
             },
             itemBuilder: (context, index) {
               final kif = kifs[index];
               return KifListItem(
-                key: ValueKey('sort_${kif.id}'), // Keyをより一意に
+                key: ValueKey('sort_${kif.id}'),
                 kif: kif,
                 mode: widget.mode,
-                onRefresh: widget.onRefresh,
+                onRefresh: _loadKifu, // ListItem側で何かあってもこのWidgetをリフレッシュ
               );
             },
           );
         }
 
+        // 通常モード
         return ListView.builder(
           itemCount: kifs.length,
           itemBuilder: (context, index) {
@@ -116,7 +111,7 @@ class KifListWidgetState extends State<KifListWidget> {
               key: ValueKey('list_${kif.id}'),
               kif: kif,
               mode: widget.mode,
-              onRefresh: widget.onRefresh,
+              onRefresh: _loadKifu,
             );
           },
         );
