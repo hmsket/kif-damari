@@ -36,13 +36,13 @@ class KifItemWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title.isEmpty ? 'タイトル未入力' : title,
+                      title.isEmpty ? '' : title,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      (detail == null || detail!.isEmpty) ? '詳細なし' : detail!,
+                      (detail == null || detail!.isEmpty) ? '' : detail!,
                       style: const TextStyle(fontSize: 14, color: Colors.grey),
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
