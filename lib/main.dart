@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:kifdamari/utils/ui_utils.dart';
 import 'package:kifdamari/widgets/kif_list_widget.dart';
 import 'database/dao/tab_dao.dart';
 import 'database/entity/tab_entity.dart';
 import 'utils/dialog_utils.dart';
 
-enum AppMode { normal, edit, delete }
+// AppModeにsortを追加
+enum AppMode { normal, edit, sort, delete }
 
 void main() => runApp(const KifdamariApp());
 
@@ -19,7 +21,7 @@ class KifdamariApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         textTheme: GoogleFonts.notoSansJpTextTheme(),
-        colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF1E88E5)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E88E5)),
       ),
     );
   }
@@ -37,6 +39,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   AppMode _currentMode = AppMode.normal;
   TabController? _tabController; 
   int _currentTabIndex = 0;
+
+  // KifListWidgetのStateにアクセスするためのGlobalKeyを保持
+  final Map<int, GlobalKey<KifListWidgetState>> _listKeys = {};
 
   @override
   void initState() {
@@ -112,16 +117,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               padding: const EdgeInsets.fromLTRB(8.0, 0, 0, 0),
               child: Image.asset(
                 'assets/images/appbar_icon.png',
-                fit: BoxFit.contain, // 枠内に収める
+                fit: BoxFit.contain,
               ),
             ),
-            backgroundColor: const Color(0XFFFFFFFF), // 背景色は白に固定
+            backgroundColor: const Color(0XFFFFFFFF),
             title: Row(
               children: [
-                // const Text('棋譜だまり'),
                 if (_currentMode != AppMode.normal) ...[
-                  // const SizedBox(width: 8),
-                  _buildModeBadge(), // モードバッジを生成するメソッド
+                  _buildModeBadge(),
                 ],
               ],
             ),
@@ -129,7 +132,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               if (_currentMode != AppMode.normal)
                 IconButton(
                   icon: const Icon(Icons.check, size: 30),
-                  onPressed: () => _updateMode(AppMode.normal),
+                  onPressed: () async {
+                    // チェックボタン押下時、並べ替えモードならDB保存を実行
+                    if (_currentMode == AppMode.sort) {
+                      final currentTabId = tabs[_currentTabIndex].id;
+                      final state = _listKeys[currentTabId]?.currentState;
+                      if (state != null) {
+                        await state.saveOrder(); // KifListWidget内の一時リストを保存
+                        UiUtils.showSuccessSnackBar(context, "棋譜の並び順を更新しました");
+                      }
+                    }
+                    _updateMode(AppMode.normal);
+                  },
                 )
               else ...[
                 PopupMenuButton<String>(
@@ -151,6 +165,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   icon: const Icon(Icons.edit),
                   onPressed: () => _updateMode(AppMode.edit),
                 ),
+                // 並べ替えプルダウンメニュー
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.swap_vert),
+                  tooltip: '並び替え',
+                  onSelected: (value) {
+                    if (value == 'sort_tabs') {
+                      showSortTabsDialog(context, tabs, _refresh); 
+                    } else if (value == 'sort_kifs') {
+                      _updateMode(AppMode.sort);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'sort_tabs', child: Text('タブを並び替え')),
+                    const PopupMenuItem(value: 'sort_kifs', child: Text('棋譜を並び替え')),
+                  ],
+                ),
                 IconButton(
                   icon: const Icon(Icons.delete),
                   onPressed: () => _updateMode(AppMode.delete),
@@ -160,59 +190,56 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             bottom: tabs.isEmpty
                 ? null
                 : PreferredSize(
-                  // TabBarの標準的な高さ（48.0）を指定
-                  preferredSize: const Size.fromHeight(48.0),
-                  child: ColoredBox(
-                    color: const Color(0XFFFFFFFF), // ここにTabBar専用の背景色を指定
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      
-                      // indicatorColor: const Color(0xFF1E88E5), 
-                      labelColor: Colors.black, 
-                      unselectedLabelColor: Colors.grey[600], 
-                      
-                      labelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.bold),
-                      unselectedLabelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.normal),
-
-                      tabs: tabs.map((t) {
-                        return Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_currentMode == AppMode.delete)
-                                GestureDetector(
-                                  onTap: () => showDeleteTabDialog(context, t, _refresh),
-                                  child: const Padding(
-                                    padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                    child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                    preferredSize: const Size.fromHeight(48.0),
+                    child: ColoredBox(
+                      color: const Color(0XFFFFFFFF),
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        labelColor: Colors.black, 
+                        unselectedLabelColor: Colors.grey[600], 
+                        labelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.bold),
+                        unselectedLabelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.normal),
+                        tabs: tabs.map((t) {
+                          return Tab(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_currentMode == AppMode.delete)
+                                  GestureDetector(
+                                    onTap: () => showDeleteTabDialog(context, t, _refresh),
+                                    child: const Padding(
+                                      padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                      child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                                    ),
                                   ),
-                                ),
-                              if (_currentMode == AppMode.edit)
-                                GestureDetector(
-                                  onTap: () => showEditTabDialog(context, t, _refresh),
-                                  child: const Padding(
-                                    padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                    child: Icon(Icons.edit, size: 20, color: Colors.green),
+                                if (_currentMode == AppMode.edit)
+                                  GestureDetector(
+                                    onTap: () => showEditTabDialog(context, t, _refresh),
+                                    child: const Padding(
+                                      padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                      child: Icon(Icons.edit, size: 20, color: Colors.green),
+                                    ),
                                   ),
-                                ),
-                              Text(t.title),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                                Text(t.title),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ),
-              ),
+          ),
           body: tabs.isEmpty
               ? const Center(child: Text("タブを追加してください"))
               : TabBarView(
                   controller: _tabController,
                   children: tabs.map((t) {
+                    // 各タブのStateを識別するためのKeyを管理
+                    final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
                     return KifListWidget(
-                      key: ValueKey('kif_list_${t.id}'),
+                      key: key,
                       tabId: t.id!,
                       mode: _currentMode,
                       onRefresh: _refresh,
@@ -224,28 +251,40 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildModeBadge() {
-    final isDelete = _currentMode == AppMode.delete;
-    
+  Widget _buildModeBadge() { 
+    String text;
+    Color color;
+
+    switch (_currentMode) {
+      case AppMode.delete:
+        text = '削除モード';
+        color = Colors.red[600]!;
+        break;
+      case AppMode.edit:
+        text = '編集モード';
+        color = Colors.green[600]!;
+        break;
+      case AppMode.sort:
+        text = '並び替えモード';
+        color = Colors.blue[600]!;
+        break;
+      case AppMode.normal:
+        return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        // 削除モードなら赤、編集モードなら緑（お好みで）
-        color: isDelete ? Colors.red[600] : Colors.green[600],
-        borderRadius: BorderRadius.circular(4), // 少し角を丸めた四角形
+        color: color,
+        borderRadius: BorderRadius.circular(4),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            isDelete ? '削除モード' : '編集モード',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

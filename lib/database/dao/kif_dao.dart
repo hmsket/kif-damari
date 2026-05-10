@@ -61,4 +61,18 @@ class KifDao {
     }
     return maxId as int;
   }
+
+  Future<void> updateAllKifOrders(List<KifEntity> kifs) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      for (int i = 0; i < kifs.length; i++) {
+        await txn.update(
+          'kif',
+          {'kif_order': i}, // リストの順序をそのまま order に反映
+          where: 'id = ?',
+          whereArgs: [kifs[i].id],
+        );
+      }
+    });
+  }
 }

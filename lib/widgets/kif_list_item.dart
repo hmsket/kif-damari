@@ -52,6 +52,7 @@ class KifListItem extends StatelessWidget {
           trailing: switch (mode) {
             AppMode.delete => const Icon(Icons.cancel, color: Colors.red),
             AppMode.edit => const Icon(Icons.edit, color: Colors.green),
+            AppMode.sort => const Icon(Icons.drag_handle, color: Colors.grey), // 並べ替え用
             AppMode.normal => null,
           },
         ),

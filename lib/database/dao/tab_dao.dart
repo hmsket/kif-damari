@@ -66,4 +66,19 @@ class TabDao {
     }
     return 0;
   }
+
+  Future<void> updateAllTabOrders(List<TabEntity> tabs) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      for (int i = 0; i < tabs.length; i++) {
+        // リストのインデックス順に tab_order を 0, 1, 2... と割り振る
+        await txn.update(
+          'tab',
+          {'tab_order': i},
+          where: 'id = ?',
+          whereArgs: [tabs[i].id],
+        );
+      }
+    });
+  }
 }

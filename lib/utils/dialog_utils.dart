@@ -130,6 +130,69 @@ Future<void> showEditTabDialog(BuildContext context, TabEntity tab, VoidCallback
   );
 }
 
+void showSortTabsDialog(BuildContext context, List<TabEntity> currentTabs, VoidCallback onRefresh) {
+  // ダイアログ内で管理するための、一時的なタブリストを作成
+  List<TabEntity> tempTabs = List.from(currentTabs);
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder( // ダイアログ内の状態（tempTabsの並び順）を管理
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('タブの並べ替え'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400, // 高さは適宜調整してください
+              child: ReorderableListView.builder(
+                itemCount: tempTabs.length,
+                itemBuilder: (context, index) {
+                  final tab = tempTabs[index];
+                  return ListTile(
+                    key: ValueKey(tab.id), // 並べ替えには一意のKeyが必須
+                    leading: const Icon(Icons.drag_handle),
+                    title: Text(tab.title),
+                  );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  setDialogState(() {
+                    if (oldIndex < newIndex) {
+                      newIndex -= 1;
+                    }
+                    final item = tempTabs.removeAt(oldIndex);
+                    tempTabs.insert(newIndex, item);
+                  });
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  // 1. DBを更新（DAOを呼び出し）
+                  await TabDao().updateAllTabOrders(tempTabs);
+                  UiUtils.showSuccessSnackBar(context, "タブの並び順を更新しました");
+
+                  // 2. ダイアログを閉じる
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  
+                  // 3. 親画面をリフレッシュして並び替えを反映
+                  onRefresh(); 
+                },
+                child: const Text('更新', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 void showDeleteTabDialog(BuildContext context, TabEntity tab, VoidCallback onRefresh) {
   showDialog(
     context: context,
