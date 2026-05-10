@@ -143,7 +143,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   },
                   itemBuilder: (context) => [
                     const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
-                    const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
+                    if (tabs.isNotEmpty)
+                      const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
                   ],
                 ),
                 IconButton(
