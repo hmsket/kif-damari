@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/utils/ui_utils.dart';
 import 'package:kifdamari/widgets/kif_list_widget.dart';
@@ -9,7 +10,18 @@ import 'utils/dialog_utils.dart';
 // AppModeにsortを追加
 enum AppMode { normal, edit, sort, delete }
 
-void main() => runApp(const KifdamariApp());
+void main() async {
+  // 画面固定の非同期処理を動かすために、Flutterのバインディングを初期化
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 画面の向きを「縦（通常）」と「縦（上下逆）」のみに固定
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  runApp(const KifdamariApp());
+}
 
 class KifdamariApp extends StatelessWidget {
   const KifdamariApp({super.key});
