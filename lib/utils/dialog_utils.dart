@@ -199,7 +199,7 @@ void showDeleteTabDialog(BuildContext context, TabEntity tab, VoidCallback onRef
     builder: (context) {
       return AlertDialog(
         title: const Text('タブを削除'),
-        content: Text('「${tab.title}」を削除します。\nこの操作は取り消せません。'),
+        content: Text('「${tab.title}」を削除します。\nまた、このタブに追加されている棋譜もすべて削除します。\nこの操作は取り消せません。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
