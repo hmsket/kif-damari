@@ -23,9 +23,10 @@ class KifTree {
   /// 本譜（メインの指し手）の合計手数を取得します。
   /// スライダーの max 値に使用します。
   int get totalMoveCount {
-    int count = 0;
-    GameNode? temp = root;
-    // 最初の分岐（本譜）を最後まで辿ってカウント
+    int count = currentNode.moveNumber;
+    GameNode? temp = currentNode;
+    
+    // 現在地から、今選ばれている文脈（first）に沿って最後まで下りきってカウントを足す
     while (temp!.nextNodes.isNotEmpty) {
       temp = temp.nextNodes.first;
       count++;
@@ -35,10 +36,22 @@ class KifTree {
 
   // --- 操作用メソッド ---
 
-  /// 1手進める（本譜の次ノードへ移動）
-  void stepNext() {
+  // 1手進める（基本は最初の選択肢。分岐選択時は特定のノードを指定可能にする）
+  void stepNext({GameNode? chosenNode}) {
+    if (chosenNode != null) {
+      currentNode = chosenNode;
+
+      if (chosenNode.parent != null) {
+        chosenNode.parent!.selectedBranchIndex =
+            chosenNode.parent!.nextNodes.indexOf(chosenNode);
+      }
+
+      return;
+    }
+
     if (currentNode.nextNodes.isNotEmpty) {
-      currentNode = currentNode.nextNodes.first;
+      currentNode = currentNode.nextNodes[
+          currentNode.selectedBranchIndex];
     }
   }
 
@@ -52,25 +65,19 @@ class KifTree {
   /// 指定した手数にジャンプします。
   /// シークバーの onChanged などから呼び出します。
   void jumpTo(int targetMoveNumber) {
-    // 範囲外のガード
     if (targetMoveNumber < 0) {
       currentNode = root;
       return;
     }
 
-    // 一旦ルートから探索を開始
-    GameNode temp = root;
-    
-    // 目標の手数まで本譜を辿る
-    for (int i = 0; i < targetMoveNumber; i++) {
-      if (temp.nextNodes.isNotEmpty) {
-        temp = temp.nextNodes.first;
-      } else {
-        // 目標手数が棋譜の最後を超えている場合はそこで止まる
-        break;
-      }
+    // 目標の手数が、現在地より「過去」なら、歴史を遡る
+    while (currentNode.moveNumber > targetMoveNumber && currentNode.parent != null) {
+      currentNode = currentNode.parent!;
     }
-    
-    currentNode = temp;
+
+    // 目標の手数が、現在地より「未来」なら、今選ばれている文脈に沿って下る
+    while (currentNode.moveNumber < targetMoveNumber && currentNode.nextNodes.isNotEmpty) {
+      currentNode = currentNode.nextNodes.first;
+    }
   }
 }

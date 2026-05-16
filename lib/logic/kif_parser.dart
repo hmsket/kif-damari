@@ -14,8 +14,10 @@ class KifParser {
     final infoRegex = RegExp(r"^([^：:]+)[：:](.*)$");
     
     // 指し手解析用
-    // 1:手数, 2:先頭(数字or同), 3:段(or全角スペース), 4:駒名, 5:元筋, 6:元段
     final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九　]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
+
+    // ★ 追加: 「変化：46手目」などの変化行を検出する正規表現
+    final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
 
     for (var line in lines) {
       final trimmedLine = line.trim();
@@ -27,28 +29,58 @@ class KifParser {
         continue;
       }
 
-      // 2. 指し手行 (数字で始まる)
+      // ★ 2. 変化行の検出 (最優先でチェック)
+      final branchMatch = branchRegex.firstMatch(trimmedLine);
+      if (branchMatch != null) {
+        final branchMoveNum = int.parse(branchMatch.group(1)!);
+        final targetParentMoveNum = branchMoveNum - 1; // 探したい親ノード自身の「手数」
+
+        // 現在地からルートに向かって遡り、
+        // 「ノード自身の手数」が、探したい親の手数（例: 31）とピッタリ一致するものを探す
+        GameNode? targetParent = currentNode;
+        bool found = false;
+
+        while (targetParent != null) {
+          if (targetParent.moveNumber == targetParentMoveNum) {
+            currentNode = targetParent; // 31手目そのものの局面を親にする
+            found = true;
+            break; // 一番現在の文脈に近い親で即座に確定
+          }
+          targetParent = targetParent.parent;
+        }
+        
+        // 直系の先祖にいなかった場合のみ、ルートから本譜を辿る
+        if (!found) {
+          GameNode backup = tree.root;
+          for (int i = 0; i < targetParentMoveNum; i++) {
+            if (backup.nextNodes.isNotEmpty) {
+              backup = backup.nextNodes.first;
+            }
+          }
+          currentNode = backup; 
+        }
+        continue;
+      }
+
+      // 3. 指し手行 (数字で始まる)
       final moveMatch = moveRegex.firstMatch(trimmedLine);
       if (moveMatch != null) {
         final moveNum = int.parse(moveMatch.group(1)!);
-        final firstChar = moveMatch.group(2)!; // 「３」や「同」
-        final secondChar = moveMatch.group(3)?.trim() ?? ""; // 「八」や「　」
-        final pieceName = moveMatch.group(4)!; // 「歩」や「成銀」
+        final firstChar = moveMatch.group(2)!;
+        final secondChar = moveMatch.group(3)?.trim() ?? "";
+        final pieceName = moveMatch.group(4)!;
         final fromXStr = moveMatch.group(5);
         final fromYStr = moveMatch.group(6);
 
         int toX, toY;
         if (firstChar == '同') {
-          // 「同」の場合は直前の着手位置を継承
           if (currentNode.state.lastMoveToX == null || currentNode.state.lastMoveToY == null) {
-            // 初手で「同」が来ることは通常ないが、エラー回避
             toX = 0; toY = 0;
           } else {
             toX = currentNode.state.lastMoveToX!;
             toY = currentNode.state.lastMoveToY!;
           }
         } else {
-          // 「３八」などの通常形式
           toX = _zenToNum[firstChar]!;
           toY = _kanToNum[secondChar]!;
         }
@@ -63,11 +95,16 @@ class KifParser {
           pieceName: pieceName,
         );
 
+        final cleanMoveLabel = trimmedLine
+            .split(RegExp(r'\s+'))
+            .skip(1)
+            .join(' ')
+            .replaceAll('+', '');
+
         // ノード作成
         final newNode = GameNode(
           moveNumber: moveNum,
-          // ラベルは「３八金(49)」や「同　歩(83)」の全体を保持
-          moveLabel: trimmedLine.split(RegExp(r'\s+')).skip(1).join(' '),
+          moveLabel: cleanMoveLabel,
           state: nextState,
         );
 

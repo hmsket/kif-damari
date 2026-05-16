@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart'; // 追加
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:kifdamari/models/game_node.dart'; // ★これを追加
 
 class KifViewerPage extends StatefulWidget {
   final KifEntity kifEntity; // String? kifPath から変更
@@ -139,6 +140,57 @@ class _KifViewerPageState extends State<KifViewerPage> {
         const SnackBar(content: Text('画像の生成に失敗しました')),
       );
     }
+  }
+
+  // ★ ②：分岐選択ボトムシートを表示するメソッド
+  void _showBranchSelector(List<GameNode> nextNodes) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  '次の手を選択してください',
+                  style: TextStyle(
+                    fontSize: 16, 
+                    fontWeight: FontWeight.bold, 
+                    color: Colors.brown,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              // 分岐の数（nextNodesの要素数）だけ選択肢（ListTile）を生成
+              ...nextNodes.map((node) {
+                // ラベルから「(49)」などの移動元情報を消してスッキリさせる処理
+                final cleanLabel = node.moveLabel!.replaceAll(RegExp(r'\(.*\)'), '');
+                return ListTile(
+                  leading: const Icon(Icons.navigation_rounded, color: Colors.orange),
+                  title: Text(
+                    "${node.moveNumber}手目: $cleanLabel",
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context); // まずボトムシートを閉じる
+                    setState(() {
+                      kifTree!.stepNext(chosenNode: node); // 選んだノードを指定して進む
+                    });
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
   
   @override
@@ -313,50 +365,94 @@ Widget _buildControlPanel() {
             iconSize: 36,
             onPressed: () => setState(() => kifTree!.stepBack()),
           ),
-          GestureDetector(
-            // ドラッグ中の処理
+GestureDetector(
+            // 縦ドラッグ（上下スワイプ）で進む・戻る
             onVerticalDragUpdate: (details) {
-              // dyは移動量（上ならマイナス、下ならプラス）
               _dragDistance += details.delta.dy;
-
-              // しきい値（10ピクセル移動するごとに1手動かす例）
               const double threshold = 10.0;
-
               if (_dragDistance <= -threshold) {
-                // 上に20px分ドラッグされたら一手進む
                 setState(() {
                   kifTree!.stepNext();
-                  _dragDistance = 0; // 蓄積をリセット
+                  _dragDistance = 0;
                 });
               } else if (_dragDistance >= threshold) {
-                // 下に20px分ドラッグされたら一手戻る
                 setState(() {
                   kifTree!.stepBack();
-                  _dragDistance = 0; // 蓄積をリセット
+                  _dragDistance = 0;
                 });
               }
             },
-            // 指を離した時に蓄積をクリア（これをしないと、次に触れた瞬間に動くことがある）
             onVerticalDragEnd: (_) => _dragDistance = 0,
             
+            // ★ここを追加：中央ボタンをタップした時、分岐があればボトムシートを開く
+            onTap: () {
+              final nextNodes = kifTree!.currentNode.nextNodes;
+              if (nextNodes.length > 1) {
+                _showBranchSelector(nextNodes);
+              }
+            },
+            
             child: SizedBox(
-              width: 90,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black45, width: 1.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${kifTree!.currentNode.moveNumber}手目\n${kifTree!.currentNode.moveLabel!.replaceAll(RegExp(r'\(.*\)'), '')}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.black,
-                    height: 1.2,
-                  ),
-                ),
+              width: 90, // 変化の文字が入るように少し幅を広げました
+              child: Builder(
+                builder: (context) {
+                  // 分岐（次の手が複数）がある局面か判定
+                  final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
+                  
+                  // 現在本譜ではなく「変化ルート」を歩んでいるか判定
+                  final bool isInsideBranch = kifTree!.currentNode.parent != null && 
+                                             kifTree!.currentNode.parent!.nextNodes.first != kifTree!.currentNode;
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    decoration: BoxDecoration(
+                      // ★分岐がある局面は、ボタンを「薄いオレンジ」にしてアピール！
+                      color: hasBranch ? Colors.orange[100] : Colors.white,
+                      border: Border.all(
+                        // ★分岐がある、または変化進行中はオレンジの太い枠線にする
+                        color: hasBranch ? Colors.orange[700]! : Colors.black45, 
+                        width: hasBranch ? 2.0 : 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // メインのテキスト表示
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${kifTree!.currentNode.moveNumber}手目',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              kifTree!.currentNode.moveLabel!.replaceAll(RegExp(r'\(.*\)'), ''),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.black,
+                                height: 1.1,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // ★分岐がある局面だけ、右上に小さな「分岐マーク（⇄）」をそっと添える
+                        if (hasBranch)
+                          const Positioned(
+                            top: -2,
+                            right: 0,
+                            child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                          ),
+                      ],
+                    ),
+                  );
+                }
               ),
             ),
           ),
