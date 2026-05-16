@@ -71,6 +71,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     setState(() {
       _loadTabs();
     });
+
+    _tabsFuture.then((tabs) {
+      if (tabs.isNotEmpty && _currentTabIndex < tabs.length) {
+        final currentTabId = tabs[_currentTabIndex].id;
+        final currentState = _listKeys[currentTabId]?.currentState;
+        if (currentState != null) {
+          currentState.refreshFromParent(); // 子の読み込み処理を実行
+        }
+      }
+    });
   }
 
   @override

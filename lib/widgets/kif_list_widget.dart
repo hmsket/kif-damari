@@ -40,6 +40,10 @@ class KifListWidgetState extends State<KifListWidget> {
     }
   }
 
+  void refreshFromParent() {
+    _loadKifu(); // キャッシュされているFutureを最新データで上書きして再描画
+  }
+
   void _loadKifu() {
     setState(() {
       _tempKifs = null; // 一時リストをクリア
