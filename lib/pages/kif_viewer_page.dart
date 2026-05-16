@@ -477,7 +477,7 @@ Widget _buildControlPanel() {
     }
 
     // --- 修正ポイント：ベースを「弱い順」に定義 ---
-    const priorityOrder = ['fu', 'ky', 'ke', 'gi', 'ki', 'ka', 'hi']; 
+    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi']; 
 
     // 枚数が1以上のものを抽出
     // この時点で [fu, ky, ..., hi] の順に並ぶ
