@@ -75,7 +75,7 @@ class KifListWidgetState extends State<KifListWidget> {
             itemCount: kifs.length,
             proxyDecorator: (child, index, animation) {
               return Material(
-                elevation: 4,
+                elevation: 80,
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 child: child,
