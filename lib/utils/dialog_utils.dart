@@ -231,6 +231,7 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
   int selectedColor = 0xFFFFFFFF;
   String? kfilePath;
   String fileNameDisplay = "未選択";
+  String? errorMessage; // ★ 追加：エラーメッセージ用の変数
 
   showDialog(
     context: context,
@@ -238,13 +239,8 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
 
       // 共通のスタイル定義
       final m3InputDecoration = InputDecoration(
-        // filled: true,
-        // fillColor: Colors.grey.withOpacity(0.1),
-        // 下線のみにする設定
         border: const UnderlineInputBorder(), 
-        enabledBorder: UnderlineInputBorder(
-          // borderSide: BorderSide(color: Colors.grey.withOpacity(0.5)),
-        ),
+        enabledBorder: UnderlineInputBorder(),
         focusedBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.blue, width: 2),
         ),
@@ -264,15 +260,13 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                     // --- KifItemWidgetのレイアウトを維持した編集エリア ---
                     Container(
                       decoration: BoxDecoration(
-                        // 以前の opacity(0.05) をやめて、選択された色をそのまま背景にします
                         color: Color(selectedColor), 
-                        // border: Border.all(...) の行を削除します
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 左側：画像エリア（レイアウト維持用）
+                          // 左側：画像エリア
                           SizedBox(
                             width: 120,
                             height: 120,
@@ -284,15 +278,14 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                               ),
                             ),
                           ),
-                          // 右側：入力エリア（TextField）
+                          // 右側：入力エリア
                           Expanded(
                             child: SizedBox(
-                              height: 120, // 左側の画像エリアと同じ高さに固定
+                              height: 120,
                               child: Padding(
                                 padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
                                 child: Column(
                                   children: [
-                                    // タイトル入力
                                     TextField(
                                       controller: titleController,
                                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -309,13 +302,12 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    // 詳細入力（残りの高さを埋める）
                                     Expanded(
                                       child: TextField(
                                         controller: detailController,
                                         style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                        maxLines: null, // 高さいっぱいに広げるためにnullに設定
-                                        expands: true,  // 親のExpanded内でいっぱいに広がる
+                                        maxLines: null,
+                                        expands: true,
                                         textAlignVertical: TextAlignVertical.top,
                                         onChanged: (_) => setDialogState(() {}),
                                         decoration: InputDecoration(
@@ -335,7 +327,6 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                               ),
                             ),
                           ),
-
                         ],
                       ),
                     ),
@@ -344,10 +335,7 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                     DropdownMenu<int>(
                       label: const Text('タブ'),
                       expandedInsets: EdgeInsets.zero,
-                      // 前回の InputDecorator とスタイルを合わせる
                       inputDecorationTheme: InputDecorationTheme(
-                        // filled: true,
-                        // fillColor: Colors.grey.withOpacity(0.1),
                         border: const UnderlineInputBorder(),
                       ),
                       menuStyle: MenuStyle(
@@ -357,10 +345,8 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                           ),
                         ),
                       ),
-
                       initialSelection: selectedTabId,
                       onSelected: (value) => setDialogState(() => selectedTabId = value!),
-                      // ↓ この dropdownMenuEntries が必須（Required）です！
                       dropdownMenuEntries: tabs.map((t) {
                         return DropdownMenuEntry<int>(
                           value: t.id!,
@@ -371,29 +357,35 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
 
                     const SizedBox(height: 20),
 
+                    // ★ 修正箇所：kif選択時の拡張子エラーチェック処理
                     InkWell(
+                      // ★ onTap の中身を以下に差し替え
                       onTap: () async {
-                        FilePickerResult? result = await FilePicker.platform.pickFiles();
-                        if (result != null) {
+                        try {
+                          FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                          if (result != null) {
+                            final file = result.files.single;
+                            final fileName = file.name;
+
+                            if (fileName.toLowerCase().endsWith('.kif')) {
+                              setDialogState(() {
+                                kfilePath = file.path;          // 正しいのでパスを保存
+                                fileNameDisplay = fileName;    // ファイル名を表示
+                                errorMessage = null;           // エラーを消す
+                              });
+                            } else {
+                              // ★ 変更：kfilePath や fileNameDisplay は元の状態を維持する
+                              setDialogState(() {
+                                errorMessage = "拡張子が .kif のファイルを選択してください";
+                              });
+                            }
+                          }
+                        } catch (e) {
                           setDialogState(() {
-                            kfilePath = result.files.single.path;
-                            fileNameDisplay = result.files.single.name;
+                            errorMessage = "ファイルの取得に失敗しました";
                           });
                         }
                       },
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'kifファイル',
-                          suffixIcon: Icon(Icons.upload_file),
-                        ),
-                        child: Text(
-                          fileNameDisplay,
-                          style: const TextStyle(fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
                     ),
 
                     const SizedBox(height: 20),
@@ -401,15 +393,10 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                     DropdownMenu<int>(
                       label: const Text('色'),
                       menuHeight: 300,
-                      // 1. 横幅を他の項目（タブ・ファイル）と揃える
                       expandedInsets: EdgeInsets.zero, 
-                      // 2. 下線スタイル（Filled）を適用して枠線を消す
                       inputDecorationTheme: InputDecorationTheme(
-                        // filled: true,
-                        // fillColor: Colors.grey.withOpacity(0.1),
                         border: const UnderlineInputBorder(),
                       ),
-                      // 3. メニュー（ポップアップ）の丸みはそのまま維持
                       menuStyle: MenuStyle(
                         shape: WidgetStatePropertyAll(
                           RoundedRectangleBorder(
@@ -448,6 +435,7 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold),),),
               TextButton(
+                // ★ kfilePathがnull（未選択 or エラー時）はボタンが非活性（押せない状態）になります
                 onPressed: kfilePath == null ? null : () async {
                   final maxKifId = await KifDao().getMaxKifId(selectedTabId);
                   final newKif = KifEntity(
@@ -476,260 +464,272 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
   );
 }
 
-Future<void> showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefresh) async {
+// ★ 解決策：関数のトップレベルから async を外し、ボタンを押した瞬間のクラッシュを防ぎます
+void showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefresh) {
   final titleController = TextEditingController(text: kif.title);
   final detailController = TextEditingController(text: kif.detail);
-  final tabs = await TabDao().getAllTabs();
   
   int selectedTabId = kif.tabId;
   int selectedColor = kif.color!;
   String? kfilePath = kif.kifPath;
-  String fileNameDisplay = kif.kifPath!.split('/').last;
-
-  if (!context.mounted) return;
+  
+  // ★ パスの区切り文字に依存しない安全なファイル名の切り出し方法に変更
+  String fileNameDisplay = Uri.parse(kif.kifPath ?? "").pathSegments.isNotEmpty
+      ? Uri.parse(kif.kifPath!).pathSegments.last
+      : "未選択";
+      
+  String? errorMessage;
 
   showDialog(
     context: context,
     builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            title: const Text('棋譜を編集'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // --- KifItemWidgetのレイアウトを維持した編集エリア ---
-                    Container(
-                      decoration: BoxDecoration(
-                        // 以前の opacity(0.05) をやめて、選択された色をそのまま背景にします
-                        color: Color(selectedColor), 
-                        // border: Border.all(...) の行を削除します
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 左側：画像エリア（レイアウト維持用）
-                          SizedBox(
-                            width: 120,
-                            height: 120,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: Image.asset('assets/images/initial.png', fit: BoxFit.contain),
-                              ),
-                            ),
+      // ★ FutureBuilder で安全にタブ一覧を非同期取得
+      return FutureBuilder<List<TabEntity>>(
+        future: TabDao().getAllTabs(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return const AlertDialog(content: Text('データの読み込みに失敗しました'));
+          }
+
+          final tabs = snapshot.data!;
+
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                title: const Text('棋譜を編集'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // --- KifItemWidgetのレイアウトを維持した編集エリア ---
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Color(selectedColor), 
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          // 右側：入力エリア（TextField）
-                          Expanded(
-                            child: SizedBox(
-                              height: 120, // 左側の画像エリアと同じ高さに固定
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
-                                child: Column(
-                                  children: [
-                                    // タイトル入力
-                                    TextField(
-                                      controller: titleController,
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                      onChanged: (_) => setDialogState(() {}),
-                                      decoration: InputDecoration(
-                                        hintText: 'タイトルを入力',
-                                        filled: true,
-                                        fillColor: Colors.grey.withOpacity(0.1),
-                                        isDense: true,
-                                        contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                                        enabledBorder: const UnderlineInputBorder(
-                                          borderSide: BorderSide(color: Colors.grey, width: 1),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    // 詳細入力（残りの高さを埋める）
-                                    Expanded(
-                                      child: TextField(
-                                        controller: detailController,
-                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                        maxLines: null, // 高さいっぱいに広げるためにnullに設定
-                                        expands: true,  // 親のExpanded内でいっぱいに広がる
-                                        textAlignVertical: TextAlignVertical.top,
-                                        onChanged: (_) => setDialogState(() {}),
-                                        decoration: InputDecoration(
-                                          hintText: '詳細を入力',
-                                          filled: true,
-                                          fillColor: Colors.grey.withOpacity(0.1),
-                                          isDense: true,
-                                          contentPadding: const EdgeInsets.all(2),
-                                          enabledBorder: const UnderlineInputBorder(
-                                            borderSide: BorderSide(color: Colors.grey, width: 1),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 120,
+                                height: 120,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.asset('assets/images/initial.png', fit: BoxFit.contain),
+                                  ),
                                 ),
                               ),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 120,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                                    child: Column(
+                                      children: [
+                                        TextField(
+                                          controller: titleController,
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                          onChanged: (_) => setDialogState(() {}),
+                                          decoration: InputDecoration(
+                                            hintText: 'タイトルを入力',
+                                            filled: true,
+                                            fillColor: Colors.grey.withOpacity(0.1),
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                            enabledBorder: const UnderlineInputBorder(
+                                              borderSide: BorderSide(color: Colors.grey, width: 1),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Expanded(
+                                          child: TextField(
+                                            controller: detailController,
+                                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                            maxLines: null,
+                                            expands: true,
+                                            textAlignVertical: TextAlignVertical.top,
+                                            onChanged: (_) => setDialogState(() {}),
+                                            decoration: InputDecoration(
+                                              hintText: '詳細を入力',
+                                              filled: true,
+                                              fillColor: Colors.grey.withOpacity(0.1),
+                                              isDense: true,
+                                              contentPadding: const EdgeInsets.all(2),
+                                              enabledBorder: const UnderlineInputBorder(
+                                                borderSide: BorderSide(color: Colors.grey, width: 1),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        DropdownMenu<int>(
+                          label: const Text('タブ'),
+                          expandedInsets: EdgeInsets.zero,
+                          inputDecorationTheme: const InputDecorationTheme(
+                            border: UnderlineInputBorder(),
+                          ),
+                          menuStyle: MenuStyle(
+                            shape: WidgetStatePropertyAll(
+                              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             ),
                           ),
+                          initialSelection: selectedTabId,
+                          onSelected: (value) => setDialogState(() => selectedTabId = value!),
+                          dropdownMenuEntries: tabs.map((t) {
+                            return DropdownMenuEntry<int>(value: t.id!, label: t.title);
+                          }).toList(),
+                        ),
 
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
-                    DropdownMenu<int>(
-                      label: const Text('タブ'),
-                      expandedInsets: EdgeInsets.zero,
-                      // 前回の InputDecorator とスタイルを合わせる
-                      inputDecorationTheme: InputDecorationTheme(
-                        // filled: true,
-                        // fillColor: Colors.grey.withOpacity(0.1),
-                        border: const UnderlineInputBorder(),
-                      ),
-                      menuStyle: MenuStyle(
-                        shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                        // --- 修正箇所：エラー時も元のファイルを維持するピッカー ---
+                        InkWell(
+                          onTap: () async {
+                            try {
+                              FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                              if (result != null) {
+                                final file = result.files.single;
+                                final fileName = file.name;
+
+                                if (fileName.toLowerCase().endsWith('.kif')) {
+                                  setDialogState(() {
+                                    kfilePath = file.path;          // 新しい正しいパスに更新
+                                    fileNameDisplay = fileName;    // 表示名も更新
+                                    errorMessage = null;           // エラーをクリア
+                                  });
+                                } else {
+                                  // ★ エラーが出ても、元の kfilePath と fileNameDisplay は一切書き換えない
+                                  setDialogState(() {
+                                    errorMessage = "拡張子が .kif のファイルを選択してください";
+                                  });
+                                }
+                              }
+                            } catch (e) {
+                              setDialogState(() {
+                                errorMessage = "ファイルの取得に失敗しました";
+                              });
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'kifファイル',
+                              suffixIcon: const Icon(Icons.upload_file),
+                              errorText: errorMessage,
+                            ),
+                            child: Text(
+                              fileNameDisplay,
+                              style: const TextStyle(fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
                           ),
                         ),
-                      ),
 
-                      initialSelection: selectedTabId,
-                      onSelected: (value) => setDialogState(() => selectedTabId = value!),
-                      // ↓ この dropdownMenuEntries が必須（Required）です！
-                      dropdownMenuEntries: tabs.map((t) {
-                        return DropdownMenuEntry<int>(
-                          value: t.id!,
-                          label: t.title,
-                        );
-                      }).toList(),
-                    ),
+                        const SizedBox(height: 20),
 
-                    const SizedBox(height: 20),
-
-                    InkWell(
-                      onTap: () async {
-                        FilePickerResult? result = await FilePicker.platform.pickFiles();
-                        if (result != null) {
-                          setDialogState(() {
-                            kfilePath = result.files.single.path;
-                            fileNameDisplay = result.files.single.name;
-                          });
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'kifファイル',
-                          suffixIcon: Icon(Icons.upload_file),
-                        ),
-                        child: Text(
-                          fileNameDisplay,
-                          style: const TextStyle(fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    DropdownMenu<int>(
-                      label: const Text('色'),
-                      menuHeight: 300,
-                      // 1. 横幅を他の項目（タブ・ファイル）と揃える
-                      expandedInsets: EdgeInsets.zero, 
-                      // 2. 下線スタイル（Filled）を適用して枠線を消す
-                      inputDecorationTheme: InputDecorationTheme(
-                        // filled: true,
-                        // fillColor: Colors.grey.withOpacity(0.1),
-                        border: const UnderlineInputBorder(),
-                      ),
-                      // 3. メニュー（ポップアップ）の丸みはそのまま維持
-                      menuStyle: MenuStyle(
-                        shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                        DropdownMenu<int>(
+                          label: const Text('色'),
+                          menuHeight: 300,
+                          expandedInsets: EdgeInsets.zero, 
+                          inputDecorationTheme: const InputDecorationTheme(
+                            border: UnderlineInputBorder(),
                           ),
+                          menuStyle: MenuStyle(
+                            shape: WidgetStatePropertyAll(
+                              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            ),
+                          ),
+                          initialSelection: selectedColor,
+                          onSelected: (val) => setDialogState(() => selectedColor = val!),
+                          dropdownMenuEntries: [
+                            {'value': 0xFFFFFFFF, 'label': 'white'},
+                            {'value': 0xFFF7D6D3, 'label': 'red'},
+                            {'value': 0xFFFFE6C7, 'label': 'orange'},
+                            {'value': 0xFFFFF6CC, 'label': 'yellow'},
+                            {'value': 0xFFE6F5D6, 'label': 'green'},
+                            {'value': 0xFFDFF5EE, 'label': 'teal'},
+                            {'value': 0xFFE3F1F8, 'label': 'blue'},
+                            {'value': 0xFFE0E9FB, 'label': 'dark_blue'},
+                            {'value': 0xFFE9DDF8, 'label': 'violet'},
+                            {'value': 0xFFF9DDEA, 'label': 'pink'},
+                            {'value': 0xFFEEE4D6, 'label': 'brown'},
+                            {'value': 0xFFEFF1F4, 'label': 'gray'},
+                          ].map((data) => DropdownMenuEntry<int>(
+                            value: data['value'] as int,
+                            label: data['label'] as String,
+                            style: MenuItemButton.styleFrom(
+                              backgroundColor: Color(data['value'] as int),
+                            ),
+                          )).toList(),
                         ),
-                      ),
-                      initialSelection: selectedColor,
-                      onSelected: (val) => setDialogState(() => selectedColor = val!),
-                      dropdownMenuEntries: [
-                        {'value': 0xFFFFFFFF, 'label': 'white'},
-                        {'value': 0xFFF7D6D3, 'label': 'red'},
-                        {'value': 0xFFFFE6C7, 'label': 'orange'},
-                        {'value': 0xFFFFF6CC, 'label': 'yellow'},
-                        {'value': 0xFFE6F5D6, 'label': 'green'},
-                        {'value': 0xFFDFF5EE, 'label': 'teal'},
-                        {'value': 0xFFE3F1F8, 'label': 'blue'},
-                        {'value': 0xFFE0E9FB, 'label': 'dark_blue'},
-                        {'value': 0xFFE9DDF8, 'label': 'violet'},
-                        {'value': 0xFFF9DDEA, 'label': 'pink'},
-                        {'value': 0xFFEEE4D6, 'label': 'brown'},
-                        {'value': 0xFFEFF1F4, 'label': 'gray'},
-                      ].map((data) => DropdownMenuEntry<int>(
-                        value: data['value'] as int,
-                        label: data['label'] as String,
-                        style: MenuItemButton.styleFrom(
-                          backgroundColor: Color(data['value'] as int),
-                        ),
-                      )).toList(),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
 
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold),),
-              ),
-              TextButton(
-                // ボタンのonPressed内
-                onPressed: () async {
-                  if (titleController.text.isNotEmpty) {
-                    int finalKifId = kif.kifId;
-                    int finalKifOrder = kif.kifOrder;
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  TextButton(
+                    // ★ 拡張子エラーが表示されている間だけボタンを無効化（元の中身が残っていても一時停止）
+                    onPressed: errorMessage != null ? null : () async {
+                      if (titleController.text.isNotEmpty) {
+                        int finalKifId = kif.kifId;
+                        int finalKifOrder = kif.kifOrder;
 
-                    // タブが移動したかチェック
-                    if (selectedTabId != kif.tabId) {
-                      // 移動先のタブでの最大値を新規取得
-                      final maxKifId = await KifDao().getMaxKifId(selectedTabId);
-                      finalKifId = maxKifId + 1;
-                      finalKifOrder = maxKifId + 1;
-                    }
+                        if (selectedTabId != kif.tabId) {
+                          final maxKifId = await KifDao().getMaxKifId(selectedTabId);
+                          finalKifId = maxKifId + 1;
+                          finalKifOrder = maxKifId + 1;
+                        }
 
-                    final updatedKif = KifEntity(
-                      id: kif.id,
-                      tabId: selectedTabId,
-                      kifId: finalKifId,
-                      title: titleController.text,
-                      detail: detailController.text,
-                      kifOrder: finalKifOrder,
-                      kifPath: kfilePath,
-                      imgPath: kif.imgPath,
-                      color: selectedColor,
-                    );
+                        final updatedKif = KifEntity(
+                          id: kif.id,
+                          tabId: selectedTabId,
+                          kifId: finalKifId,
+                          title: titleController.text,
+                          detail: detailController.text,
+                          kifOrder: finalKifOrder,
+                          kifPath: kfilePath,
+                          imgPath: kif.imgPath,
+                          color: selectedColor,
+                        );
 
-                    await KifDao().updateKif(updatedKif);
-                    
-                    UiUtils.showSuccessSnackBar(context, "棋譜を更新しました");
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      onRefresh();
-                    }
-                  }
-                },
-                child: const Text('更新', style: TextStyle(fontWeight: FontWeight.bold),),
-              ),
-            ],
+                        await KifDao().updateKif(updatedKif);
+                        
+                        UiUtils.showSuccessSnackBar(context, "棋譜を更新しました");
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          onRefresh();
+                        }
+                      }
+                    },
+                    child: const Text('更新', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
