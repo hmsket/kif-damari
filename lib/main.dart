@@ -6,6 +6,7 @@ import 'package:kifdamari/widgets/kif_list_widget.dart';
 import 'database/dao/tab_dao.dart';
 import 'database/entity/tab_entity.dart';
 import 'utils/dialog_utils.dart';
+import 'package:url_launcher/url_launcher.dart'; // ★追加
 
 // AppModeにsortを追加
 enum AppMode { normal, edit, sort, delete }
@@ -134,13 +135,84 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
         return Scaffold(
           backgroundColor: const Color(0XFFF1F1F5),
+          // 【ポイント1】Scaffoldにdrawerを追加。これで左からのスワイプでサイドバーが出ます
+// Scaffoldのdrawer部分
+          drawer: Drawer(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                const DrawerHeader(
+                  decoration: BoxDecoration(color: Color(0xFF1E88E5)),
+                  child: Text(
+                    '棋譜だまりメニュー',
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: const Text('設定'),
+                  onTap: () {
+                    Navigator.pop(context); // サイドバーを閉じる
+                    // TODO: 設定画面への遷移などをここに書く
+                  },
+                ),
+                // ★ここに追加しました
+ListTile(
+                  leading: const Icon(Icons.privacy_tip),
+                  title: const Text('プライバシーポリシー'),
+                  onTap: () async {
+                    Navigator.pop(context); // 先にサイドバーを閉じる
+                    
+                    // ★ Google サイトで公開したあなたのURLに書き換えてください
+                    final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-privacy');
+                    
+                    try {
+                      // 外部ブラウザでURLを開く
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url,
+                        );
+                      } else {
+                        if (mounted) {
+                          UiUtils.showSuccessSnackBar(context, "ページを開けませんでした");
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        UiUtils.showSuccessSnackBar(context, "ページを開けませんでした");
+                      }
+                    }
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.info),
+                  title: const Text('アプリについて'),
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+          ),
           appBar: AppBar(
-            leading: Padding(
-              padding: const EdgeInsets.fromLTRB(8.0, 0, 0, 0),
-              child: Image.asset(
-                'assets/images/appbar_icon.png',
-                fit: BoxFit.contain,
-              ),
+            // drawerがあっても自動でハンバーガーアイコンを出さない
+            automaticallyImplyLeading: false,
+            // Builderで囲むことで、Scaffoldのcontext（情報）を正しく取得できるようにします
+            leading: Builder(
+              builder: (context) {
+                return GestureDetector(
+                  // 画像がタップされたらサイドバー（Drawer）を開く
+                  onTap: () => Scaffold.of(context).openDrawer(),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8.0, 0, 0, 0),
+                    child: Image.asset(
+                      'assets/images/appbar_icon.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                );
+              },
             ),
             backgroundColor: const Color(0XFFFFFFFF),
             title: Row(
@@ -155,12 +227,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 IconButton(
                   icon: const Icon(Icons.check, size: 30),
                   onPressed: () async {
-                    // チェックボタン押下時、並べ替えモードならDB保存を実行
                     if (_currentMode == AppMode.sort) {
                       final currentTabId = tabs[_currentTabIndex].id;
                       final state = _listKeys[currentTabId]?.currentState;
                       if (state != null) {
-                        await state.saveOrder(); // KifListWidget内の一時リストを保存
+                        await state.saveOrder();
                         UiUtils.showSuccessSnackBar(context, "棋譜の並び順を更新しました");
                       }
                     }
@@ -189,7 +260,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   tooltip: '編集',
                   onPressed: () => _updateMode(AppMode.edit),
                 ),
-                // 並べ替えプルダウンメニュー
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.swap_vert),
                   tooltip: '並び替え',
@@ -261,7 +331,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               : TabBarView(
                   controller: _tabController,
                   children: tabs.map((t) {
-                    // 各タブのStateを識別するためのKeyを管理
                     final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
                     return KifListWidget(
                       key: key,
