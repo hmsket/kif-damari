@@ -213,6 +213,30 @@ ListTile(
                   },
                 ),
 
+                // 利用規約の下あたりに追加するのが一般的です
+                ListTile(
+                  leading: const Icon(Icons.verified_user_outlined), // ライセンスっぽい盾や証明書のマーク
+                  title: const Text('ライセンス'),
+                  onTap: () {
+                    Navigator.pop(context); // 先にサイドバーを閉じる
+                    
+                    // ★Flutter標準のライセンスページを爆速で開く
+                    showLicensePage(
+                      context: context,
+                      applicationName: '棋譜だまり', // アプリ名
+                      applicationVersion: '1.0.0', // バージョン（pubspec.yamlと合わせておくと良いです）
+                      applicationIcon: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Image.asset(
+                          'assets/images/appbar_icon.png', // おなじみの画像アイコン
+                          width: 48,
+                          height: 48,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
                 ListTile(
                   leading: const Icon(Icons.info),
                   title: const Text('アプリについて'),
