@@ -231,21 +231,11 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
   int selectedColor = 0xFFFFFFFF;
   String? kfilePath;
   String fileNameDisplay = "未選択";
-  String? errorMessage; // ★ 追加：エラーメッセージ用の変数
+  String? errorMessage;
 
   showDialog(
     context: context,
     builder: (context) {
-
-      // 共通のスタイル定義
-      final m3InputDecoration = InputDecoration(
-        border: const UnderlineInputBorder(), 
-        enabledBorder: UnderlineInputBorder(),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.blue, width: 2),
-        ),
-      );
-
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
@@ -266,7 +256,6 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 左側：画像エリア
                           SizedBox(
                             width: 120,
                             height: 120,
@@ -278,7 +267,6 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                               ),
                             ),
                           ),
-                          // 右側：入力エリア
                           Expanded(
                             child: SizedBox(
                               height: 120,
@@ -335,31 +323,24 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                     DropdownMenu<int>(
                       label: const Text('タブ'),
                       expandedInsets: EdgeInsets.zero,
-                      inputDecorationTheme: InputDecorationTheme(
-                        border: const UnderlineInputBorder(),
+                      inputDecorationTheme: const InputDecorationTheme(
+                        border: UnderlineInputBorder(),
                       ),
                       menuStyle: MenuStyle(
                         shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         ),
                       ),
                       initialSelection: selectedTabId,
                       onSelected: (value) => setDialogState(() => selectedTabId = value!),
                       dropdownMenuEntries: tabs.map((t) {
-                        return DropdownMenuEntry<int>(
-                          value: t.id!,
-                          label: t.title,
-                        );
+                        return DropdownMenuEntry<int>(value: t.id!, label: t.title);
                       }).toList(),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // ★ 修正箇所：kif選択時の拡張子エラーチェック処理
                     InkWell(
-                      // ★ onTap の中身を以下に差し替え
                       onTap: () async {
                         try {
                           FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
@@ -369,12 +350,11 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
 
                             if (fileName.toLowerCase().endsWith('.kif')) {
                               setDialogState(() {
-                                kfilePath = file.path;          // 正しいのでパスを保存
-                                fileNameDisplay = fileName;    // ファイル名を表示
-                                errorMessage = null;           // エラーを消す
+                                kfilePath = file.path;
+                                fileNameDisplay = fileName;
+                                errorMessage = null;
                               });
                             } else {
-                              // ★ 変更：kfilePath や fileNameDisplay は元の状態を維持する
                               setDialogState(() {
                                 errorMessage = "拡張子が .kif のファイルを選択してください";
                               });
@@ -386,6 +366,20 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                           });
                         }
                       },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'kifファイル',
+                          suffixIcon: const Icon(Icons.upload_file),
+                          errorText: errorMessage,
+                        ),
+                        child: Text(
+                          fileNameDisplay,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
                     ),
 
                     const SizedBox(height: 20),
@@ -394,14 +388,12 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                       label: const Text('色'),
                       menuHeight: 300,
                       expandedInsets: EdgeInsets.zero, 
-                      inputDecorationTheme: InputDecorationTheme(
-                        border: const UnderlineInputBorder(),
+                      inputDecorationTheme: const InputDecorationTheme(
+                        border: UnderlineInputBorder(),
                       ),
                       menuStyle: MenuStyle(
                         shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         ),
                       ),
                       initialSelection: selectedColor,
@@ -433,11 +425,13 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
             ),
 
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold),),),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold)),),
               TextButton(
-                // ★ kfilePathがnull（未選択 or エラー時）はボタンが非活性（押せない状態）になります
                 onPressed: kfilePath == null ? null : () async {
-                  final maxKifId = await KifDao().getMaxKifId(selectedTabId);
+                  // ★ 対策：一件も棋譜がない場合は null が返るため、「?? 0」で0にフォールバックさせます
+                  final rawMaxKifId = await KifDao().getMaxKifId(selectedTabId);
+                  final maxKifId = rawMaxKifId ?? 0; 
+
                   final newKif = KifEntity(
                     tabId: selectedTabId,
                     kifId: maxKifId + 1,
@@ -454,7 +448,7 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
                     onRefresh();
                   }
                 },
-                child: const Text('追加', style: TextStyle(fontWeight: FontWeight.bold),),
+                child: const Text('追加', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           );
