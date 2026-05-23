@@ -186,6 +186,34 @@ ListTile(
                 ),
 
                 ListTile(
+                  leading: const Icon(Icons.description),
+                  title: const Text('利用規約'),
+                  onTap: () async {
+                    Navigator.pop(context); // 先にサイドバーを閉じる
+                    
+                    // ★ Google サイトで公開したあなたのURLに書き換えてください
+                    final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-terms');
+                    
+                    try {
+                      // 外部ブラウザでURLを開く
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url,
+                        );
+                      } else {
+                        if (mounted) {
+                          UiUtils.showSuccessSnackBar(context, "ページを開けませんでした");
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        UiUtils.showSuccessSnackBar(context, "ページを開けませんでした");
+                      }
+                    }
+                  },
+                ),
+
+                ListTile(
                   leading: const Icon(Icons.info),
                   title: const Text('アプリについて'),
                   onTap: () {
