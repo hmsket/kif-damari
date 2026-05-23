@@ -7,6 +7,7 @@ import 'database/dao/tab_dao.dart';
 import 'database/entity/tab_entity.dart';
 import 'utils/dialog_utils.dart';
 import 'package:url_launcher/url_launcher.dart'; // ★追加
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // AppModeにsortを追加
 enum AppMode { normal, edit, sort, delete }
@@ -154,6 +155,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   onTap: () {
                     Navigator.pop(context); // サイドバーを閉じる
                     // TODO: 設定画面への遷移などをここに書く
+                  },
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                  child: Text(
+                    'SNS',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey, // 少し薄い色にして「見出し」感を演出
+                    ),
+                  ),
+                ),
+                ListTile(
+                  // Flutter標準の「シェア」や「パブリック」を連想させるアイコン
+                  leading: const FaIcon(
+                    FontAwesomeIcons.xTwitter, 
+                    size: 20, // 他のアイコンとサイズ感を合わせるために20〜22くらいがおすすめ
+                  ),
+                  title: const Text('公式𝕏（旧Twitter）'),
+                  onTap: () async {
+                    Navigator.pop(context); // サイドバーを閉じる
+                    
+                    // ★ご自身のXのアカウント名（@以降）に書き換えてください
+                    final Uri url = Uri.parse('https://x.com/kif_damari');
+                    
+                    try {
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url, 
+                          mode: LaunchMode.externalApplication, // ブラウザ、またはXのアプリで開く
+                        );
+                      } else {
+                        if (mounted) {
+                          UiUtils.showSuccessSnackBar(context, "リンクを開けませんでした");
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        UiUtils.showSuccessSnackBar(context, "エラーが発生しました");
+                      }
+                    }
                   },
                 ),
                 // const Divider(), // 薄い区切り線を入れて見やすくします
