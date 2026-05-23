@@ -156,6 +156,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     // TODO: 設定画面への遷移などをここに書く
                   },
                 ),
+                // const Divider(), // 薄い区切り線を入れて見やすくします
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                  child: Text(
+                    '法的情報',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey, // 少し薄い色にして「見出し」感を演出
+                    ),
+                  ),
+                ),
                 // ★ここに追加しました
 ListTile(
                   leading: const Icon(Icons.privacy_tip),
