@@ -1,25 +1,24 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' as ui; // 追加
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
+import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
-import 'package:kifdamari/database/entity/kif_entity.dart'; // 追加
-import 'package:kifdamari/logic/diagram_generator.dart'; // 追加
+import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/logic/diagram_generator.dart';
 import 'package:kifdamari/logic/thumbnail_manager.dart';
-import 'package:path_provider/path_provider.dart'; // 追加
+import 'package:path_provider/path_provider.dart';
 
 import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:kifdamari/models/game_node.dart'; // ★これを追加
+import 'package:kifdamari/models/game_node.dart';
 
 class KifViewerPage extends StatefulWidget {
-  final KifEntity kifEntity; // String? kifPath から変更
+  final KifEntity kifEntity;
 
   const KifViewerPage({super.key, required this.kifEntity});
 
@@ -34,6 +33,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
   bool _isReversed = false;
   double _dragStartX = 0.0; 
   int _dragStartMoveNumber = 0; 
+
+  // 🌟 追加：カスタムサイドバーの開閉を管理する状態変数
+  bool _isSidebarOpen = false;
 
   @override
   void initState() {
@@ -58,12 +60,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
         String content;
 
         try {
-          // 1. まずは UTF-8 としてデコードを試みる
-          // allowMalformed: false にすることで、不正なバイトがある場合に例外を投げさせる
           content = utf8.decode(bytes, allowMalformed: false);
           debugPrint("UTF-8 で読み込みました");
         } catch (_) {
-          // 2. UTF-8 で失敗した場合は Shift-JIS としてデコード
           content = await CharsetConverter.decode("Shift_JIS", bytes);
           debugPrint("Shift-JIS で読み込みました");
         }
@@ -86,15 +85,12 @@ class _KifViewerPageState extends State<KifViewerPage> {
     }
   }
 
-  // サムネイル生成とDB更新の実体メソッド
   Future<void> _handleMakeThumbnail() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('サムネイル画像を生成中...'), duration: Duration(seconds: 1)),
     );
 
     try {
-      // 1. Canvasで画像を生成
-      // lib/pages/kif_viewer_page.dart 内の _handleMakeThumbnail
       final uiImage = await DiagramGenerator.generate(
         kifTree!.currentNode.state,
       );
@@ -104,15 +100,12 @@ class _KifViewerPageState extends State<KifViewerPage> {
       if (byteData != null) {
         final Uint8List pngBytes = byteData.buffer.asUint8List();
         
-        // 2. ThumbnailManagerを使用して物理ファイルを保存
         final savedPath = await ThumbnailManager.saveThumbnail(
           widget.kifEntity.tabId, 
           widget.kifEntity.kifId, 
           pngBytes
         );
 
-        // 3. KifEntityのimgPathを更新した新しいインスタンスを作成
-        // KifEntityにcopyWithがない場合は、全ての引数を渡して再生成します
         final updatedKif = KifEntity(
           id: widget.kifEntity.id,
           tabId: widget.kifEntity.tabId,
@@ -121,11 +114,10 @@ class _KifViewerPageState extends State<KifViewerPage> {
           detail: widget.kifEntity.detail,
           kifOrder: widget.kifEntity.kifOrder,
           kifPath: widget.kifEntity.kifPath,
-          imgPath: savedPath, // ここに新しいパスをセット
+          imgPath: savedPath,
           color: widget.kifEntity.color,
         );
 
-        // 4. KifDaoを使用してデータベースを更新
         await KifDao().updateKif(updatedKif);
 
         debugPrint("DB更新完了: $savedPath");
@@ -142,7 +134,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
     }
   }
 
-  // ★ ②：分岐選択ボトムシートを表示するメソッド
   void _showBranchSelector(List<GameNode> nextNodes) {
     showModalBottomSheet(
       context: context,
@@ -167,9 +158,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 ),
               ),
               const Divider(height: 1),
-              // 分岐の数（nextNodesの要素数）だけ選択肢（ListTile）を生成
               ...nextNodes.map((node) {
-                // ラベルから「(49)」などの移動元情報を消してスッキリさせる処理
                 final cleanLabel = node.moveLabel!.replaceAll(RegExp(r'\(.*\)'), '');
                 return ListTile(
                   leading: const Icon(Icons.navigation_rounded, color: Colors.orange),
@@ -178,9 +167,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                   onTap: () {
-                    Navigator.pop(context); // まずボトムシートを閉じる
+                    Navigator.pop(context);
                     setState(() {
-                      kifTree!.stepNext(chosenNode: node); // 選んだノードを指定して進む
+                      kifTree!.stepNext(chosenNode: node);
                     });
                   },
                 );
@@ -201,101 +190,188 @@ class _KifViewerPageState extends State<KifViewerPage> {
       );
     }
 
+    // 🌟 サイドバーの横幅（画面全体の85%）
+    final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
+
     return Scaffold(
       backgroundColor: Colors.orange[50],
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onLongPressStart: (details) {
-          HapticFeedback.mediumImpact(); 
-          setState(() {
-            _isSeeking = true;
-            _dragStartX = details.localPosition.dx;
-            _dragStartMoveNumber = kifTree!.currentNode.moveNumber;
-          });
-        },
-        onLongPressMoveUpdate: (details) {
-          if (!_isSeeking) return;
-          double deltaX = details.localPosition.dx - _dragStartX;
-          int sensitivity = 3; 
-          int moveOffset = (deltaX / sensitivity).toInt();
-          
-          setState(() {
-            kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
-          });
-        },
-        onLongPressEnd: (_) => setState(() => _isSeeking = false),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // --- 上側のエリア ---
-              _buildPlayerAndKomaDai(
-                playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
-                isSente: _isReversed, 
-                isUpper: true, // ★ 常に上側レイアウト
-              ),
-              // --- 盤面エリア ---
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: AspectRatio(
-                  aspectRatio: 0.93,
-                  child: Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      GestureDetector(
-                        onTapUp: (details) {
-                          if (_isSeeking) return;
-                          final box = context.findRenderObject() as RenderBox?;
-                          if (box == null) return;
-                          final halfWidth = box.size.width / 2;
-                          
-                          // タップ位置による進む・戻るの判定
-                          // 反転時は左右の役割を入れ替えるかどうかは好みによります
-                          setState(() {
-                            if (details.localPosition.dx > halfWidth) {
-                              kifTree!.stepNext();
-                            } else {
-                              kifTree!.stepBack();
-                            }
-                          });
-                        },
-                        child: KifBoard(
-                          state: kifTree!.currentNode.state,
-                          isReversed: _isReversed, // ★ 盤面コンポーネントに渡す
-                        ),
+      // 🌟 endDrawer は競合を避けるために完全に削除し、Stackによるカスタムドロワーに移行します。
+      body: Stack(
+        children: [
+          // 1. 【メインコンテンツ】将棋盤やコントロールパネル一式
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onLongPressStart: (details) {
+              HapticFeedback.mediumImpact(); 
+              setState(() {
+                _isSeeking = true;
+                _dragStartX = details.localPosition.dx;
+                _dragStartMoveNumber = kifTree!.currentNode.moveNumber;
+              });
+            },
+            onLongPressMoveUpdate: (details) {
+              if (!_isSeeking) return;
+              double deltaX = details.localPosition.dx - _dragStartX;
+              int sensitivity = 3; 
+              int moveOffset = (deltaX / sensitivity).toInt();
+              
+              setState(() {
+                kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
+              });
+            },
+            onLongPressEnd: (_) => setState(() => _isSeeking = false),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // --- 上側のエリア ---
+                  _buildPlayerAndKomaDai(
+                    playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
+                    isSente: _isReversed, 
+                    isUpper: true,
+                  ),
+                  // --- 盤面エリア ---
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: AspectRatio(
+                      aspectRatio: 0.93,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          GestureDetector(
+                            onTapUp: (details) {
+                              if (_isSeeking) return;
+                              final box = context.findRenderObject() as RenderBox?;
+                              if (box == null) return;
+                              final halfWidth = box.size.width / 2;
+                              
+                              setState(() {
+                                if (details.localPosition.dx > halfWidth) {
+                                  kifTree!.stepNext();
+                                } else {
+                                  kifTree!.stepBack();
+                                }
+                              });
+                            },
+                            child: KifBoard(
+                              state: kifTree!.currentNode.state,
+                              isReversed: _isReversed,
+                            ),
+                          ),
+                          if (_isSeeking) _buildFloatingSeekBar(),
+                        ],
                       ),
-                      if (_isSeeking) _buildFloatingSeekBar(),
-                    ],
-                  ),
-                ),
-              ),
-              // --- 下側のエリア ---
-              _buildPlayerAndKomaDai(
-                playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
-                isSente: !_isReversed,
-                isUpper: false, // ★ 常に下側レイアウト
-              ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                  padding: const EdgeInsets.all(12.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.brown[200]!),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      "${kifTree!.currentNode.joinedComment}",
-                      style: const TextStyle(fontSize: 14, height: 1.5),
                     ),
                   ),
+                  // --- 下側のエリア ---
+                  _buildPlayerAndKomaDai(
+                    playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
+                    isSente: !_isReversed,
+                    isUpper: false,
+                  ),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.brown[200]!),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          "${kifTree!.currentNode.joinedComment}",
+                          style: const TextStyle(fontSize: 14, height: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildControlPanel(),
+                ],
+              ),
+            ),
+          ),
+
+          // 2. 【暗幕レイヤー】サイドバーが開いている時にメイン画面をじんわり暗くし、タップで閉じる機能
+          if (_isSidebarOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isSidebarOpen = false;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  color: Colors.black.withOpacity(0.4),
                 ),
               ),
-              _buildControlPanel(),
-            ],
+            ),
+
+          // 3. 【カスタムサイドバー本体】アニメーションスライドイン
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            right: _isSidebarOpen ? 0 : -sidebarWidth, // 画面外か、画面の右端ぴったりか
+            top: 0,
+            bottom: 0,
+            width: sidebarWidth,
+            child: Material(
+              elevation: 16,
+              color: Colors.white,
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '局面分岐ツリー',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              setState(() {
+                                _isSidebarOpen = false;
+                              });
+                            },
+                          )
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: KifTreeView(
+                        rootNode: kifTree!.root,
+                        currentNode: kifTree!.currentNode,
+                        onNodeSelected: (selectedNode) {
+                          setState(() {
+                            kifTree!.currentNode = selectedNode;
+
+                            // タップしたノードからルートまで遡り、選択分岐インデックスを同期
+                            GameNode? temp = selectedNode;
+                            while (temp != null && temp.parent != null) {
+                              final parent = temp.parent!;
+                              parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
+                              temp = parent;
+                            }
+                            
+                            // 🌟 追加：ノードがタップされて局面移動したら、スッとサイドバーを閉じる
+                            _isSidebarOpen = false;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -345,14 +421,13 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
-Widget _buildControlPanel() {
-    // テーマ色の取得
+  Widget _buildControlPanel() {
     final colorScheme = Theme.of(context).colorScheme;
-    double _dragDistance = 0;
+    double dragDistance = 0;
 
     return Container(
       color: const Color(0XFFF1F1F5),
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // 全体の余白調整
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -365,91 +440,88 @@ Widget _buildControlPanel() {
             iconSize: 36,
             onPressed: () => setState(() => kifTree!.stepBack()),
           ),
-GestureDetector(
-            // 縦ドラッグ（上下スワイプ）で進む・戻る
+          GestureDetector(
             onVerticalDragUpdate: (details) {
-              _dragDistance += details.delta.dy;
+              dragDistance += details.delta.dy;
               const double threshold = 10.0;
-              if (_dragDistance <= -threshold) {
+              if (dragDistance <= -threshold) {
                 setState(() {
                   kifTree!.stepNext();
-                  _dragDistance = 0;
+                  dragDistance = 0;
                 });
-              } else if (_dragDistance >= threshold) {
+              } else if (dragDistance >= threshold) {
                 setState(() {
                   kifTree!.stepBack();
-                  _dragDistance = 0;
+                  dragDistance = 0;
                 });
               }
             },
-            onVerticalDragEnd: (_) => _dragDistance = 0,
-            
-            // ★ここを追加：中央ボタンをタップした時、分岐があればボトムシートを開く
+            onVerticalDragEnd: (_) => dragDistance = 0,
             onTap: () {
               final nextNodes = kifTree!.currentNode.nextNodes;
               if (nextNodes.length > 1) {
                 _showBranchSelector(nextNodes);
               }
             },
-            
             child: SizedBox(
-              width: 90, // 変化の文字が入るように少し幅を広げました
+              width: 90,
               child: Builder(
                 builder: (context) {
-                  // 分岐（次の手が複数）がある局面か判定
                   final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
-                  
-                  // 現在本譜ではなく「変化ルート」を歩んでいるか判定
                   final bool isInsideBranch = kifTree!.currentNode.parent != null && 
-                                             kifTree!.currentNode.parent!.nextNodes.first != kifTree!.currentNode;
+                                              kifTree!.currentNode.parent!.nextNodes.first != kifTree!.currentNode;
 
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    decoration: BoxDecoration(
-                      // ★分岐がある局面は、ボタンを「薄いオレンジ」にしてアピール！
-                      color: hasBranch ? Colors.orange[100] : Colors.white,
-                      border: Border.all(
-                        // ★分岐がある、または変化進行中はオレンジの太い枠線にする
-                        color: hasBranch ? Colors.orange[700]! : Colors.black45, 
-                        width: hasBranch ? 2.0 : 1.5,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // メインのテキスト表示
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${kifTree!.currentNode.moveNumber}手目',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.normal,
-                                color: Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              kifTree!.currentNode.moveLabel!.replaceAll(RegExp(r'\(.*\)'), ''),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.black,
-                                height: 1.1,
-                              ),
-                            ),
-                          ],
+                  return GestureDetector(
+                    onTap: () {
+                      // 🌟 修正：Scaffoldのエンドドロワーではなく、setStateで自作サイドバーのフラグをONにする
+                      setState(() {
+                        _isSidebarOpen = true;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: hasBranch ? Colors.orange[100] : Colors.white,
+                        border: Border.all(
+                          color: hasBranch ? Colors.orange[700]! : Colors.black45, 
+                          width: hasBranch ? 2.0 : 1.5,
                         ),
-                        // ★分岐がある局面だけ、右上に小さな「分岐マーク（⇄）」をそっと添える
-                        if (hasBranch)
-                          const Positioned(
-                            top: -2,
-                            right: 0,
-                            child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${kifTree!.currentNode.moveNumber}手目',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.normal,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                kifTree!.currentNode.moveLabel!.replaceAll(RegExp(r'\(.*\)'), ''),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.black,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ],
                           ),
-                      ],
+                          if (hasBranch)
+                            const Positioned(
+                              top: -2,
+                              right: 0,
+                              child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 }
@@ -465,7 +537,6 @@ GestureDetector(
             icon: const Icon(Icons.last_page),
             onPressed: () => setState(() => kifTree!.jumpTo(kifTree!.totalMoveCount)),
           ),
-          // --- メニューボタンなどの既存ボタン群 ---
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             offset: const Offset(0, -220),
@@ -480,11 +551,10 @@ GestureDetector(
                     _isReversed = !_isReversed;
                   });
                   break;
-                // 他のケースも必要に応じて追加
               }
             },
             itemBuilder: (BuildContext context) => [
-              const PopupMenuItem( // 追加
+              const PopupMenuItem(
                 value: 'make_thumbnail',
                 child: ListTile(
                   leading: Icon(Icons.collections, size: 20),
@@ -493,7 +563,7 @@ GestureDetector(
                   visualDensity: VisualDensity.compact,
                 ),
               ),              
-              const PopupMenuItem( // 追加
+              const PopupMenuItem(
                 value: 'share_thumbnail',
                 child: ListTile(
                   leading: Icon(Icons.share, size: 20),
@@ -542,16 +612,11 @@ GestureDetector(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: Row(
         children: [
-          // 上側（isUpper=true）なら先に氏名を表示
           if (isUpper) ...[
             _buildNameLabel(playerName, isSente),
             const SizedBox(width: 8),
           ],
-          
-          // 駒台（isSenteを渡して中身のデータを取得、isUpperを渡して配置を決定）
           Expanded(child: _buildPieceStand(isSente, isUpper)),
-          
-          // 下側（isUpper=false）なら後に氏名を表示
           if (!isUpper) ...[
             const SizedBox(width: 8),
             _buildNameLabel(playerName, isSente),
@@ -572,25 +637,18 @@ GestureDetector(
       );
     }
 
-    // --- 修正ポイント：ベースを「弱い順」に定義 ---
     const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi']; 
 
-    // 枚数が1以上のものを抽出
-    // この時点で [fu, ky, ..., hi] の順に並ぶ
     var sortedEntries = priorityOrder
         .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
         .map((key) => MapEntry(key, hand[key]!))
         .toList();
 
-    // 後手の場合は「右側から弱い順」にするため、リストを反転させて [hi, ..., fu] にする
-    // これを WrapAlignment.end で表示すると、一番右端に 'fu' が来る
     if (!isSente) {
       sortedEntries = sortedEntries.reversed.toList();
     }
 
     return Wrap(
-      // 先手は左寄せ（左端から fu, ky...）
-      // 後手は右寄せ（右端から fu, ky...）
       alignment: isUpper ? WrapAlignment.end : WrapAlignment.start,
       spacing: 1.0,
       runSpacing: 1.0,
@@ -639,7 +697,6 @@ GestureDetector(
   Future<void> _shareThumbnail() async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      // パスは前回のものと同じ
       final path = '${appDir.path}/thumbnails/thumb_${widget.kifEntity.tabId}_${widget.kifEntity.kifId}.png';
       final file = File(path);
 
