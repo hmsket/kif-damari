@@ -194,7 +194,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
     return Scaffold(
-      backgroundColor: Colors.orange[50],
+      // backgroundColor: Colors.orange[50],
       // 🌟 endDrawer は競合を避けるために完全に削除し、Stackによるカスタムドロワーに移行します。
       body: Stack(
         children: [
@@ -276,7 +276,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.brown[200]!),
+                        // border: Border.all(color: Colors.brown[200]!),
                       ),
                       child: SingleChildScrollView(
                         child: Text(
