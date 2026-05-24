@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:kifdamari/pages/version_info_page.dart';
 import 'package:kifdamari/utils/ui_utils.dart';
 import 'package:kifdamari/widgets/kif_list_widget.dart';
 import 'database/dao/tab_dao.dart';
@@ -149,12 +150,38 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     style: TextStyle(color: Colors.white, fontSize: 20),
                   ),
                 ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                  child: Text(
+                    '棋譜だまり',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey, // 少し薄い色にして「見出し」感を演出
+                    ),
+                  ),
+                ),
                 ListTile(
                   leading: const Icon(Icons.settings),
                   title: const Text('設定'),
                   onTap: () {
                     Navigator.pop(context); // サイドバーを閉じる
                     // TODO: 設定画面への遷移などをここに書く
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outlined), // 見出しに合わせてoutlinedにするのも綺麗です！
+                  title: const Text('バージョン情報'),
+                  onTap: () {
+                    Navigator.pop(context); // 先にサイドバーを閉じる
+                    
+                    // ★アプリ内の更新履歴画面へ画面遷移
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const VersionInfoPage(),
+                      ),
+                    );
                   },
                 ),
                 const Padding(
@@ -289,14 +316,6 @@ ListTile(
                         ),
                       ),
                     );
-                  },
-                ),
-
-                ListTile(
-                  leading: const Icon(Icons.info),
-                  title: const Text('アプリについて'),
-                  onTap: () {
-                    Navigator.pop(context);
                   },
                 ),
               ],
