@@ -48,48 +48,83 @@ class _KifTreeViewState extends State<KifTreeView> {
     _buildTreeLayout();
   }
 
-  /// 外部から渡されたルートノードを基に、各ノードの2次元グリッド座標 (X: 分岐列, Y: 手数) を計算します
+/// 外部から渡されたルートノードを基に、各ノードの2次元グリッド座標 (X: 分岐列, Y: 手数) を計算します
   void _buildTreeLayout() {
     rootNode = widget.rootNode;
 
-    // 参照一致の空のマップで初期化
     nodePositions = HashMap<GameNode, Point<double>>.identity();
     maxColumn = 0;
     maxRow = 0;
 
-    // 行(手数)ごとの、現在使用可能な最新の列番号を追跡するマップ
-    final Map<int, double> nextColumnForRow = {};
+    final Map<GameNode, double> subtreeWidths = HashMap<GameNode, double>.identity();
+    _calculateSubtreeWidths(rootNode, subtreeWidths);
 
-    _calculatePositions(rootNode, 0.0, nextColumnForRow);
+    // 🌟 整数値で厳密に重なりを管理するため、double ではなく int 型のマップにします
+    final Map<int, int> nextColumnForRow = {};
+
+    // 3つ目の引数（基準列）も 0 (整数) からスタートします
+    _assignPositions(rootNode, 0, subtreeWidths, nextColumnForRow);
   }
 
-  /// 再帰的にツリーを探索し、重ならないように座標を割り当てるアルゴリズム
-  void _calculatePositions(GameNode node, double preferredColumn, Map<int, double> nextColumnForRow) {
+  /* _calculateSubtreeWidths は変更なしでOKです */
+
+  /// 【2パス目】サブツリーの幅を考慮し、グリッドに綺麗に配置する
+  void _assignPositions(
+    GameNode node,
+    int currentLeftColumn, // 🌟 ズレを防ぐため int 型に変更
+    Map<GameNode, double> subtreeWidths,
+    Map<int, int> nextColumnForRow, // 🌟 int 型に変更
+  ) {
     final int row = node.moveNumber;
-    
-    // この行（手数）ですでに他の分岐が使っている右端の列を取得
-    double assignedColumn = preferredColumn;
-    final double currentNextAvail = nextColumnForRow[row] ?? 0.0;
-    
+
+    // この行（手数）で、すでに使われた列よりも左にいかないようにガード
+    int assignedColumn = currentLeftColumn;
+    final int currentNextAvail = nextColumnForRow[row] ?? 0;
     if (assignedColumn < currentNextAvail) {
       assignedColumn = currentNextAvail;
     }
 
-    // 座標を確定 (X, Y)
-    nodePositions[node] = Point(assignedColumn, row.toDouble());
-    
-    // この行の次の空き列を更新 (ノード同士が重ならないように1.2マス空ける)
-    nextColumnForRow[row] = assignedColumn + 1.2;
+    // 座標を確定 (Xはきれいな整数値になるため、縦のラインが完全に揃います)
+    nodePositions[node] = Point(assignedColumn.toDouble(), row.toDouble());
 
-    if (assignedColumn > maxColumn) maxColumn = assignedColumn;
+    // 🌟 余白（+1.2）を足すのをやめ、シンプルに「1列消費した」として更新します
+    nextColumnForRow[row] = assignedColumn + 1;
+
+    if (assignedColumn > maxColumn) maxColumn = assignedColumn.toDouble();
     if (row > maxRow) maxRow = row.toDouble();
 
-    // 子ノード（次の一手）を探索
+    // 子ノードの配置を開始する「基準の左端列」
+    int childLeftPointer = assignedColumn;
+
     for (int i = 0; i < node.nextNodes.length; i++) {
-      // 最初の子供（本譜）は同じ列を維持し、2番目以降の分岐（変化）は右側にずらして配置する
-      final double childPreferredColumn = (i == 0) ? assignedColumn : assignedColumn + (i * 1.0);
-      _calculatePositions(node.nextNodes[i], childPreferredColumn, nextColumnForRow);
+      final child = node.nextNodes[i];
+      // 幅を整数に切り上げ（通常は1.0, 2.0などの整数が入っています）
+      final int childWidth = (subtreeWidths[child] ?? 1.0).ceil();
+
+      // 子ノードを配置
+      _assignPositions(child, childLeftPointer, subtreeWidths, nextColumnForRow);
+
+      // 次の兄弟ノードは、この子のサブツリーが消費した幅の分だけ右にずらす
+      childLeftPointer += childWidth;
     }
+  }
+
+  /// 【1パス目】ノードが配下に持つサブツリーの総列幅を計算する（最低値は 1.0）
+  double _calculateSubtreeWidths(GameNode node, Map<GameNode, double> subtreeWidths) {
+    if (node.nextNodes.isEmpty) {
+      subtreeWidths[node] = 1.0;
+      return 1.0;
+    }
+
+    double totalWidth = 0.0;
+    for (final child in node.nextNodes) {
+      totalWidth += _calculateSubtreeWidths(child, subtreeWidths);
+    }
+
+    // 子ノードが複数ある場合はその合計、1つだけの場合は親と同じ幅(1.0)
+    // ただし、見た目の好みに応じて最低 1.0 とする
+    subtreeWidths[node] = max(1.0, totalWidth);
+    return subtreeWidths[node]!;
   }
 
   @override
