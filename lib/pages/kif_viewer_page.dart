@@ -192,6 +192,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
     // 🌟 サイドバーの横幅（画面全体の85%）
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
+    // このメソッド、または build メソッド内の上部でコントローラーを宣言してください。
+    final ScrollController _commentScrollController = ScrollController();
 
     return Scaffold(
       // backgroundColor: Colors.orange[50],
@@ -268,6 +270,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                     isSente: !_isReversed,
                     isUpper: false,
                   ),
+                 // 【重要】もしクラスの上部（Stateの中など）に定義していない場合は、
                   Expanded(
                     child: Container(
                       width: double.infinity,
@@ -278,10 +281,16 @@ class _KifViewerPageState extends State<KifViewerPage> {
                         borderRadius: BorderRadius.circular(8),
                         // border: Border.all(color: Colors.brown[200]!),
                       ),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          "${kifTree!.currentNode.joinedComment}",
-                          style: const TextStyle(fontSize: 14, height: 1.5),
+                      // ★ Container の child の直下を Scrollbar にします
+                      child: Scrollbar(
+                        controller: _commentScrollController, // コントローラーを紐付け
+                        thumbVisibility: true,               // 常にバーを表示（お好みで false でもOK）
+                        child: SingleChildScrollView(
+                          controller: _commentScrollController, // スクロールビュー側にも同じものを渡す
+                          child: Text(
+                            "${kifTree!.currentNode.joinedComment}",
+                            style: const TextStyle(fontSize: 14, height: 1.5),
+                          ),
                         ),
                       ),
                     ),
