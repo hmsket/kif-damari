@@ -1,103 +1,115 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/board_state.dart'; // パスはプロジェクトに合わせて調整してください
+import 'package:kifdamari/models/board_state.dart';
 
 class DiagramGenerator {
-  /// 9x9の盤面のみを白黒PNG画像として生成する
- static Future<ui.Image> generate(BoardState state) async {
-    const double boardSize = 900.0; // 盤面自体のサイズ
-    const double margin = 20.0;     // ★追加：外側の余白サイズ
-    const double totalSize = boardSize + (margin * 2); // ★全体のサイズ
-    
-    const double cellSize = boardSize / 9;
+  static const double _boardSize = 900.0;
+  static const double _margin = 20.0;
+  static const double _totalSize = _boardSize + (_margin * 2);
+  static const double _cellSize = _boardSize / 9;
 
+  // 盤面を白黒PNG画像として生成する
+  static Future<ui.Image> generate(BoardState state) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    // 1. 背景を白で塗りつぶす (全体のサイズで)
+    // 背景を白で塗りつぶす
     final bgPaint = Paint()..color = Colors.white;
-    canvas.drawRect(const Rect.fromLTWH(0, 0, totalSize, totalSize), bgPaint);
+    canvas.drawRect(const Rect.fromLTWH(0, 0, _totalSize, _totalSize), bgPaint);
 
-    // ★重要：これ以降の描画をすべて余白分だけ右下にずらす
-    canvas.translate(margin, margin);
+    // これ以降の描画をすべて余白分だけ右下にずらす
+    canvas.translate(_margin, _margin);
 
-    // 1. 直近の着手マスをハイライト (BoardState内の情報を直接使用)
+    // 各要素を順番に描画
+    _drawLastMoveHighlight(canvas, state);
+    _drawBoardGrid(canvas);
+    _drawStars(canvas);
+    _drawPieces(canvas, state);
+
+    final picture = recorder.endRecording();
+    return await picture.toImage(_totalSize.toInt(), _totalSize.toInt());
+  }
+
+  // 直近の着手マスをハイライト
+  static void _drawLastMoveHighlight(Canvas canvas, BoardState state) {
     if (state.lastMoveToX != null && state.lastMoveToY != null) {
       final highlightPaint = Paint()
         ..color = Colors.red.withOpacity(0.25)
         ..style = PaintingStyle.fill;
 
-      // 盤面のインデックス計算 (BoardStateの movePiece 内のロジックと合わせる)
-      // BoardState では toY-1, 9-toX を使っているので、それに準拠します
-      double hX = (9 - state.lastMoveToX!) * cellSize;
-      double hY = (state.lastMoveToY! - 1) * cellSize;
+      double hX = (9 - state.lastMoveToX!) * _cellSize;
+      double hY = (state.lastMoveToY! - 1) * _cellSize;
 
       canvas.drawRect(
-        Rect.fromLTWH(hX, hY, cellSize, cellSize),
+        Rect.fromLTWH(hX, hY, _cellSize, _cellSize),
         highlightPaint,
       );
     }
+  }
 
-    // 2. 枠線を描く (ここは 0,0 から boardSize でOK。translate されているので)
+  // 枠線と内側の格子線を描く
+  static void _drawBoardGrid(Canvas canvas) {
     final linePaint = Paint()
       ..color = Colors.black
-      ..strokeWidth = 6.0 // ★外枠をさらに太く（3.0 -> 6.0）
+      ..strokeWidth = 6.0 // 外枠をさらに太くする
       ..style = PaintingStyle.stroke;
 
     // 外枠の描画
-    canvas.drawRect(const Rect.fromLTWH(0, 0, boardSize, boardSize), linePaint);
+    canvas.drawRect(const Rect.fromLTWH(0, 0, _boardSize, _boardSize), linePaint);
 
     // 内側の格子線
-    linePaint.strokeWidth = 2.5; // ★内側の線も少し太く（1.0 -> 2.5）
+    linePaint.strokeWidth = 2.5; // 内側の線も少し太くする
     for (int i = 1; i < 9; i++) {
       // 縦線
-      canvas.drawLine(Offset(cellSize * i, 0), Offset(cellSize * i, boardSize), linePaint);
+      canvas.drawLine(Offset(_cellSize * i, 0), Offset(_cellSize * i, _boardSize), linePaint);
       // 横線
-      canvas.drawLine(Offset(0, cellSize * i), Offset(boardSize, cellSize * i), linePaint);
+      canvas.drawLine(Offset(0, _cellSize * i), Offset(_boardSize, _cellSize * i), linePaint);
     }
+  }
 
+  // 星を描く
+  static void _drawStars(Canvas canvas) {
     final starPaint = Paint()
       ..color = Colors.black
       ..style = PaintingStyle.fill;
 
-    // 3・6・9の交点（インデックス的には3マス目と6マス目）
-    final List<double> starPositions = [cellSize * 3, cellSize * 6];
+    final List<double> starPositions = [_cellSize * 3, _cellSize * 6];
     for (var py in starPositions) {
       for (var px in starPositions) {
-        canvas.drawCircle(Offset(px, py), 12.0, starPaint); // 半径8.0くらいの円
+        canvas.drawCircle(Offset(px, py), 12.0, starPaint);
       }
     }
+  }
 
-    // 3. 駒を描画する
+  // 全ての駒を描画する
+  static void _drawPieces(Canvas canvas, BoardState state) {
     for (int y = 0; y < 9; y++) {
       for (int x = 0; x < 9; x++) {
         final String? pieceName = state.grid[y][x];
         if (pieceName != null && pieceName.trim().isNotEmpty) {
           final isSente = pieceName.startsWith('b');
           final pieceText = _convertPieceToKanji(pieceName);
-          _drawPiece(canvas, pieceText, x, y, cellSize, isSente);
+          _drawPiece(canvas, pieceText, x, y, isSente);
         }
       }
     }
-
-    final picture = recorder.endRecording();
-    // ★画像として切り出すサイズを totalSize に変更
-    return await picture.toImage(totalSize.toInt(), totalSize.toInt());
   }
 
-  static void _drawPiece(Canvas canvas, String text, int x, int y, double cellSize, bool isSente) {
+  // 駒1つの描画処理
+  static void _drawPiece(Canvas canvas, String text, int x, int y, bool isSente) {
     String visualText = text.isEmpty ? "?" : text;
 
-    final centerX = x * cellSize + cellSize / 2;
-    final centerY = y * cellSize + cellSize / 2;
+    final centerX = x * _cellSize + _cellSize / 2;
+    final centerY = y * _cellSize + _cellSize / 2;
 
     final textPainter = TextPainter(
       text: TextSpan(
         text: visualText,
         style: GoogleFonts.notoSansJp(
           color: Colors.black,
-          fontSize: cellSize * 0.8,
+          fontSize: _cellSize * 0.8,
           fontWeight: FontWeight.normal,
         ),
       ),
@@ -105,22 +117,20 @@ class DiagramGenerator {
       textAlign: TextAlign.center,
     );
 
-    textPainter.layout(minWidth: 0, maxWidth: cellSize);
+    textPainter.layout(minWidth: 0, maxWidth: _cellSize);
 
     canvas.save();
     canvas.translate(centerX, centerY);
 
     if (!isSente) {
-      canvas.rotate(3.14159); // 後手回転
+      canvas.rotate(math.pi);
     }
 
-    // textPainter.width と height を使って、
-    // 描画開始点を「中心から半分戻った位置」に正確に指定します。
-    double verticalAdjustment = cellSize * 0.05; // 0.05〜0.08 くらいで微調整
+    double verticalAdjustment = _cellSize * 0.05;
     
     final offset = Offset(
       -textPainter.width / 2, 
-      (-textPainter.height / 2) - verticalAdjustment // マイナスすることで上に移動
+      (-textPainter.height / 2) - verticalAdjustment
     );
     
     textPainter.paint(canvas, offset);
@@ -128,11 +138,10 @@ class DiagramGenerator {
     canvas.restore();
   }
 
+  // 駒のIDを漢字1文字に変換
   static String _convertPieceToKanji(String pieceId) {
     if (pieceId.isEmpty) return '';
     
-    // 先頭の 'b' や 'w' を除いた「駒種」の部分だけを抽出
-    // pieceId が 'bFU' なら 'FU' に、'FU' ならそのまま 'FU' になります
     final id = pieceId.length > 1 && (pieceId.startsWith('b') || pieceId.startsWith('w'))
         ? pieceId.substring(1).toUpperCase().trim() 
         : pieceId.toUpperCase().trim();
@@ -147,7 +156,6 @@ class DiagramGenerator {
       case 'HI': return '飛'; case 'RY': return '龍';
       case 'OU': case 'GY': return '玉';
       default: 
-        // 変換できなかった場合は、IDの先頭1文字を出す（空文字にしない）
         return id.isNotEmpty ? id[0] : '?';
     }
   }

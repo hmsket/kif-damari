@@ -28,6 +28,7 @@ class BoardState {
       (_) => List<String?>.filled(9, null),
     );
 
+    // 後手 (White) 
     initialGrid[0][0] = 'wya'; initialGrid[0][1] = 'wke'; initialGrid[0][2] = 'wgi';
     initialGrid[0][3] = 'wki'; initialGrid[0][4] = 'wgy'; initialGrid[0][5] = 'wki';
     initialGrid[0][6] = 'wgi'; initialGrid[0][7] = 'wke'; initialGrid[0][8] = 'wya';
@@ -116,7 +117,7 @@ class BoardState {
     );
   }
 
-  // 成駒を取った時に元の駒に戻すためのヘルパー
+  // 成駒を取った時に元の駒に戻す
   String _getRawPieceType(String code) {
     switch (code) {
       case 'to': return 'fu';
@@ -125,12 +126,12 @@ class BoardState {
       case 'ng': return 'gi';
       case 'um': return 'ka';
       case 'ry': return 'hi';
-      default: return code; // 成っていない駒はそのままでOK
+      default: return code;
     }
   }
 
   String _convertToAssetCode(String kanji) {
-    // 1. まず「成」が含まれているかチェック（飛成、銀成など）
+    // 「成」の文字がある成駒
     if (kanji.contains("成")) {
       if (kanji.contains("飛")) return "ry";
       if (kanji.contains("角")) return "um";
@@ -140,7 +141,7 @@ class BoardState {
       if (kanji.contains("歩")) return "to";
     }
 
-    // 2. 「成」という文字はないが、成駒の漢字単体の場合（竜、馬、と、全...）
+    // 「成」の文字がない成駒
     if (kanji.contains("龍") || kanji.contains("竜")) return "ry";
     if (kanji.contains("馬")) return "um";
     if (kanji.contains("全")) return "ng";
@@ -148,7 +149,7 @@ class BoardState {
     if (kanji.contains("杏")) return "ny";
     if (kanji.contains("と")) return "to";
 
-    // 3. 通常の駒
+    // 通常の駒
     if (kanji.contains("飛")) return "hi";
     if (kanji.contains("角")) return "ka";
     if (kanji.contains("銀")) return "gi";
