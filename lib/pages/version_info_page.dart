@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 class VersionInfoPage extends StatelessWidget {
   const VersionInfoPage({super.key});
 
-  // ★今後のアップデート履歴は、このリストの「先頭」に足していく件で管理します
   static const List<Map<String, dynamic>> _changelog = [
     {
       'version': '1.0.0',
@@ -36,7 +35,6 @@ class VersionInfoPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // バージョンと日付のヘッダー
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -58,7 +56,6 @@ class VersionInfoPage extends StatelessWidget {
                   ),
                   const Divider(height: 24),
                   
-                  // アップデートのタイトル
                   Text(
                     item['title'] as String,
                     style: const TextStyle(
@@ -68,7 +65,6 @@ class VersionInfoPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  // 箇条書きの内容
                   ...contents.map((content) => Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
                         child: Row(

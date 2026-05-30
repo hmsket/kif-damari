@@ -3,11 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:kifdamari/models/game_node.dart';
 
-/// 棋譜の分岐を美しい樹形図（ツリービュー）で描画するWidget。
-/// InteractiveViewer を使用しているため、ドラッグスクロールやピンチによるズームに対応しています。
 class KifTreeView extends StatefulWidget {
-  final GameNode rootNode;        // 0手目のルートノード
-  final GameNode currentNode;     // 現在選択されているノード
+  final GameNode rootNode;
+  final GameNode currentNode;
   final Function(GameNode) onNodeSelected;
 
   const KifTreeView({
@@ -23,15 +21,15 @@ class KifTreeView extends StatefulWidget {
 
 class _KifTreeViewState extends State<KifTreeView> {
   // グリッド配置のサイズ定義
-  static const double rowHeight = 85.0;     // 手数（縦方向）の間隔
-  static const double columnWidth = 95.0;  // 分岐（横方向）の間隔
-  static const double nodeWidth = 75.0;    // ノード（ボタン）の幅
-  static const double nodeHeight = 50.0;   // ノード（ボタン）の高さ
+  static const double rowHeight = 85.0;   // 手数（縦方向）の間隔
+  static const double columnWidth = 95.0; // 分岐（横方向）の間隔
+  static const double nodeWidth = 75.0;   // ノード（ボタン）の幅
+  static const double nodeHeight = 50.0;  // ノード（ボタン）の高さ
 
   late GameNode rootNode;
   
-  // 🌟 同一局面（千日手や手戻りなど）がマップのキー重複でバグるのを防ぐため、
-  // 参照一致 (Identity) で比較する HashMap を使用します。
+  // 同一局面（千日手や手戻りなど）がマップのキー重複でバグるのを防ぐため、
+  // 参照一致 (Identity) で比較する HashMap を使用する
   Map<GameNode, Point<double>> nodePositions = HashMap<GameNode, Point<double>>.identity();
   double maxColumn = 0;
   double maxRow = 0;
@@ -48,7 +46,7 @@ class _KifTreeViewState extends State<KifTreeView> {
     _buildTreeLayout();
   }
 
-/// 外部から渡されたルートノードを基に、各ノードの2次元グリッド座標 (X: 分岐列, Y: 手数) を計算します
+  // 外部から渡されたルートノードを基に、各ノードの2次元グリッド座標 (X: 分岐列, Y: 手数) を計算します
   void _buildTreeLayout() {
     rootNode = widget.rootNode;
 
@@ -59,21 +57,19 @@ class _KifTreeViewState extends State<KifTreeView> {
     final Map<GameNode, double> subtreeWidths = HashMap<GameNode, double>.identity();
     _calculateSubtreeWidths(rootNode, subtreeWidths);
 
-    // 🌟 整数値で厳密に重なりを管理するため、double ではなく int 型のマップにします
+    // 整数値で厳密に重なりを管理するため、double ではなく int 型のマップにする
     final Map<int, int> nextColumnForRow = {};
 
-    // 3つ目の引数（基準列）も 0 (整数) からスタートします
+    // 3つ目の引数（基準列）も 0 (整数) からスタートする
     _assignPositions(rootNode, 0, subtreeWidths, nextColumnForRow);
   }
 
-  /* _calculateSubtreeWidths は変更なしでOKです */
-
-  /// 【2パス目】サブツリーの幅を考慮し、グリッドに綺麗に配置する
+  // 【2パス目】サブツリーの幅を考慮し、グリッドに綺麗に配置する
   void _assignPositions(
     GameNode node,
-    int currentLeftColumn, // 🌟 ズレを防ぐため int 型に変更
+    int currentLeftColumn,
     Map<GameNode, double> subtreeWidths,
-    Map<int, int> nextColumnForRow, // 🌟 int 型に変更
+    Map<int, int> nextColumnForRow,
   ) {
     final int row = node.moveNumber;
 
@@ -84,10 +80,9 @@ class _KifTreeViewState extends State<KifTreeView> {
       assignedColumn = currentNextAvail;
     }
 
-    // 座標を確定 (Xはきれいな整数値になるため、縦のラインが完全に揃います)
+    // 座標を確定
     nodePositions[node] = Point(assignedColumn.toDouble(), row.toDouble());
 
-    // 🌟 余白（+1.2）を足すのをやめ、シンプルに「1列消費した」として更新します
     nextColumnForRow[row] = assignedColumn + 1;
 
     if (assignedColumn > maxColumn) maxColumn = assignedColumn.toDouble();
@@ -98,7 +93,7 @@ class _KifTreeViewState extends State<KifTreeView> {
 
     for (int i = 0; i < node.nextNodes.length; i++) {
       final child = node.nextNodes[i];
-      // 幅を整数に切り上げ（通常は1.0, 2.0などの整数が入っています）
+      // 幅を整数に切り上げ
       final int childWidth = (subtreeWidths[child] ?? 1.0).ceil();
 
       // 子ノードを配置
@@ -109,7 +104,7 @@ class _KifTreeViewState extends State<KifTreeView> {
     }
   }
 
-  /// 【1パス目】ノードが配下に持つサブツリーの総列幅を計算する（最低値は 1.0）
+  // 【1パス目】ノードが配下に持つサブツリーの総列幅を計算する（最低値は 1.0）
   double _calculateSubtreeWidths(GameNode node, Map<GameNode, double> subtreeWidths) {
     if (node.nextNodes.isEmpty) {
       subtreeWidths[node] = 1.0;
@@ -139,21 +134,21 @@ class _KifTreeViewState extends State<KifTreeView> {
 
     return InteractiveViewer(
       boundaryMargin: const EdgeInsets.all(100.0), // スクロール時に端に余裕を持たせる
-      minScale: 0.1, // 🌟 ズームアウトで全体を見渡しやすくする
+      minScale: 0.1, // ズームアウトで全体を見渡しやすくする
       maxScale: 2.0,
-      constrained: false, // 🌟 超重要：これを false にすることで、画面サイズを超えたスクロールを許可します！
+      constrained: false, // 画面サイズを超えたスクロールを許可する
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque, // 🌟 背景タップを確実に拾うための設定
+        behavior: HitTestBehavior.opaque, // 背景タップを確実に拾う
         child: Container(
           width: contentWidth,
           height: contentHeight,
           padding: const EdgeInsets.all(30.0),
-          // 🌟 colorを指定してタッチ可能にする（透明にすることで見た目はそのまま）
+          // colorを指定してタッチ可能にする
           color: Colors.transparent, 
           child: Stack(
-            clipBehavior: Clip.none, // 念のためはみ出しによるクリップを無効化
+            clipBehavior: Clip.none,
             children: [
-              // 1. ノード間を繋ぐコネクタ線（折れ線）を CustomPaint で描画
+              // ノード間を繋ぐ線を描画
               Positioned.fill(
                 child: CustomPaint(
                   painter: KifTreePainter(
@@ -166,7 +161,7 @@ class _KifTreeViewState extends State<KifTreeView> {
                   ),
                 ),
               ),
-              // 2. 各ノードを Widget（ボタン）として配置
+              // 各ノードを Widget（ボタン）として配置
               ...nodePositions.entries.map((entry) {
                 final node = entry.key;
                 final pos = entry.value;
@@ -177,7 +172,7 @@ class _KifTreeViewState extends State<KifTreeView> {
                 final bool isCurrent = node == widget.currentNode;
                 final bool hasBranch = node.nextNodes.length > 1;
 
-                // 指し手テキスト（カッコ内の座標などをトリム・Null安全に対応）
+                // 指し手テキスト
                 final String label = (node.moveLabel ?? '').replaceAll(RegExp(r'\(.*\)'), '');
 
                 return Positioned(
@@ -334,7 +329,7 @@ class KifTreePainter extends CustomPainter {
     });
   }
 
-  /// 指定したノードが、ルートから現在地(currentNode)までのパスに含まれているかを判定
+  // 指定したノードが、ルートから現在地(currentNode)までのパスに含まれているかを判定
   bool _isNodeInCurrentPath(GameNode node) {
     GameNode? temp = currentNode;
     while (temp != null) {

@@ -1,6 +1,6 @@
+import 'package:kifdamari/database/database_helper.dart';
+import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:sqflite/sqflite.dart';
-import '../entity/kif_entity.dart';
-import '../database_helper.dart';
 
 class KifDao {
   Future<Database> get _db async => await DatabaseHelper.instance.database;
@@ -68,7 +68,7 @@ class KifDao {
       for (int i = 0; i < kifs.length; i++) {
         await txn.update(
           'kif',
-          {'kif_order': i}, // リストの順序をそのまま order に反映
+          {'kif_order': i},
           where: 'id = ?',
           whereArgs: [kifs[i].id],
         );

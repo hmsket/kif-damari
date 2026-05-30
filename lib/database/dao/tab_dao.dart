@@ -1,6 +1,6 @@
+import 'package:kifdamari/database/database_helper.dart';
+import 'package:kifdamari/database/entity/tab_entity.dart';
 import 'package:sqflite/sqflite.dart';
-import '../entity/tab_entity.dart';
-import '../database_helper.dart';
 
 class TabDao {
   Future<Database> get _db async => await DatabaseHelper.instance.database;
@@ -71,7 +71,6 @@ class TabDao {
     final db = await _db;
     await db.transaction((txn) async {
       for (int i = 0; i < tabs.length; i++) {
-        // リストのインデックス順に tab_order を 0, 1, 2... と割り振る
         await txn.update(
           'tab',
           {'tab_order': i},

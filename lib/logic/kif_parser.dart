@@ -1,5 +1,5 @@
-import '../models/game_node.dart';
-import '../models/kif_tree.dart';
+import 'package:kifdamari/models/game_node.dart';
+import 'package:kifdamari/models/kif_tree.dart';
 
 class KifParser {
   static const _zenToNum = {'１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9};
@@ -10,26 +10,26 @@ class KifParser {
     final tree = KifTree.initial();
     GameNode currentNode = tree.root;
 
-    // ヘッダー情報(キーワード：値)用
+    // ヘッダー情報(キーワード：値)
     final infoRegex = RegExp(r"^([^：:]+)[：:](.*)$");
     
-    // 指し手解析用
+    // 指し手解析
     final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九　]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
 
-    // ★ 追加: 「変化：46手目」などの変化行を検出する正規表現
+    // 「変化：46手目」などの変化行を検出するための正規表現
     final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
 
     for (var line in lines) {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty) continue;
 
-      // 1. コメント行 (* で始まる)
+      // コメント行 (*で始まる)
       if (trimmedLine.startsWith('*')) {
         currentNode.addComment(trimmedLine.substring(1));
         continue;
       }
 
-      // ★ 2. 変化行の検出 (最優先でチェック)
+      // 変化行の検出
       final branchMatch = branchRegex.firstMatch(trimmedLine);
       if (branchMatch != null) {
         final branchMoveNum = int.parse(branchMatch.group(1)!);
@@ -42,9 +42,9 @@ class KifParser {
 
         while (targetParent != null) {
           if (targetParent.moveNumber == targetParentMoveNum) {
-            currentNode = targetParent; // 31手目そのものの局面を親にする
+            currentNode = targetParent; // その局面を親にする
             found = true;
-            break; // 一番現在の文脈に近い親で即座に確定
+            break;
           }
           targetParent = targetParent.parent;
         }
@@ -62,7 +62,7 @@ class KifParser {
         continue;
       }
 
-      // 3. 指し手行 (数字で始まる)
+      // 指し手行 (数字で始まる)
       final moveMatch = moveRegex.firstMatch(trimmedLine);
       if (moveMatch != null) {
         final moveNum = int.parse(moveMatch.group(1)!);

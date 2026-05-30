@@ -53,7 +53,6 @@ class KifItemWidget extends StatelessWidget {
             ),
           ],
         ),
-        // 右上のアイコン配置用
         if (trailing != null)
           Positioned(
             top: 6,
@@ -64,20 +63,17 @@ class KifItemWidget extends StatelessWidget {
     );
   }
 
-  /// 画像表示ロジック
   Widget _buildImage() {
-    // 1. imgPath があり、かつファイルが存在する場合
     if (imgPath != null && imgPath!.isNotEmpty) {
       final file = File(imgPath!);
       if (file.existsSync()) {
         return ClipRRect(
-          borderRadius: BorderRadius.circular(4), // 少し角を丸くすると馴染みます
+          borderRadius: BorderRadius.circular(4),
           child: Image.file(file, fit: BoxFit.contain),
         );
       }
     }
 
-    // 2. それ以外は初期画像を表示
     return Image.asset('assets/images/initial.png', fit: BoxFit.contain);
   }
 }

@@ -22,7 +22,7 @@ class DatabaseHelper {
       path,
       version: 1,
       onCreate: _createDB,
-      onConfigure: _onConfigure, // 外部キー制約の有効化
+      onConfigure: _onConfigure,
     );
   }
 
@@ -54,7 +54,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // 初期データ
     await _insertDefaultTabs(db);
   }
 

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import '../models/board_state.dart';
+import 'package:kifdamari/models/board_state.dart';
 
 class KifBoard extends StatelessWidget {
   final BoardState state;
-  final bool isReversed; // ★ 追加
+  final bool isReversed;
 
   const KifBoard({
     super.key,
     required this.state,
-    this.isReversed = false, // ★ 追加（デフォルトは通常表示）
+    this.isReversed = false,
   });
 
   @override
@@ -32,10 +32,8 @@ class KifBoard extends StatelessWidget {
               final displayX = isReversed ? (8 - x) : x;
               final displayY = isReversed ? (8 - y) : y;
 
-              // ★ 駒の画像名を決定するロジック
               String finalPieceName = pieceName;
               if (isReversed) {
-                // bで始まるならwに、wで始まるならbに入れ替える
                 if (pieceName.startsWith('b')) {
                   finalPieceName = pieceName.replaceFirst('b', 'w');
                 } else if (pieceName.startsWith('w')) {
@@ -51,7 +49,6 @@ class KifBoard extends StatelessWidget {
                   height: cellSizeH,
                   child: Padding(
                     padding: const EdgeInsets.all(2.0),
-                    // ★ RotatedBox を削除し、finalPieceName を使用
                     child: Image.asset(
                       'assets/images/pieces/$finalPieceName.png',
                       fit: BoxFit.contain,
@@ -65,15 +62,12 @@ class KifBoard extends StatelessWidget {
 
         return Stack(
           children: [
-            // 1. 盤面画像
             Positioned.fill(
               child: Image.asset('assets/images/board.png', fit: BoxFit.fill),
             ),
 
-            // 2. ハイライトレイヤー（座標計算に isReversed を適用）
             if (state.lastMoveFromX != null && state.lastMoveFromY != null)
               _buildHighlight(
-                // 内部座標系 x: 9-筋(1~9), y: 段(1~9) を 0~8 インデックスに変換
                 x: isReversed ? (state.lastMoveFromX! - 1) : (9 - state.lastMoveFromX!),
                 y: isReversed ? (9 - state.lastMoveFromY!) : (state.lastMoveFromY! - 1),
                 color: Colors.red.withOpacity(0.2),
@@ -93,7 +87,6 @@ class KifBoard extends StatelessWidget {
                 offsetY: offsetY,
               ),
 
-            // 3. 駒レイヤー
             ...pieces,
           ],
         );
