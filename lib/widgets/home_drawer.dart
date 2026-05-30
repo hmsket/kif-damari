@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kifdamari/pages/version_info_page.dart';
-import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 
 class HomeDrawer extends StatelessWidget {
   const HomeDrawer({super.key});
@@ -79,12 +79,12 @@ class HomeDrawer extends StatelessWidget {
                   );
                 } else {
                   if (context.mounted) {
-                    ShowSuccessSnackbar.show(context, "リンクを開けませんでした");
+                    ShowErrorSnackbar.show(context, "リンクを開けませんでした");
                   }
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ShowSuccessSnackbar.show(context, "エラーが発生しました");
+                  ShowErrorSnackbar.show(context, "エラーが発生しました");
                 }
               }
             },
@@ -113,12 +113,12 @@ class HomeDrawer extends StatelessWidget {
                   );
                 } else {
                   if (context.mounted) {
-                    ShowSuccessSnackbar.show(context, "ページを開けませんでした");
+                    ShowErrorSnackbar.show(context, "ページを開けませんでした");
                   }
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ShowSuccessSnackbar.show(context, "ページを開けませんでした");
+                  ShowErrorSnackbar.show(context, "ページを開けませんでした");
                 }
               }
             },
@@ -136,12 +136,12 @@ class HomeDrawer extends StatelessWidget {
                   );
                 } else {
                   if (context.mounted) {
-                    ShowSuccessSnackbar.show(context, "ページを開けませんでした");
+                    ShowErrorSnackbar.show(context, "ページを開けませんでした");
                   }
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ShowSuccessSnackbar.show(context, "ページを開けませんでした");
+                  ShowErrorSnackbar.show(context, "ページを開けませんでした");
                 }
               }
             },
