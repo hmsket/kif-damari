@@ -24,7 +24,7 @@ class SuccessSnackBar extends SnackBar {
               children: [
                 Icon(
                   Icons.check,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: Colors.green[700],
                   size: 30,
                 ),
                 const SizedBox(width: 16),
@@ -40,13 +40,13 @@ class SuccessSnackBar extends SnackBar {
               ],
             ),
           ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          backgroundColor: Colors.green[50],
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(6),
             side: BorderSide(
-              color: Theme.of(context).colorScheme.primary,
+              color: Colors.green[700]!,
               width: 1.5,
             ),
           ),
