@@ -7,6 +7,7 @@ import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
+import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
@@ -89,10 +90,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
   }
 
   Future<void> _handleMakeThumbnail() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('サムネイル画像を生成中...'), duration: Duration(seconds: 1)),
-    );
-
     try {
       final uiImage = await DiagramGenerator.generate(
         kifTree!.currentNode.state,
@@ -123,17 +120,10 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
         await KifDao().updateKif(updatedKif);
 
-        debugPrint("DB更新完了: $savedPath");
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('サムネイルを更新しました')),
-        );
+        ShowSuccessSnackbar.show(context, "サムネイルを更新しました");
       }
     } catch (e) {
-      debugPrint("図面生成エラー: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('画像の生成に失敗しました')),
-      );
+      ShowErrorSnackbar.show(context, "サムネイルの更新に失敗しました");
     }
   }
 
