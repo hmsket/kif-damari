@@ -557,13 +557,15 @@ class _KifViewerPageState extends State<KifViewerPage> {
             menuChildren: [
               MenuItemButton(
                 leadingIcon: const Icon(Icons.collections, size: 20),
-                child: const Text('サムネイルにする'),
+                child: const Text('この局面でサムネイルを生成'),
                 onPressed: () => _handleMakeThumbnail(),
               ),
               MenuItemButton(
-                leadingIcon: const Icon(Icons.share, size: 20),
-                child: const Text('共有する'),
-                onPressed: () => _shareThumbnail(),
+                leadingIcon: const Icon(Icons.copy, size: 20),
+                child: const Text('棋譜ファイルをコピー'),
+                onPressed: () {
+                  // コピーの処理
+                },
               ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.cached, size: 20),
@@ -572,20 +574,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                   setState(() {
                     _isReversed = !_isReversed;
                   });
-                },
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.copy, size: 20),
-                child: const Text('棋譜をコピー'),
-                onPressed: () {
-                  // コピーの処理
-                },
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.share, size: 20),
-                child: const Text('棋譜を共有'),
-                onPressed: () {
-                  // 共有の処理
                 },
               ),
             ],
