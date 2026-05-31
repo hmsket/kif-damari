@@ -20,6 +20,7 @@ class VersionInfoPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('バージョン情報'),
       ),
+      backgroundColor: const Color(0XFFF1F1F5),
       body: ListView.builder(
         padding: const EdgeInsets.all(16.0),
         itemCount: _changelog.length,
@@ -28,8 +29,8 @@ class VersionInfoPage extends StatelessWidget {
           final List<String> contents = item['contents'] as List<String>;
 
           return Card(
+            color: Colors.white, 
             margin: const EdgeInsets.all(8.0),
-            elevation: 2,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
