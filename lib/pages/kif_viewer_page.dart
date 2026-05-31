@@ -546,69 +546,62 @@ class _KifViewerPageState extends State<KifViewerPage> {
             icon: const Icon(Icons.last_page),
             onPressed: () => setState(() => kifTree!.jumpTo(kifTree!.totalMoveCount)),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            offset: const Offset(0, -220),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 8,
-            onSelected: (String value) {
-              switch (value) {
-                case 'make_thumbnail': _handleMakeThumbnail(); break;
-                case 'share_thumbnail': _shareThumbnail(); break;
-                case 'reverse':
+          MenuAnchor(
+            alignmentOffset: const Offset(0, 0), 
+            style: MenuStyle(
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              elevation: WidgetStateProperty.all(8),
+            ),
+            menuChildren: [
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.collections, size: 20),
+                child: const Text('サムネイルにする'),
+                onPressed: () => _handleMakeThumbnail(),
+              ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.share, size: 20),
+                child: const Text('共有する'),
+                onPressed: () => _shareThumbnail(),
+              ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.cached, size: 20),
+                child: const Text('盤面を反転'),
+                onPressed: () {
                   setState(() {
                     _isReversed = !_isReversed;
                   });
-                  break;
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'make_thumbnail',
-                child: ListTile(
-                  leading: Icon(Icons.collections, size: 20),
-                  title: Text('サムネイルにする'),
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),              
-              const PopupMenuItem(
-                value: 'share_thumbnail',
-                child: ListTile(
-                  leading: Icon(Icons.share, size: 20),
-                  title: Text('共有する'),
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
+                },
               ),
-              const PopupMenuItem(
-                value: 'reverse',
-                child: ListTile(
-                  leading: Icon(Icons.cached, size: 20),
-                  title: Text('盤面を反転'),
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.copy, size: 20),
+                child: const Text('棋譜をコピー'),
+                onPressed: () {
+                  // コピーの処理
+                },
               ),
-              const PopupMenuItem(
-                value: 'copy',
-                child: ListTile(
-                  leading: Icon(Icons.copy, size: 20),
-                  title: Text('棋譜をコピー'),
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'share',
-                child: ListTile(
-                  leading: Icon(Icons.share, size: 20),
-                  title: Text('棋譜を共有'),
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.share, size: 20),
+                child: const Text('棋譜を共有'),
+                onPressed: () {
+                  // 共有の処理
+                },
               ),
             ],
+            // 💡 三点リーダーのアイコンボタン（トリガー）をここに定義します
+            builder: (BuildContext context, MenuController controller, Widget? child) {
+              return IconButton(
+                icon: const Icon(Icons.more_vert),
+                onPressed: () {
+                  if (controller.isOpen) {
+                    controller.close();
+                  } else {
+                    controller.open();
+                  }
+                },
+              );
+            },
           ),
         ],
       ),
