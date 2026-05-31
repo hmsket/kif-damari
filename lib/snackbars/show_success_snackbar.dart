@@ -9,7 +9,9 @@ class ShowSuccessSnackbar {
       builder: (context) => SuccessSnackBarWidget(
         message: message,
         onDismissed: () {
-          overlayEntry.remove();
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
         },
       ),
     );
@@ -35,32 +37,24 @@ class SuccessSnackBarWidget extends StatefulWidget {
 class _SuccessSnackBarWidgetState extends State<SuccessSnackBarWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
   late Animation<double> _opacityAnimation;
+  bool _isDismissed = false;
 
   @override
   void initState() {
     super.initState();
 
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-
-    _offsetAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.0), // 定位置
-      end: const Offset(0, 1.5),   // 下方向へ画面外まで移動
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInCubic,
-    ));
 
     _opacityAnimation = Tween<double>(
       begin: 1.0,
       end: 0.0,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeIn,
+      curve: Curves.easeInOut,
     ));
 
     _startLifecycle();
@@ -68,8 +62,15 @@ class _SuccessSnackBarWidgetState extends State<SuccessSnackBarWidget>
 
   Future<void> _startLifecycle() async {
     await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
+    if (!mounted || _isDismissed) return;
+    
     await _controller.forward();    
+    _dismiss();
+  }
+
+  void _dismiss() {
+    if (_isDismissed) return;
+    _isDismissed = true;
     widget.onDismissed();
   }
 
@@ -87,10 +88,14 @@ class _SuccessSnackBarWidgetState extends State<SuccessSnackBarWidget>
       bottom: bottomPadding + 16,
       left: 16,
       right: 16,
-      child: FadeTransition(
-        opacity: _opacityAnimation,
-        child: SlideTransition(
-          position: _offsetAnimation,
+      child: Dismissible(
+        key: UniqueKey(),
+        direction: DismissDirection.down,
+        onDismissed: (direction) {
+          _dismiss();
+        },
+        child: FadeTransition(
+          opacity: _opacityAnimation,
           child: Material(
             color: Colors.transparent,
             child: Container(
