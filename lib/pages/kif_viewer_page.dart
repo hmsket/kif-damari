@@ -7,6 +7,7 @@ import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
+import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
@@ -33,6 +34,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
   bool _isReversed = false;
   double _dragStartX = 0.0; 
   int _dragStartMoveNumber = 0; 
+  String? _rawKifContent;
 
   // 🌟 追加：カスタムサイドバーの開閉を管理する状態変数
   bool _isSidebarOpen = false;
@@ -71,6 +73,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
         setState(() {
           kifTree = tree;
+          _rawKifContent = content;
           _isLoading = false;
         });
       } else {
@@ -564,7 +567,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 leadingIcon: const Icon(Icons.copy, size: 20),
                 child: const Text('棋譜ファイルをコピー'),
                 onPressed: () {
-                  // コピーの処理
+                  Clipboard.setData(ClipboardData(text: _rawKifContent!));
                 },
               ),
               MenuItemButton(
