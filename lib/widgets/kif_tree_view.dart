@@ -21,7 +21,7 @@ class KifTreeView extends StatefulWidget {
 
 class _KifTreeViewState extends State<KifTreeView> {
   // グリッド配置のサイズ定義
-  static const double rowHeight = 85.0;   // 手数（縦方向）の間隔
+  static const double rowHeight = 70.0;   // 手数（縦方向）の間隔
   static const double columnWidth = 95.0; // 分岐（横方向）の間隔
   static const double nodeWidth = 75.0;   // ノード（ボタン）の幅
   static const double nodeHeight = 50.0;  // ノード（ボタン）の高さ

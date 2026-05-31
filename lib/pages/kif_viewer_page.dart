@@ -338,7 +338,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '局面分岐ツリー',
+                            '棋譜ツリー',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
                           ),
                           IconButton(
