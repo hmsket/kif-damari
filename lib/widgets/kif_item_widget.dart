@@ -43,7 +43,7 @@ class KifItemWidget extends StatelessWidget {
                     ),
                     Text(
                       (detail == null || detail!.isEmpty) ? '' : detail!,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      style: const TextStyle(fontSize: 14, color: Colors.black54),
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                     ),
