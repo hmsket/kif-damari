@@ -246,7 +246,7 @@ class _KifTreeViewState extends State<KifTreeView> {
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                node.moveNumber == 0 ? '初期配置' : label,
+                                node.moveNumber == 0 ? '開始局面' : label,
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
