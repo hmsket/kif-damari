@@ -27,9 +27,8 @@ class _KifTreeViewState extends State<KifTreeView> {
   static const double nodeHeight = 50.0;  // ノード（ボタン）の高さ
 
   late GameNode rootNode;
-  
-  // 同一局面（千日手や手戻りなど）がマップのキー重複でバグるのを防ぐため、
-  // 参照一致 (Identity) で比較する HashMap を使用する
+  late TransformationController _transformationController;
+
   Map<GameNode, Point<double>> nodePositions = HashMap<GameNode, Point<double>>.identity();
   double maxColumn = 0;
   double maxRow = 0;
@@ -37,13 +36,58 @@ class _KifTreeViewState extends State<KifTreeView> {
   @override
   void initState() {
     super.initState();
+    _transformationController = TransformationController();
     _buildTreeLayout();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrentNode();
+    });
   }
 
   @override
   void didUpdateWidget(KifTreeView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _buildTreeLayout();
+
+    if (oldWidget.currentNode != widget.currentNode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToCurrentNode();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  // 現在の手(currentNode)の位置が画面の上方中央に来るようにスクロール(並行移動)させる
+  void _scrollToCurrentNode() {
+    final currentPos = nodePositions[widget.currentNode];
+    if (currentPos == null) return;
+
+    // 現在のノードのピクセル座標を計算（paddingの30pxを考慮）
+    final double nodeX = currentPos.x * columnWidth + 30.0;
+    final double nodeY = currentPos.y * rowHeight + 30.0;
+
+    // 画面（View）自体のサイズを取得
+    final Size viewSize = context.size ?? const Size(0, 0);
+    if (viewSize.width == 0 || viewSize.height == 0) return;
+
+    // 【計算】ターゲットが画面上部に見えるようなスクロール量を算出
+    // X座標: 画面の横中央にノードが来るようにする
+    final double targetX = (viewSize.width / 2) - nodeX - (nodeWidth / 2);
+    // Y座標: 画面の上部（例えば上から80pxの位置）にノードが来るようにする
+    final double targetY = 80.0 - nodeY;
+
+    // InteractiveViewerのMatrix4を更新（4x4行列の要素として平行移動をセット）
+    final Matrix4 newMatrix = Matrix4.identity()
+      ..translate(targetX, targetY);
+
+    setState(() {
+      _transformationController.value = newMatrix;
+    });
   }
 
   // 外部から渡されたルートノードを基に、各ノードの2次元グリッド座標 (X: 分岐列, Y: 手数) を計算します
@@ -57,14 +101,10 @@ class _KifTreeViewState extends State<KifTreeView> {
     final Map<GameNode, double> subtreeWidths = HashMap<GameNode, double>.identity();
     _calculateSubtreeWidths(rootNode, subtreeWidths);
 
-    // 整数値で厳密に重なりを管理するため、double ではなく int 型のマップにする
     final Map<int, int> nextColumnForRow = {};
-
-    // 3つ目の引数（基準列）も 0 (整数) からスタートする
     _assignPositions(rootNode, 0, subtreeWidths, nextColumnForRow);
   }
 
-  // 【2パス目】サブツリーの幅を考慮し、グリッドに綺麗に配置する
   void _assignPositions(
     GameNode node,
     int currentLeftColumn,
@@ -73,38 +113,28 @@ class _KifTreeViewState extends State<KifTreeView> {
   ) {
     final int row = node.moveNumber;
 
-    // この行（手数）で、すでに使われた列よりも左にいかないようにガード
     int assignedColumn = currentLeftColumn;
     final int currentNextAvail = nextColumnForRow[row] ?? 0;
     if (assignedColumn < currentNextAvail) {
       assignedColumn = currentNextAvail;
     }
 
-    // 座標を確定
     nodePositions[node] = Point(assignedColumn.toDouble(), row.toDouble());
-
     nextColumnForRow[row] = assignedColumn + 1;
 
     if (assignedColumn > maxColumn) maxColumn = assignedColumn.toDouble();
     if (row > maxRow) maxRow = row.toDouble();
 
-    // 子ノードの配置を開始する「基準の左端列」
     int childLeftPointer = assignedColumn;
 
     for (int i = 0; i < node.nextNodes.length; i++) {
       final child = node.nextNodes[i];
-      // 幅を整数に切り上げ
       final int childWidth = (subtreeWidths[child] ?? 1.0).ceil();
-
-      // 子ノードを配置
       _assignPositions(child, childLeftPointer, subtreeWidths, nextColumnForRow);
-
-      // 次の兄弟ノードは、この子のサブツリーが消費した幅の分だけ右にずらす
       childLeftPointer += childWidth;
     }
   }
 
-  // 【1パス目】ノードが配下に持つサブツリーの総列幅を計算する（最低値は 1.0）
   double _calculateSubtreeWidths(GameNode node, Map<GameNode, double> subtreeWidths) {
     if (node.nextNodes.isEmpty) {
       subtreeWidths[node] = 1.0;
@@ -116,8 +146,6 @@ class _KifTreeViewState extends State<KifTreeView> {
       totalWidth += _calculateSubtreeWidths(child, subtreeWidths);
     }
 
-    // 子ノードが複数ある場合はその合計、1つだけの場合は親と同じ幅(1.0)
-    // ただし、見た目の好みに応じて最低 1.0 とする
     subtreeWidths[node] = max(1.0, totalWidth);
     return subtreeWidths[node]!;
   }
@@ -128,27 +156,25 @@ class _KifTreeViewState extends State<KifTreeView> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 描画エリアの全体サイズを決定
     final double contentWidth = (maxColumn + 1) * columnWidth + 120;
     final double contentHeight = (maxRow + 1) * rowHeight + 120;
 
     return InteractiveViewer(
-      boundaryMargin: const EdgeInsets.all(100.0), // スクロール時に端に余裕を持たせる
-      minScale: 0.1, // ズームアウトで全体を見渡しやすくする
+      transformationController: _transformationController, // コントローラーを紐付け
+      boundaryMargin: const EdgeInsets.all(100.0), 
+      minScale: 0.1, 
       maxScale: 2.0,
-      constrained: false, // 画面サイズを超えたスクロールを許可する
+      constrained: false, 
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque, // 背景タップを確実に拾う
+        behavior: HitTestBehavior.opaque, 
         child: Container(
           width: contentWidth,
           height: contentHeight,
           padding: const EdgeInsets.all(30.0),
-          // colorを指定してタッチ可能にする
           color: Colors.transparent, 
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // ノード間を繋ぐ線を描画
               Positioned.fill(
                 child: CustomPaint(
                   painter: KifTreePainter(
@@ -161,7 +187,6 @@ class _KifTreeViewState extends State<KifTreeView> {
                   ),
                 ),
               ),
-              // 各ノードを Widget（ボタン）として配置
               ...nodePositions.entries.map((entry) {
                 final node = entry.key;
                 final pos = entry.value;
@@ -171,8 +196,6 @@ class _KifTreeViewState extends State<KifTreeView> {
 
                 final bool isCurrent = node == widget.currentNode;
                 final bool hasBranch = node.nextNodes.length > 1;
-
-                // 指し手テキスト
                 final String label = (node.moveLabel ?? '').replaceAll(RegExp(r'\(.*\)'), '');
 
                 return Positioned(
@@ -185,7 +208,6 @@ class _KifTreeViewState extends State<KifTreeView> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
-                        // 現在検討中の局面はオレンジ、分岐のある局面は薄いオレンジ、通常は白
                         color: isCurrent ? Colors.orange[300] : Colors.white,
                         border: Border.all(
                           color: isCurrent ? Colors.orange[800]! : Colors.grey[400]!,
@@ -236,13 +258,12 @@ class _KifTreeViewState extends State<KifTreeView> {
                               ),
                             ],
                           ),
-                          // 分岐がある場合に小さなアイコンを添える
                           if (hasBranch && !isCurrent)
                             const Positioned(
                               top: 2,
                               right: 2,
                               child: Icon(
-                               Icons.alt_route,
+                                Icons.alt_route,
                                 size: 10,
                                 color: Colors.orange,
                               ),
