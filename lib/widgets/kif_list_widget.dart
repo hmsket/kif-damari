@@ -67,8 +67,17 @@ class KifListWidgetState extends State<KifListWidget> {
         }
 
         final kifs = _tempKifs ?? snapshot.data ?? [];
-        if (kifs.isEmpty) return const Center(child: Text('棋譜がまだありません'));
-
+        if (kifs.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 40.0),
+              child: Text(
+                '棋譜がありません\n＋ボタンから追加してください',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
         if (widget.mode == AppMode.sort) {
           return ReorderableListView.builder(
             itemCount: kifs.length,

@@ -238,7 +238,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
           ),
           body: tabs.isEmpty
-              ? const Center(child: Text("タブを追加してください"))
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 40.0), 
+                    child: Text(
+                      "タブがありません\n＋ボタンから追加してください",
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
               : TabBarView(
                   controller: _tabController,
                   children: tabs.map((t) {
