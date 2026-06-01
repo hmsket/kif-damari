@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:kifdamari/pages/setting_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kifdamari/pages/version_info_page.dart';
@@ -36,6 +37,12 @@ class HomeDrawer extends StatelessWidget {
             title: const Text('設定'),
             onTap: () {
               Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingPage(),
+                ),
+              );
             },
           ),
           ListTile(
