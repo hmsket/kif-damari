@@ -186,13 +186,9 @@ class _KifTreeViewState extends State<KifTreeView> {
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
                         // 現在検討中の局面はオレンジ、分岐のある局面は薄いオレンジ、通常は白
-                        color: isCurrent
-                            ? Colors.orange[300]
-                            : (hasBranch ? Colors.orange[50] : Colors.white),
+                        color: isCurrent ? Colors.orange[300] : Colors.white,
                         border: Border.all(
-                          color: isCurrent
-                              ? Colors.orange[800]!
-                              : (hasBranch ? Colors.orange[400]! : Colors.grey[400]!),
+                          color: isCurrent ? Colors.orange[800]! : Colors.grey[400]!,
                           width: isCurrent ? 2.5 : 1.5,
                         ),
                         borderRadius: BorderRadius.circular(8),
