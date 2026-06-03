@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'app_settings.dart'; // 設定クラスをインポート
 
 class KifItemWidget extends StatelessWidget {
   final String title;
@@ -17,49 +18,63 @@ class KifItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final settings = AppSettings(); // 設定管理クラスのインスタンス
+
+    // ★ポイント：ValueListenableBuilder で囲んで、設定変更をリアルタイムに検知
+    return ValueListenableBuilder(
+      valueListenable: settings.listenable,
+      builder: (context, box, child) {
+        // Hiveから現在のサムネイルサイズを取得（デフォルト値はAppSettings側が持っています）
+        // 型をdoubleに変換してSizedBoxに適用します
+        final double currentThumbSize = settings.get<int>('thumbnailSize').toDouble();
+
+        return Stack(
           children: [
-            SizedBox(
-              width: 120, height: 120,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: _buildImage(),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(2, 8, 4, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.isEmpty ? '' : title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      (detail == null || detail!.isEmpty) ? '' : detail!,
-                      style: const TextStyle(fontSize: 14, color: Colors.black54),
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ★ 120固定だった部分を取得したサイズに変更！
+                SizedBox(
+                  width: currentThumbSize,
+                  height: currentThumbSize,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: _buildImage(),
+                  ),
                 ),
-              ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 8, 4, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title.isEmpty ? '' : title,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          (detail == null || detail!.isEmpty) ? '' : detail!,
+                          style: const TextStyle(fontSize: 14, color: Colors.black54),
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
+            if (trailing != null)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: trailing!,
+              ),
           ],
-        ),
-        if (trailing != null)
-          Positioned(
-            top: 6,
-            right: 6,
-            child: trailing!,
-          ),
-      ],
+        );
+      },
     );
   }
 

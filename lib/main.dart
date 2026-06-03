@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/pages/home_page.dart';
 
@@ -12,7 +13,10 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
+  
+  await Hive.initFlutter();
+  await Hive.openBox('settings_box');
+  
   runApp(const KifdamariApp());
 }
 
