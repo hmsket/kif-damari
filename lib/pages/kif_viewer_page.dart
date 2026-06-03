@@ -9,6 +9,7 @@ import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
@@ -177,6 +178,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
   
   @override
   Widget build(BuildContext context) {
+    final settings = AppSettings();
+    
     if (_isLoading || kifTree == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -263,7 +266,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                     isSente: !_isReversed,
                     isUpper: false,
                   ),
-                 // 【重要】もしクラスの上部（Stateの中など）に定義していない場合は、
                   Expanded(
                     child: Container(
                       width: double.infinity,
@@ -272,17 +274,24 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(8),
-                        // border: Border.all(color: Colors.brown[200]!),
                       ),
-                      // ★ Container の child の直下を Scrollbar にします
-                      child: Scrollbar(
-                        controller: _commentScrollController, // コントローラーを紐付け
-                        thumbVisibility: true,               // 常にバーを表示（お好みで false でもOK）
-                        child: SingleChildScrollView(
-                          controller: _commentScrollController, // スクロールビュー側にも同じものを渡す
-                          child: Text(
-                            "${kifTree!.currentNode.joinedComment}",
-                            style: const TextStyle(fontSize: 14, height: 1.5),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onLongPress: () {
+                          // 空にしておくことで外側のシークバー発火を防ぐ
+                        },
+                        child: Scrollbar(
+                          controller: _commentScrollController,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _commentScrollController,
+                            child: SelectableText(
+                              "${kifTree!.currentNode.joinedComment}",
+                              style: TextStyle(
+                                fontSize: settings.get<double>('fontSize'), 
+                                height: 1.5,
+                              ),
+                            ),
                           ),
                         ),
                       ),

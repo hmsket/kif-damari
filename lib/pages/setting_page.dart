@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kifdamari/settings/font_size_setting.dart';
 import 'package:kifdamari/settings/thumbnail_size_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 
@@ -38,7 +39,9 @@ class SettingPage extends StatelessWidget {
               const SizedBox(height: 12),
 
               _buildSectionTitle('棋譜再生画面'),
-              
+
+              FontSizeSetting(settings: settings),
+
             ],
           );
         },
