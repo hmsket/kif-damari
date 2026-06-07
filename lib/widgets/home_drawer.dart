@@ -70,10 +70,7 @@ class HomeDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
-            leading: const FaIcon(
-              FontAwesomeIcons.xTwitter, 
-              size: 20,
-            ),
+            leading: const Icon(Icons.share),
             title: const Text('公式𝕏（旧Twitter）'),
             onTap: () async {
               Navigator.pop(context);
