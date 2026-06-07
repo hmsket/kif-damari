@@ -7,7 +7,7 @@
         </intent>
     </queries>
     <application
-        android:label="kifdamari"
+        android:label="棋譜だまり"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
