@@ -31,6 +31,7 @@ flutter:
   assets:
     - assets/images/appbar_icon.png
     - assets/images/board.png
+    - assets/images/icon.png
     - assets/images/initial.png
     - assets/images/pieces/
 
