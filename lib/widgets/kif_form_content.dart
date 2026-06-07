@@ -119,7 +119,7 @@ class _KifFormContentState extends State<KifFormContent> {
                               Expanded(
                                 child: TextField(
                                   controller: _detailController,
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                                   maxLines: null,
                                   expands: true,
                                   textAlignVertical: TextAlignVertical.top,
