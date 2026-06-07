@@ -27,7 +27,7 @@ class FontSizeSetting extends StatelessWidget {
           '現在のサイズ: $currentSize',
           style: const TextStyle(color: Colors.grey, fontSize: 13),
         ),
-        trailing: const Icon(Icons.edit, size: 20, color: Colors.grey),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
         onTap: () => _showSliderDialog(context),
       ),
     );
