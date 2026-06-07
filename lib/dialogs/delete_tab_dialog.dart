@@ -28,11 +28,11 @@ class DeleteTabDialogContent extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
+          child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         TextButton(
           onPressed: () => _deleteTab(context),
-          child: const Text('削除'),
+          child: const Text('削除', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );
