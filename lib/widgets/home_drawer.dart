@@ -24,7 +24,7 @@ class HomeDrawer extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
             child: Text(
-              '棋譜だまり',
+              'アプリについて',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
