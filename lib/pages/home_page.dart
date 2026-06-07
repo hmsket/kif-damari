@@ -110,21 +110,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           backgroundColor: const Color(0XFFF1F1F5),
           drawer: const HomeDrawer(),
           appBar: AppBar(
-            automaticallyImplyLeading: false,
-            leading: Builder(
-              builder: (context) {
-                return GestureDetector(
-                  onTap: () => Scaffold.of(context).openDrawer(),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8.0, 0, 0, 0),
-                    child: Image.asset(
-                      'assets/images/appbar_icon.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                );
-              },
-            ),
             backgroundColor: const Color(0XFFFFFFFF),
             title: Row(
               children: [
