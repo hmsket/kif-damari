@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:kifdamari/widgets/constants.dart';
 
 class AppSettings {
   final Box _box = Hive.box('settings_box');
@@ -7,6 +8,7 @@ class AppSettings {
   final Map<String, dynamic> _defaults = {
     'isDarkMode': false,
     'fontSize': 14.0,
+    'kifLimit': defaultKifLimit,
     'thumbnailSize': 120,
     'defaultPlayerName': 'プレイヤー',
   };

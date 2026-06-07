@@ -75,4 +75,12 @@ class KifDao {
       }
     });
   }
+
+  Future<int> getTotalKifCount() async {
+    final db = await _db;
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM kif'),
+    );
+    return count ?? 0;
+  }
 }

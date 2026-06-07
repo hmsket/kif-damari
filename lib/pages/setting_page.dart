@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/settings/font_size_setting.dart';
+import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/settings/thumbnail_size_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 
@@ -26,13 +27,7 @@ class SettingPage extends StatelessWidget {
             children: [
               _buildSectionTitle('ホーム画面'),
               
-              _buildSettingCard(
-                title: '追加できる棋譜の上限数を増やす',
-                subtitle: '現在の設定: ${settings.get<double>('fontSize').toInt()}',
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                onTap: () {
-                },
-              ),
+              KifRewardSetting(settings: settings),
 
               ThumbnailSizeSetting(settings: settings),
 

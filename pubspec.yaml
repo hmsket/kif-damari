@@ -20,6 +20,7 @@ dependencies:
   url_launcher: ^6.3.2
   font_awesome_flutter: ^11.0.0
   hive_flutter: ^1.1.0
+  google_mobile_ads: ^5.1.0
 
 dev_dependencies:
   flutter_test:

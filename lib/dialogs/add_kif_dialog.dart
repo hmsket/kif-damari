@@ -3,7 +3,10 @@ import 'package:kifdamari/widgets/kif_form_content.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/dao/tab_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/constants.dart';
 
 void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback onRefresh) async {
   final tabs = await TabDao().getAllTabs();
@@ -24,6 +27,21 @@ void showAddKifDialog(BuildContext context, int currentTabIndex, VoidCallback on
             errorMessage: errorMessage,
             onErrorMessageChanged: (error) => setDialogState(() => errorMessage = error),
             onSubmit: ({required tabId, required title, required detail, required kifPath, required color}) async {
+
+              final currentKifCount = await KifDao().getTotalKifCount();
+
+              final settings = AppSettings();
+              final rawLimit = settings.get('kifLimit');
+              final kifLimit = (rawLimit ?? defaultKifLimit) as int;
+
+              if (currentKifCount >= kifLimit) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  KifRewardSetting(settings: settings).showConfirmationDialog(context);
+                }
+                return;
+              }
+
               final rawMaxKifId = await KifDao().getMaxKifId(tabId);
               final maxKifId = rawMaxKifId ?? 0; 
 

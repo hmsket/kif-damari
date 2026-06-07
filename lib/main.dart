@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:kifdamari/pages/home_page.dart';
 
 void main() async {
   // 画面固定の非同期処理を動かすために、Flutterのバインディングを初期化
   WidgetsFlutterBinding.ensureInitialized();
+
+  await MobileAds.instance.initialize();
   
   // 画面の向きを「縦（通常）」と「縦（上下逆）」のみに固定
   await SystemChrome.setPreferredOrientations([
