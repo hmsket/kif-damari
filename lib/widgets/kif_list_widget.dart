@@ -23,6 +23,17 @@ class KifListWidget extends StatefulWidget {
 class KifListWidgetState extends State<KifListWidget> {
   Future<List<KifEntity>>? _kifuFuture;
   List<KifEntity>? _tempKifs;
+  
+  int _lastKifCount = 0;
+  bool _isFirstLoadDone = false;
+
+  bool get isKifEmpty {
+    if (_tempKifs != null) return _tempKifs!.isEmpty;
+    if (!_isFirstLoadDone) return true;
+    return _lastKifCount == 0;
+  }
+
+  int get kifCount => _tempKifs?.length ?? _lastKifCount;
 
   @override
   void initState() {
@@ -67,6 +78,21 @@ class KifListWidgetState extends State<KifListWidget> {
         }
 
         final kifs = _tempKifs ?? snapshot.data ?? [];
+
+        final bool countChanged = _lastKifCount != kifs.length;
+        final bool shouldNotify = !_isFirstLoadDone || (countChanged && kifs.isEmpty);
+
+        _lastKifCount = kifs.length;
+        _isFirstLoadDone = true;
+
+        if (shouldNotify && widget.mode == AppMode.normal) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              widget.onRefresh();
+            }
+          });
+        }
+
         if (kifs.isEmpty) {
           return const Center(
             child: Padding(

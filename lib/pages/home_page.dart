@@ -101,7 +101,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
           _tabController!.addListener(() {
             if (!_tabController!.indexIsChanging) {
-              _currentTabIndex = _tabController!.index;
+              setState(() {
+                _currentTabIndex = _tabController!.index;
+              });
             }
           });
         }
@@ -124,12 +126,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   icon: const Icon(Icons.check, size: 30),
                   onPressed: () async {
                     if (_currentMode == AppMode.sort) {
+                      if (tabs.isEmpty) {
+                        _updateMode(AppMode.normal);
+                        return;
+                      }
                       final currentTabId = tabs[_currentTabIndex].id;
                       final state = _listKeys[currentTabId]?.currentState;
-                      if (state != null) {
-                        await state.saveOrder();
-                        ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
+                      
+                      if (state == null || state.isKifEmpty) {
+                        _updateMode(AppMode.normal);
+                        return;
                       }
+                      
+                      await state.saveOrder();
+                      ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
                     }
                     _updateMode(AppMode.normal);
                   },
@@ -154,27 +164,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 IconButton(
                   icon: const Icon(Icons.edit),
                   tooltip: '編集',
-                  onPressed: () => _updateMode(AppMode.edit),
+                  onPressed: tabs.isNotEmpty 
+                      ? () => _updateMode(AppMode.edit) 
+                      : null,
                 ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.swap_vert),
                   tooltip: '並び替え',
+                  enabled: tabs.isNotEmpty,
                   onSelected: (value) {
                     if (value == 'sort_tabs') {
                       showSortTabsDialog(context, tabs, _refresh); 
                     } else if (value == 'sort_kifs') {
+                      final currentTabId = tabs[_currentTabIndex].id;
+                      final state = _listKeys[currentTabId]?.currentState;
+                      if (state == null || state.isKifEmpty) return;
                       _updateMode(AppMode.sort);
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'sort_tabs', child: Text('タブを並び替え')),
-                    const PopupMenuItem(value: 'sort_kifs', child: Text('棋譜を並び替え')),
-                  ],
+                  itemBuilder: (context) {
+                    final currentTabId = tabs.isNotEmpty ? tabs[_currentTabIndex].id : null;
+                    final state = _listKeys[currentTabId]?.currentState;
+                    final bool hasKif = state != null && !state.isKifEmpty;
+                    return [
+                      const PopupMenuItem(value: 'sort_tabs', child: Text('タブを並び替え')),                      
+                      if (hasKif)
+                        const PopupMenuItem(value: 'sort_kifs', child: Text('棋譜を並び替え')),
+                    ];
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete),
                   tooltip: '削除',
-                  onPressed: () => _updateMode(AppMode.delete),
+                  onPressed: tabs.isNotEmpty 
+                      ? () => _updateMode(AppMode.delete) 
+                      : null,
                 ),
               ]
             ],
