@@ -33,36 +33,34 @@ void showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefre
                 errorMessage: errorMessage,
                 onErrorMessageChanged: (error) => setDialogState(() => errorMessage = error),
                 onSubmit: ({required tabId, required title, required detail, required kifPath, required color}) async {
-                  if (title.isNotEmpty) {
-                    int finalKifId = kif.kifId;
-                    int finalKifOrder = kif.kifOrder;
+                  int finalKifId = kif.kifId;
+                  int finalKifOrder = kif.kifOrder;
 
-                    if (tabId != kif.tabId) {
-                      final maxKifId = await KifDao().getMaxKifId(tabId);
-                      finalKifId = maxKifId + 1;
-                      finalKifOrder = maxKifId + 1;
-                    }
-
-                    final updatedKif = KifEntity(
-                      id: kif.id,
-                      tabId: tabId,
-                      kifId: finalKifId,
-                      title: title,
-                      detail: detail,
-                      kifOrder: finalKifOrder,
-                      kifPath: kifPath,
-                      imgPath: kif.imgPath,
-                      color: color,
-                    );
-
-                    await KifDao().updateKif(updatedKif);
-                    ShowSuccessSnackbar.show(context, "棋譜を更新しました");
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      onRefresh();
-                    }
+                  if (tabId != kif.tabId) {
+                    final maxKifId = await KifDao().getMaxKifId(tabId);
+                    finalKifId = maxKifId + 1;
+                    finalKifOrder = maxKifId + 1;
                   }
-                },
+
+                  final updatedKif = KifEntity(
+                    id: kif.id,
+                    tabId: tabId,
+                    kifId: finalKifId,
+                    title: title,
+                    detail: detail,
+                    kifOrder: finalKifOrder,
+                    kifPath: kifPath,
+                    imgPath: kif.imgPath,
+                    color: color,
+                  );
+
+                  await KifDao().updateKif(updatedKif);
+                  ShowSuccessSnackbar.show(context, "棋譜を更新しました");
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    onRefresh();
+                  }
+                }
               );
             },
           );
