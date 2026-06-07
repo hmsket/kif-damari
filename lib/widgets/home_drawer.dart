@@ -46,6 +46,29 @@ class HomeDrawer extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.menu_book),
+            title: const Text('使い方'),
+              onTap: () async {
+              Navigator.pop(context);
+              final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-manual');
+              try {
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(
+                    url,
+                  );
+                } else {
+                  if (context.mounted) {
+                    ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                }
+              }
+            }
+          ),
+          ListTile(
             leading: const Icon(Icons.info_outlined),
             title: const Text('バージョン情報'),
             onTap: () {
