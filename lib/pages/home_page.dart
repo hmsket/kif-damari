@@ -246,28 +246,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
           ),
-          body: tabs.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: 40.0), 
-                    child: Text(
-                      "タブがありません\n＋ボタンから追加してください",
-                      textAlign: TextAlign.center,
+          body: SafeArea(
+            child: tabs.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 40.0), 
+                      child: Text(
+                        "タブがありません\n＋ボタンから追加してください",
+                        textAlign: TextAlign.center,
+                      ),
                     ),
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: tabs.map((t) {
+                      final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
+                      return KifListWidget(
+                        key: key,
+                        tabId: t.id!,
+                        mode: _currentMode,
+                        onRefresh: _refresh,
+                      );
+                    }).toList(),
                   ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: tabs.map((t) {
-                    final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
-                    return KifListWidget(
-                      key: key,
-                      tabId: t.id!,
-                      mode: _currentMode,
-                      onRefresh: _refresh,
-                    );
-                  }).toList(),
-                ),
+          ),
         );
       },
     );
