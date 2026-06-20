@@ -686,9 +686,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Colors.white.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.red, width: 0.5),
                   ),
                   child: Text(
                     '${entry.value}',
