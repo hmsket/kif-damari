@@ -34,6 +34,8 @@ class KifListItem extends StatelessWidget {
             showDeleteKifDialog(context, kif, onRefresh);
           } else if (mode == AppMode.edit) {
             showEditKifDialog(context, kif, onRefresh);
+          } else if (mode == AppMode.sort) {
+            // 並び替えモード時は遷移しないようにする
           } else {
             Navigator.push(
               context,
