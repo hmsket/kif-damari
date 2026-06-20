@@ -300,6 +300,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
                                 color: Colors.blue,
                                 decoration: TextDecoration.none,
                               ),
+                              contextMenuBuilder: (context, editableTextState) {
+                                return AdaptiveTextSelectionToolbar.editableText(
+                                  editableTextState: editableTextState,
+                                );
+                              },
                               onOpen: (link) async {
                                 final url = Uri.parse(link.url);
                                 if (await canLaunchUrl(url)) {
