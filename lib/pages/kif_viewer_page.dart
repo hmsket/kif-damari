@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
+import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
@@ -16,8 +17,8 @@ import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/logic/diagram_generator.dart';
 import 'package:kifdamari/logic/thumbnail_manager.dart';
 import 'package:path_provider/path_provider.dart';
-
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:kifdamari/models/game_node.dart';
 
 class KifViewerPage extends StatefulWidget {
@@ -285,12 +286,31 @@ class _KifViewerPageState extends State<KifViewerPage> {
                           thumbVisibility: true,
                           child: SingleChildScrollView(
                             controller: _commentScrollController,
-                            child: SelectableText(
-                              "${kifTree!.currentNode.joinedComment}",
+                            child: SelectableLinkify(
+                              text: "${kifTree!.currentNode.joinedComment}",
                               style: TextStyle(
                                 fontSize: settings.get<double>('fontSize'), 
-                                height: 1.5,
                               ),
+                              strutStyle: StrutStyle(
+                                fontSize: settings.get<double>('fontSize'),
+                                height: 1.5,
+                                forceStrutHeight: true,
+                              ),
+                              linkStyle: const TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.none,
+                              ),
+                              onOpen: (link) async {
+                                final url = Uri.parse(link.url);
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(
+                                    url,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                } else {
+                                  ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                                }
+                              },
                             ),
                           ),
                         ),
