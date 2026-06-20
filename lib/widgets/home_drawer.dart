@@ -215,7 +215,7 @@ class HomeDrawer extends StatelessWidget {
                 applicationIcon: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Image.asset(
-                    'assets/images/appbar_icon.png',
+                    'assets/images/icon.png',
                     width: 48,
                     height: 48,
                   ),
