@@ -213,15 +213,21 @@ class _KifFormContentState extends State<KifFormContent> {
           child: const Text('キャンセル', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         TextButton(
-          onPressed: (widget.initialKif == null && _kfilePath == null) || widget.errorMessage != null
+          onPressed: widget.errorMessage != null && _kfilePath != null
               ? null
-              : () => widget.onSubmit(
+              : () {
+                  if (_kfilePath == null) {
+                    widget.onErrorMessageChanged("棋譜ファイルを選択してください");
+                    return;
+                  }
+                  widget.onSubmit(
                     tabId: _selectedTabId,
                     title: _titleController.text,
                     detail: _detailController.text,
                     kifPath: _kfilePath,
                     color: _selectedColor,
-                  ),
+                  );
+                },
           child: Text(widget.confirmButtonText, style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
