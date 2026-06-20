@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:kifdamari/pages/setting_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
+import 'package:kifdamari/widgets/constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kifdamari/pages/version_info_page.dart';
 
@@ -42,7 +43,7 @@ class HomeDrawer extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'アプリメニュー',
+                  'Ver ' + currentVersion,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 12,
@@ -211,7 +212,7 @@ class HomeDrawer extends StatelessWidget {
               showLicensePage(
                 context: context,
                 applicationName: '棋譜だまり',
-                applicationVersion: '1.0.0',
+                applicationVersion: currentVersion,
                 applicationIcon: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Image.asset(
