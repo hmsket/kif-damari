@@ -109,10 +109,8 @@ class KifBoard extends StatelessWidget {
       width: cellSizeW,
       height: cellSizeH,
       child: Container(
-        margin: const EdgeInsets.all(1.0),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(2),
         ),
       ),
     );
