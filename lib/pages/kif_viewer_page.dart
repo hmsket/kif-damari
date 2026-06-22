@@ -8,6 +8,7 @@ import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
+import 'package:kifdamari/pages/diagram_preview_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
@@ -126,6 +127,40 @@ class _KifViewerPageState extends State<KifViewerPage> {
       }
     } catch (e) {
       ShowErrorSnackbar.show(context, "サムネイルの更新に失敗しました");
+    }
+  }
+
+  Future<void> _shareCurrentDiagramWithHand() async {
+    try {
+      final uiImage = await DiagramGenerator.generateForShare(
+        state: kifTree!.currentNode.state,
+        info: Map<String, String>.from(kifTree!.info),
+        isReversed: _isReversed,
+      );
+
+      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception("画像の変換に失敗しました");
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      final tempDir = await getTemporaryDirectory();
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final file = File('${tempDir.path}/kif_share_$timestamp.png');
+      await file.writeAsBytes(pngBytes);
+
+      final moveNumber = kifTree!.currentNode.moveNumber;
+      final shareText = "棋譜だまりから局面を共有しています（${moveNumber}手目）\n#将棋 #棋譜だまり";
+
+      if (await file.exists()) {
+        await Share.shareXFiles(
+          [XFile(file.path)], 
+          text: shareText,
+        );
+      }
+    } catch (e) {
+      debugPrint("共有失敗: $e");
+      if (mounted) {
+        ShowErrorSnackbar.show(context, "画像の共有に失敗しました");
+      }
     }
   }
 
@@ -595,6 +630,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 },
               ),
               MenuItemButton(
+                leadingIcon: const Icon(Icons.image, size: 20),
+                child: const Text('局面画像を生成・保存'),
+                onPressed: () => _navigateToPreviewPage(),
+              ),
+              MenuItemButton(
                 leadingIcon: const Icon(Icons.cached, size: 20),
                 child: const Text('盤面を反転'),
                 onPressed: () {
@@ -710,19 +750,36 @@ class _KifViewerPageState extends State<KifViewerPage> {
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
   }
 
-  Future<void> _shareThumbnail() async {
+  Future<void> _navigateToPreviewPage() async {
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final path = '${appDir.path}/thumbnails/thumb_${widget.kifEntity.tabId}_${widget.kifEntity.kifId}.png';
-      final file = File(path);
+      // 画像を生成
+      final uiImage = await DiagramGenerator.generateForShare(
+        state: kifTree!.currentNode.state,
+        info: Map<String, String>.from(kifTree!.info),
+        isReversed: _isReversed,
+      );
 
-      if (await file.exists()) {
-        await Share.shareXFiles([XFile(path)], text: '\n#棋譜だまり');
-      } else {
-        debugPrint("ファイルが見つかりません: $path");
-      }
+      // バイトデータ化
+      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception("画像の変換に失敗しました");
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      // 画面がまだ存在していれば、プレビューページへ遷移
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DiagramPreviewPage(
+            pngBytes: pngBytes,
+            moveNumber: kifTree!.currentNode.moveNumber,
+          ),
+        ),
+      );
     } catch (e) {
-      debugPrint("共有失敗: $e");
+      debugPrint("画像生成失敗: $e");
+      if (mounted) {
+        ShowErrorSnackbar.show(context, "画像の生成に失敗しました");
+      }
     }
   }
 }
