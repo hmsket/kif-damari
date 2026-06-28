@@ -5,13 +5,15 @@ import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 
 class DiagramPreviewPage extends StatefulWidget {
-  final Uint8List pngBytes;
+  final Uint8List initialPngBytes;
   final int moveNumber;
+  final Future<Uint8List> Function(bool highlightLastMove) onToggleHighlight;
 
   const DiagramPreviewPage({
     super.key,
-    required this.pngBytes,
+    required this.initialPngBytes,
     required this.moveNumber,
+    required this.onToggleHighlight,
   });
 
   @override
@@ -20,25 +22,50 @@ class DiagramPreviewPage extends StatefulWidget {
 
 class _DiagramPreviewPageState extends State<DiagramPreviewPage> {
   bool _isSaving = false;
+  bool _isGenerating = false;
+  bool _highlightLastMove = true;
+  late Uint8List _currentPngBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPngBytes = widget.initialPngBytes;
+  }
+
+  Future<void> _updateImage(bool newValue) async {
+    setState(() {
+      _highlightLastMove = newValue;
+      _isGenerating = true;
+    });
+
+    try {
+      final newBytes = await widget.onToggleHighlight(newValue);
+      setState(() {
+        _currentPngBytes = newBytes;
+      });
+    } catch (e) {
+      if (mounted) {
+        ShowErrorSnackbar.show(context, '画像の再生成に失敗しました');
+      }
+    } finally {
+      setState(() => _isGenerating = false);
+    }
+  }
+
   Future<void> _saveImage() async {
     setState(() => _isSaving = true);
     try {
-      // 保存権限があるかチェック
       bool hasAccess = await Gal.hasAccess();
-      
-      // 権限がなければ、ユーザーに許可を求めるダイアログを表示
       if (!hasAccess) {
         hasAccess = await Gal.requestAccess();
       }
 
-      // 許可が得られた場合のみ保存を実行
       if (hasAccess) {
-        await Gal.putImageBytes(widget.pngBytes);
+        await Gal.putImageBytes(_currentPngBytes);
         if (mounted) {
           ShowSuccessSnackbar.show(context, '画像を保存しました');
         }
       } else {
-        // ユーザーが拒否した場合
         if (mounted) {
           ShowErrorSnackbar.show(context, '保存にはストレージへのアクセス許可が必要です');
         }
@@ -67,12 +94,36 @@ class _DiagramPreviewPageState extends State<DiagramPreviewPage> {
             // 上半分：プレビュー画像
             Expanded(
               child: Center(
-                child: Image.memory(
-                  widget.pngBytes,
-                  fit: BoxFit.contain,
+                child: _isGenerating
+                    ? const CircularProgressIndicator()
+                    : Image.memory(
+                        _currentPngBytes,
+                        fit: BoxFit.contain,
+                      ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SwitchListTile(
+                  title: const Text(
+                    '最終手を強調表示する',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  value: _highlightLastMove,
+                  onChanged: _isGenerating ? null : (bool value) => _updateImage(value),
                 ),
               ),
             ),
+
             // 下半分：保存ボタン
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -80,7 +131,7 @@ class _DiagramPreviewPageState extends State<DiagramPreviewPage> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveImage,
+                  onPressed: (_isSaving || _isGenerating) ? null : _saveImage,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black87,

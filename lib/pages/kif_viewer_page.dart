@@ -752,26 +752,32 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
   Future<void> _navigateToPreviewPage() async {
     try {
-      // 画像を生成
-      final uiImage = await DiagramGenerator.generateForShare(
-        state: kifTree!.currentNode.state,
-        info: Map<String, String>.from(kifTree!.info),
-        isReversed: _isReversed,
-      );
+      Future<Uint8List> generateBytes({required bool highlightLastMove}) async {
+        final uiImage = await DiagramGenerator.generateForShare(
+          state: kifTree!.currentNode.state,
+          info: Map<String, String>.from(kifTree!.info),
+          isReversed: _isReversed,
+          highlightLastMove: highlightLastMove,
+        );
 
-      // バイトデータ化
-      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception("画像の変換に失敗しました");
-      final Uint8List pngBytes = byteData.buffer.asUint8List();
+        final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
+        if (byteData == null) throw Exception("画像の変換に失敗しました");
+        return byteData.buffer.asUint8List();
+      }
 
-      // 画面がまだ存在していれば、プレビューページへ遷移
+      final initialPngBytes = await generateBytes(highlightLastMove: true);
+
       if (!mounted) return;
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => DiagramPreviewPage(
-            pngBytes: pngBytes,
+            initialPngBytes: initialPngBytes,
             moveNumber: kifTree!.currentNode.moveNumber,
+            onToggleHighlight: (bool highlightLastMove) async {
+              return await generateBytes(highlightLastMove: highlightLastMove);
+            },
           ),
         ),
       );

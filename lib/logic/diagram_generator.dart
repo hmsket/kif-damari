@@ -10,8 +10,7 @@ class DiagramGenerator {
   static const double _totalSize = _boardSize + (_margin * 2);
   static const double _cellSize = _boardSize / 9;
 
-  // 盤面を白黒PNG画像として生成する
-  static Future<ui.Image> generate(BoardState state) async {
+  static Future<ui.Image> generate(BoardState state, {bool highlightLastMove = true}) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
@@ -23,7 +22,7 @@ class DiagramGenerator {
     canvas.translate(_margin, _margin);
 
     // 各要素を順番に描画
-    _drawLastMoveHighlight(canvas, state);
+    _drawLastMoveHighlight(canvas, state, highlightLastMove: highlightLastMove);
     _drawBoardGrid(canvas);
     _drawStars(canvas);
     _drawPieces(canvas, state);
@@ -33,7 +32,9 @@ class DiagramGenerator {
   }
 
   // 直近の着手マスをハイライト
-  static void _drawLastMoveHighlight(Canvas canvas, BoardState state) {
+  static void _drawLastMoveHighlight(Canvas canvas, BoardState state, {required bool highlightLastMove}) {
+    if (!highlightLastMove) return;
+
     if (state.lastMoveToX != null && state.lastMoveToY != null) {
       final highlightPaint = Paint()
         ..color = Colors.red.withOpacity(0.25)
@@ -164,9 +165,10 @@ class DiagramGenerator {
     required BoardState state,
     required Map<String, String> info,
     required bool isReversed,
+    bool highlightLastMove = true,
   }) async {
     // 盤面を取得
-    final ui.Image boardImage = await generate(state);
+    final ui.Image boardImage = await generate(state, highlightLastMove: highlightLastMove);
 
     // 画像の全体サイズ・余白の定義
     const double sideAreaWidth = 110.0;
@@ -264,28 +266,23 @@ class DiagramGenerator {
     double y = 0.0;
 
     if (rotate180) {
-      // 左側（後手）：上詰め（反転前は上端に配置）
       y = rect.top + _margin;
     } else {
-      // 右側（先手）：下詰め（そのまま下端に配置）
       y = (rect.bottom - _margin) - totalTextHeight;
     }
 
     canvas.save();
     
-    // 180度回転の適用（左側プレイヤー用）
     if (rotate180) {
       final centerX = rect.left + rect.width / 2;
       final centerY = y + totalTextHeight / 2;
       canvas.translate(centerX, centerY);
       canvas.rotate(math.pi);
       
-      // 回転後はローカル座標系の中心からの相対位置にマッピング
       x = -baseFontSize / 2;
       y = -totalTextHeight / 2;
     }
 
-    // １文字ずつ描画
     for (int i = 0; i < verticalItems.length; i++) {
       final item = verticalItems[i];
       final String currentText = item.key;
@@ -308,7 +305,6 @@ class DiagramGenerator {
 
         textPainter.paint(canvas, Offset(textX, textY));
 
-        // ２枚以上あるなら算用数字で表示
         if (count > 1) {
           final countPainter = TextPainter(
             text: TextSpan(
@@ -322,7 +318,6 @@ class DiagramGenerator {
             textDirection: TextDirection.ltr,
           )..layout();
 
-          // 駒文字の右端の直後、かつ下端に揃える計算
           final double countX = textX + textPainter.width + 4.0; 
           final double countY = (textY + textPainter.height) - countPainter.height - 4.0;
 
@@ -330,7 +325,6 @@ class DiagramGenerator {
         }
       }
 
-      // 次の行（1列分）へ Y 座標を進める
       y += cellHeight;
     }
 
