@@ -40,7 +40,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
   int _dragStartMoveNumber = 0; 
   String? _rawKifContent;
 
-  // 🌟 追加：カスタムサイドバーの開閉を管理する状態変数
   bool _isSidebarOpen = false;
 
   @override
@@ -222,17 +221,12 @@ class _KifViewerPageState extends State<KifViewerPage> {
       );
     }
 
-    // 🌟 サイドバーの横幅（画面全体の85%）
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
-    // このメソッド、または build メソッド内の上部でコントローラーを宣言してください。
     final ScrollController _commentScrollController = ScrollController();
 
     return Scaffold(
-      // backgroundColor: Colors.orange[50],
-      // 🌟 endDrawer は競合を避けるために完全に削除し、Stackによるカスタムドロワーに移行します。
       body: Stack(
         children: [
-          // 1. 【メインコンテンツ】将棋盤やコントロールパネル一式
           GestureDetector(
             behavior: HitTestBehavior.translucent,
             onLongPressStart: (details) {
@@ -257,13 +251,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
             child: SafeArea(
               child: Column(
                 children: [
-                  // --- 上側のエリア ---
                   _buildPlayerAndKomaDai(
                     playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
                     isSente: _isReversed, 
                     isUpper: true,
                   ),
-                  // --- 盤面エリア ---
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: AspectRatio(
@@ -296,7 +288,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       ),
                     ),
                   ),
-                  // --- 下側のエリア ---
                   _buildPlayerAndKomaDai(
                     playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
                     isSente: !_isReversed,
@@ -313,9 +304,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       ),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onLongPress: () {
-                          // 空にしておくことで外側のシークバー発火を防ぐ
-                        },
+                        onLongPress: () {},
                         child: Scrollbar(
                           controller: _commentScrollController,
                           thumbVisibility: true,
@@ -363,7 +352,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
             ),
           ),
 
-          // 2. 【暗幕レイヤー】サイドバーが開いている時にメイン画面をじんわり暗くし、タップで閉じる機能
           if (_isSidebarOpen)
             Positioned.fill(
               child: GestureDetector(
@@ -379,11 +367,10 @@ class _KifViewerPageState extends State<KifViewerPage> {
               ),
             ),
 
-          // 3. 【カスタムサイドバー本体】アニメーションスライドイン
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
-            right: _isSidebarOpen ? 0 : -sidebarWidth, // 画面外か、画面の右端ぴったりか
+            right: _isSidebarOpen ? 0 : -sidebarWidth, 
             top: 0,
             bottom: 0,
             width: sidebarWidth,
@@ -423,7 +410,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                           setState(() {
                             kifTree!.currentNode = selectedNode;
 
-                            // タップしたノードからルートまで遡り、選択分岐インデックスを同期
                             GameNode? temp = selectedNode;
                             while (temp != null && temp.parent != null) {
                               final parent = temp.parent!;
@@ -431,7 +417,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                               temp = parent;
                             }
                             
-                            // 🌟 追加：ノードがタップされて局面移動したら、スッとサイドバーを閉じる
                             _isSidebarOpen = false;
                           });
                         },
@@ -493,7 +478,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
   }
 
   Widget _buildControlPanel() {
-    final colorScheme = Theme.of(context).colorScheme;
     double dragDistance = 0;
 
     return Container(
@@ -539,12 +523,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
               child: Builder(
                 builder: (context) {
                   final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
-                  final bool isInsideBranch = kifTree!.currentNode.parent != null && 
-                                              kifTree!.currentNode.parent!.nextNodes.first != kifTree!.currentNode;
 
                   return GestureDetector(
                     onTap: () {
-                      // 🌟 修正：Scaffoldのエンドドロワーではなく、setStateで自作サイドバーのフラグをONにする
                       setState(() {
                         _isSidebarOpen = true;
                       });
@@ -644,7 +625,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 },
               ),
             ],
-            // 💡 三点リーダーのアイコンボタン（トリガー）をここに定義します
             builder: (BuildContext context, MenuController controller, Widget? child) {
               return IconButton(
                 icon: const Icon(Icons.more_vert),
@@ -750,12 +730,25 @@ class _KifViewerPageState extends State<KifViewerPage> {
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
   }
 
-  Future<void> _navigateToPreviewPage() async {
+void _navigateToPreviewPage() async {
     try {
-      Future<Uint8List> generateBytes({required bool highlightLastMove}) async {
+      final String initialSente = kifTree!.info['先手'] ?? '先手';
+      final String initialGote = kifTree!.info['後手'] ?? '後手';
+
+      Future<Uint8List> generateBytes({
+        required bool highlightLastMove,
+        required String senteName,
+        required String goteName,
+      }) async {
+        final Map<String, String> updatedInfo = Map<String, String>.from(kifTree!.info);
+        updatedInfo['先手'] = senteName;
+        updatedInfo['後手'] = goteName;
+        updatedInfo['sente'] = senteName;
+        updatedInfo['gote'] = goteName;
+
         final uiImage = await DiagramGenerator.generateForShare(
           state: kifTree!.currentNode.state,
-          info: Map<String, String>.from(kifTree!.info),
+          info: updatedInfo,
           isReversed: _isReversed,
           highlightLastMove: highlightLastMove,
         );
@@ -765,7 +758,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
         return byteData.buffer.asUint8List();
       }
 
-      final initialPngBytes = await generateBytes(highlightLastMove: true);
+      final initialPngBytes = await generateBytes(
+        highlightLastMove: true,
+        senteName: initialSente,
+        goteName: initialGote,
+      );
 
       if (!mounted) return;
 
@@ -775,8 +772,18 @@ class _KifViewerPageState extends State<KifViewerPage> {
           builder: (context) => DiagramPreviewPage(
             initialPngBytes: initialPngBytes,
             moveNumber: kifTree!.currentNode.moveNumber,
-            onToggleHighlight: (bool highlightLastMove) async {
-              return await generateBytes(highlightLastMove: highlightLastMove);
+            initialSenteName: initialSente, 
+            initialGoteName: initialGote,
+            onUpdateDiagram: ({
+              required bool highlightLastMove,
+              required String senteName,
+              required String goteName,
+            }) async {
+              return await generateBytes(
+                highlightLastMove: highlightLastMove,
+                senteName: senteName,
+                goteName: goteName,
+              );
             },
           ),
         ),

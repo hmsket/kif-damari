@@ -54,14 +54,14 @@ class DiagramGenerator {
   static void _drawBoardGrid(Canvas canvas) {
     final linePaint = Paint()
       ..color = Colors.black
-      ..strokeWidth = 6.0 // 外枠をさらに太くする
+      ..strokeWidth = 6.0 
       ..style = PaintingStyle.stroke;
 
     // 外枠の描画
     canvas.drawRect(const Rect.fromLTWH(0, 0, _boardSize, _boardSize), linePaint);
 
     // 内側の格子線
-    linePaint.strokeWidth = 2.5; // 内側の線も少し太くする
+    linePaint.strokeWidth = 2.5; 
     for (int i = 1; i < 9; i++) {
       // 縦線
       canvas.drawLine(Offset(_cellSize * i, 0), Offset(_cellSize * i, _boardSize), linePaint);
@@ -240,6 +240,14 @@ class DiagramGenerator {
 
     verticalItems.add(MapEntry(isSente ? '☗' : '☖', 1));
 
+    for (int i = 0; i < name.length; i++) {
+      verticalItems.add(MapEntry(name[i], 1));
+    }
+    
+    if (name.isNotEmpty) {
+      verticalItems.add(const MapEntry('', 1)); 
+    }
+
     bool hasPieces = false;
     for (var key in priorityOrder) {
       final count = hand[key] ?? 0;
@@ -259,8 +267,8 @@ class DiagramGenerator {
     const double cellHeight = baseFontSize * fontHeight;
     final double totalTextHeight = verticalItems.length * cellHeight;
 
-    const double boardPullOffset = 20.0; // 盤面側へ引き寄せる距離
-    const double textInnerPadding = 0.1;  // 文字セル内のわずかな左余白係数
+    const double boardPullOffset = 20.0; 
+    const double textInnerPadding = 0.1;  
 
     double x = rect.left + (rect.width - baseFontSize) / 2;
     double y = 0.0;
