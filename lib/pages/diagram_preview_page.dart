@@ -114,7 +114,7 @@ void _showEditNameDialog() {
                 Navigator.pop(context);
                 _updateImage();
               },
-              child: const Text('反映', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('反映する', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -246,7 +246,7 @@ void _showEditNameDialog() {
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
                               dense: true,
-                              title: const Text('最終手を強調表示する', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                              title: const Text('現在手を強調表示する', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                               value: _highlightLastMove,
                               onChanged: _isGenerating
                                   ? null
