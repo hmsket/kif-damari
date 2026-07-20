@@ -124,4 +124,37 @@ class KifParser {
     }
     return tree;
   }
+
+  static String encode(KifTree tree) {
+    final buffer = StringBuffer();
+
+    // ヘッダー情報の書き出し
+    tree.info.forEach((key, value) {
+      buffer.writeln('$key：$value');
+    });
+    buffer.writeln('手数----指手----消費時間--');
+
+    // 本譜（メインライン）の指手を再帰的に書き出す
+    _writeNodes(buffer, tree.root.nextNodes);
+
+    return buffer.toString();
+  }
+
+  static void _writeNodes(StringBuffer buffer, List<GameNode> nodes) {
+    if (nodes.isEmpty) return;
+
+    // メインライン（インデックス0）を優先して出力
+    final primaryNode = nodes.first;
+    final cleanLabel = primaryNode.moveLabel ?? '';
+    
+    // 手数を4桁右詰めで整形して指手を出力
+    buffer.writeln('${primaryNode.moveNumber.toString().padLeft(4)} $cleanLabel');
+
+    // コメントがある場合は `*` を頭につけて出力
+    for (var comment in primaryNode.comments) {
+      buffer.writeln('*$comment');
+    }
+
+    _writeNodes(buffer, primaryNode.nextNodes);
+  }
 }

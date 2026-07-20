@@ -9,6 +9,7 @@ import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/pages/diagram_preview_page.dart';
+import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
@@ -598,6 +599,18 @@ class _KifViewerPageState extends State<KifViewerPage> {
               elevation: WidgetStateProperty.all(8),
             ),
             menuChildren: [
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.edit, size: 20, color: Colors.brown),
+                child: const Text('棋譜編集モードに切り替え'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => KifEditorPage(kifEntity: widget.kifEntity),
+                    ),
+                  );
+                },
+              ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.collections, size: 20),
                 child: const Text('この局面でサムネイルを生成'),

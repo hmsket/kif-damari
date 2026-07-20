@@ -1,0 +1,816 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:charset_converter/charset_converter.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
+import 'package:kifdamari/logic/shogi_rule_helper.dart';
+import 'package:kifdamari/models/kif_tree.dart';
+import 'package:kifdamari/logic/kif_parser.dart';
+import 'package:kifdamari/widgets/kif_board.dart';
+import 'package:kifdamari/models/board_state.dart';
+import 'package:kifdamari/models/game_node.dart';
+import 'package:kifdamari/widgets/kif_tree_view.dart';
+import 'package:share_plus/share_plus.dart';
+
+class KifEditorPage extends StatefulWidget {
+  final KifEntity kifEntity;
+  const KifEditorPage({super.key, required this.kifEntity});
+
+  @override
+  State<KifEditorPage> createState() => _KifEditorPageState();
+}
+
+class _KifEditorPageState extends State<KifEditorPage> {
+  KifTree? kifTree;
+  bool _isLoading = true;
+  bool _isReversed = false;
+
+  int? _selectedFile; 
+  int? _selectedRank; 
+  String? _selectedHandPiece; 
+
+  double _dragDistance = 0.0;
+  bool _isSidebarOpen = false;
+
+  // コメント入力欄を制御するコントローラー
+  final TextEditingController _commentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _initKifData();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  // GameNodeの仕様（joinedComment）に合わせてコメントを同期
+  void _syncCommentFromCurrentNode() {
+    if (kifTree != null) {
+      _commentController.text = kifTree!.currentNode.joinedComment;
+    }
+  }
+
+  Future<void> _initKifData() async {
+    final String? path = widget.kifEntity.kifPath;
+    if (path == null || path.isEmpty) {
+      setState(() {
+        kifTree = KifTree.initial();
+        _isLoading = false;
+        _syncCommentFromCurrentNode();
+      });
+      return;
+    }
+
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        String content;
+        try {
+          content = utf8.decode(bytes, allowMalformed: false);
+        } catch (_) {
+          content = await CharsetConverter.decode("Shift_JIS", bytes);
+        }
+        final tree = KifParser.decode(content);
+        setState(() {
+          kifTree = tree;
+          _isLoading = false;
+          _syncCommentFromCurrentNode();
+        });
+      } else {
+        throw Exception("ファイルが見つかりません");
+      }
+    } catch (e) {
+      debugPrint("KIF解析エラー: $e");
+      setState(() {
+        kifTree = KifTree.initial();
+        _isLoading = false;
+        _syncCommentFromCurrentNode();
+      });
+    }
+  }
+
+  void _onBoardTap(TapUpDetails details, BoxConstraints constraints) {
+    if (kifTree == null) return;
+
+    final double boardWidth = constraints.maxWidth;
+    final double boardHeight = constraints.maxHeight;
+
+    final double cellWidth = boardWidth / 9;
+    final double cellHeight = boardHeight / 9;
+
+    double localX = details.localPosition.dx;
+    double localY = details.localPosition.dy;
+
+    if (_isReversed) {
+      localX = boardWidth - localX;
+      localY = boardHeight - localY;
+    }
+
+    int file = 9 - (localX / cellWidth).floor();
+    int rank = (localY / cellHeight).floor() + 1;
+
+    if (file < 1 || file > 9 || rank < 1 || rank > 9) return;
+
+    _handleSquareClick(file, rank);
+  }
+
+  void _handleSquareClick(int file, int rank) {
+    final currentState = kifTree!.currentNode.state;
+    final String? clickedPiece = currentState.grid[rank - 1][9 - file];
+    final currentPlayer = currentState.nextPlayer;
+
+    setState(() {
+      if (_selectedHandPiece != null) {
+        if (clickedPiece == null) {
+          final validDrops = _getValidDropMoves(_selectedHandPiece!);
+          final bool canDrop = validDrops.any((m) => m[0] == file && m[1] == rank);
+          if (canDrop) {
+            _dropPiece(pieceType: _selectedHandPiece!, toFile: file, toRank: rank);
+          }
+          _selectedHandPiece = null;
+        } else {
+          _selectedHandPiece = null;
+          _selectPieceIfOwn(clickedPiece, file, rank, currentPlayer);
+        }
+      } else {
+        if (_selectedFile == null) {
+          _selectPieceIfOwn(clickedPiece, file, rank, currentPlayer);
+        } else {
+          if (_selectedFile == file && _selectedRank == rank) {
+            _selectedFile = null;
+            _selectedRank = null;
+          } else if (clickedPiece != null && _isOwnPiece(clickedPiece, currentPlayer)) {
+            _selectedFile = file;
+            _selectedRank = rank;
+          } else {
+            final validMoves = _getValidMoves(_selectedFile!, _selectedRank!);
+            final bool canMove = validMoves.any((m) => m[0] == file && m[1] == rank);
+            if (canMove) {
+              _movePiece(fromFile: _selectedFile!, fromRank: _selectedRank!, toFile: file, toRank: rank);
+            }
+            _selectedFile = null;
+            _selectedRank = null;
+          }
+        }
+      }
+    });
+  }
+  
+  bool _isOwnPiece(String pieceCode, Player player) {
+    if (player == Player.sente && pieceCode.startsWith('b')) return true;
+    if (player == Player.gote && pieceCode.startsWith('w')) return true;
+    return false;
+  }
+
+  void _selectPieceIfOwn(String? pieceCode, int file, int rank, Player player) {
+    if (pieceCode != null && _isOwnPiece(pieceCode, player)) {
+      _selectedFile = file;
+      _selectedRank = rank;
+    }
+  }
+
+  String _getKanjiNameFromCode(String code) {
+    final type = code.substring(1);
+    switch (type) {
+      case 'fu': return '歩';
+      case 'ya': return '香';
+      case 'ke': return '桂';
+      case 'gi': return '銀';
+      case 'ki': return '金';
+      case 'ka': return '角';
+      case 'hi': return '飛';
+      case 'gy': return '玉';
+      case 'to': return 'と金';
+      case 'ny': return '成香';
+      case 'nk': return '成桂';
+      case 'ng': return '成銀';
+      case 'um': return '馬';
+      case 'ry': return '龍';
+      default: return '歩';
+    }
+  }
+
+  String _getKanjiNameFromHandCode(String type) {
+    switch (type) {
+      case 'fu': return '歩';
+      case 'ya': return '香';
+      case 'ke': return '桂';
+      case 'gi': return '銀';
+      case 'ki': return '金';
+      case 'ka': return '角';
+      case 'hi': return '飛';
+      default: return '歩';
+    }
+  }
+
+  void _movePiece({required int fromFile, required int fromRank, required int toFile, required int toRank}) async {
+    final currentState = kifTree!.currentNode.state;
+    final String? movingPiece = currentState.grid[fromRank - 1][9 - fromFile];
+    if (movingPiece == null) return;
+
+    final isSente = movingPiece.startsWith('b');
+    final String type = movingPiece.substring(1);
+    
+    const cannotPromoteTypes = {'ki', 'gy', 'to', 'ny', 'nk', 'ng', 'um', 'ry'};
+    final bool canPromoteType = !cannotPromoteTypes.contains(type);
+
+    final bool isFromInEnemyCamp = isSente ? (fromRank <= 3) : (fromRank >= 7);
+    final bool isToInEnemyCamp = isSente ? (toRank <= 3) : (toRank >= 7);
+    final bool isPromotionZone = isFromInEnemyCamp || isToInEnemyCamp;
+
+    bool shouldPromote = false;
+
+    if (canPromoteType && isPromotionZone) {
+      final bool mustPromote = (type == 'fu' || type == 'ya') && (isSente ? toRank == 1 : toRank == 9) ||
+                               (type == 'ke' && (isSente ? toRank <= 2 : toRank >= 8));
+
+      if (mustPromote) {
+        shouldPromote = true;
+      } else {
+        if (mounted) {
+          shouldPromote = await _showPromotionDialog(context) ?? false;
+        }
+      }
+    }
+
+    String pieceKanji = _getKanjiNameFromCode(movingPiece);
+    if (shouldPromote) {
+      if (pieceKanji == '歩') pieceKanji = 'と';
+      else if (pieceKanji == '飛') pieceKanji = '龍';
+      else if (pieceKanji == '角') pieceKanji = '馬';
+      else pieceKanji = '成$pieceKanji';
+    }
+
+    final BoardState nextState = currentState.movePiece(
+      fromX: fromFile,
+      fromY: fromRank,
+      toX: toFile,
+      toY: toRank,
+      pieceName: pieceKanji,
+    );
+
+    setState(() {
+      final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
+      final String promoteLabel = shouldPromote ? '成' : '';
+      final String label = "$fromFile$fromRank$pieceKanji$promoteLabel(${toFile}${toRank})"; 
+
+      final newNode = GameNode(
+        moveNumber: nextMoveNumber,
+        state: nextState,
+        moveLabel: label,
+        parent: kifTree!.currentNode,
+      );
+
+      kifTree!.currentNode.nextNodes.add(newNode);
+      kifTree!.currentNode = newNode;
+      _syncCommentFromCurrentNode(); 
+    });
+  }
+
+  Future<bool?> _showPromotionDialog(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('成りますか？', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('成らない', style: TextStyle(color: Colors.black54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('成る', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _dropPiece({required String pieceType, required int toFile, required int toRank}) {
+    final currentState = kifTree!.currentNode.state;
+    final String pieceKanji = _getKanjiNameFromHandCode(pieceType);
+
+    final BoardState nextState = currentState.movePiece(
+      fromX: null,
+      fromY: null,
+      toX: toFile,
+      toY: toRank,
+      pieceName: pieceKanji,
+    );
+
+    setState(() {
+      final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
+      final String label = "${pieceKanji}打(${toFile}${toRank})";
+
+      final newNode = GameNode(
+        moveNumber: nextMoveNumber,
+        state: nextState,
+        moveLabel: label,
+        parent: kifTree!.currentNode,
+      );
+
+      kifTree!.currentNode.nextNodes.add(newNode);
+      kifTree!.currentNode = newNode;
+      _syncCommentFromCurrentNode(); 
+    });
+  }
+
+  List<List<int>> _getValidMoves(int fromFile, int fromRank) {
+    if (kifTree == null) return [];
+    return ShogiRuleHelper.getValidMoves(
+      boardState: kifTree!.currentNode.state,
+      fromFile: fromFile,
+      fromRank: fromRank,
+    );
+  }
+
+  List<List<int>> _getValidDropMoves(String pieceType) {
+    if (kifTree == null) return [];
+    return ShogiRuleHelper.getValidDropMoves(
+      boardState: kifTree!.currentNode.state,
+      pieceType: pieceType,
+    );
+  }
+
+  Widget _buildControlPanel() {
+    return Container(
+      color: const Color(0XFFF1F1F5),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.first_page),
+            onPressed: () => setState(() {
+              kifTree!.jumpTo(0);
+              _selectedFile = null;
+              _selectedRank = null;
+              _selectedHandPiece = null;
+              _syncCommentFromCurrentNode(); 
+            }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            iconSize: 36,
+            onPressed: () => setState(() {
+              kifTree!.stepBack();
+              _selectedFile = null;
+              _selectedRank = null;
+              _selectedHandPiece = null;
+              _syncCommentFromCurrentNode(); 
+            }),
+          ),
+          GestureDetector(
+            onVerticalDragUpdate: (details) {
+              _dragDistance += details.delta.dy;
+              const double threshold = 10.0;
+              if (_dragDistance <= -threshold) {
+                setState(() {
+                  kifTree!.stepNext();
+                  _dragDistance = 0;
+                  _selectedFile = null;
+                  _selectedRank = null;
+                  _selectedHandPiece = null;
+                  _syncCommentFromCurrentNode(); 
+                });
+              } else if (_dragDistance >= threshold) {
+                setState(() {
+                  kifTree!.stepBack();
+                  _dragDistance = 0;
+                  _selectedFile = null;
+                  _selectedRank = null;
+                  _selectedHandPiece = null;
+                  _syncCommentFromCurrentNode(); 
+                });
+              }
+            },
+            onVerticalDragEnd: (_) => _dragDistance = 0,
+            child: SizedBox(
+              width: 90,
+              child: Builder(
+                builder: (context) {
+                  final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
+
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isSidebarOpen = true;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: hasBranch ? Colors.orange[100] : Colors.white,
+                        border: Border.all(
+                          color: hasBranch ? Colors.orange[700]! : Colors.black45, 
+                          width: hasBranch ? 2.0 : 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${kifTree!.currentNode.moveNumber}手目',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.normal,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                kifTree!.currentNode.moveLabel?.replaceAll(RegExp(r'\(.*\)'), '') ?? '開始局面',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.black,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (hasBranch)
+                            const Positioned(
+                              top: -2,
+                              right: 0,
+                              child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            iconSize: 36,
+            onPressed: () => setState(() {
+              kifTree!.stepNext();
+              _selectedFile = null;
+              _selectedRank = null;
+              _selectedHandPiece = null;
+              _syncCommentFromCurrentNode(); 
+            }),
+          ),
+          IconButton(
+            icon: const Icon(Icons.last_page),
+            onPressed: () => setState(() {
+              kifTree!.jumpTo(kifTree!.totalMoveCount);
+              _selectedFile = null;
+              _selectedRank = null;
+              _selectedHandPiece = null;
+              _syncCommentFromCurrentNode(); 
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCommentEditDialog() async {
+    final result = await showCommentEditDialog(context, kifTree!.currentNode.joinedComment);
+    if (result != null) {
+      setState(() {
+        kifTree!.currentNode.comments.clear();
+        kifTree!.currentNode.comments.addAll(result);
+        _syncCommentFromCurrentNode();
+      });
+    }
+  }
+  
+  Widget _buildCommentField() {
+    final String currentComment = kifTree!.currentNode.joinedComment;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap: _showCommentEditDialog, 
+        borderRadius: BorderRadius.circular(8), 
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: SizedBox(
+            width: double.infinity,
+            height: double.infinity, 
+            child: SingleChildScrollView(
+              child: Text(
+                currentComment.isEmpty ? 'タップしてこの局面のコメントを入力' : currentComment,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: currentComment.isEmpty ? Colors.grey[400] : Colors.black87,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || kifTree == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
+
+    return Scaffold(
+      backgroundColor: const Color(0XFFF1F1F5),
+      resizeToAvoidBottomInset: false, 
+      appBar: AppBar(
+        backgroundColor: const Color(0XFFFFFFFF),
+        // title: Text(
+        //   '棋譜編集: ${widget.kifEntity.title.isEmpty ? "新規棋譜" : widget.kifEntity.title}',
+        //   style: GoogleFonts.notoSansJp(fontSize: 16, fontWeight: FontWeight.bold),
+        // ),
+        actions: [
+          // IconButton(
+          //   icon: const Icon(Icons.cached),
+          //   tooltip: '盤面反転',
+          //   onPressed: () => setState(() => _isReversed = !_isReversed),
+          // ),
+          IconButton(
+            icon: const Icon(Icons.save),
+            tooltip: '保存',
+            onPressed: _saveKifData,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        bottom: true,
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildPlayerAndKomaDai(
+                  playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
+                  isSente: _isReversed, 
+                  isUpper: true,
+                ),
+                
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: AspectRatio(
+                    aspectRatio: 0.93,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return GestureDetector(
+                          onTapUp: (details) => _onBoardTap(details, constraints),
+                          child: KifBoard(
+                            state: kifTree!.currentNode.state,
+                            isReversed: _isReversed,
+                            selectedX: _selectedFile,
+                            selectedY: _selectedRank,
+                            validMoves: (_selectedFile != null && _selectedRank != null) 
+                                ? _getValidMoves(_selectedFile!, _selectedRank!) 
+                                : (_selectedHandPiece != null)
+                                    ? _getValidDropMoves(_selectedHandPiece!)
+                                    : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+                _buildPlayerAndKomaDai(
+                  playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
+                  isSente: !_isReversed,
+                  isUpper: false,
+                ),
+                
+                Expanded(
+                  child: _buildCommentField(),
+                ),
+                
+                _buildControlPanel(),
+              ],
+            ),
+
+            if (_isSidebarOpen)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isSidebarOpen = false),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    color: Colors.black.withOpacity(0.4),
+                  ),
+                ),
+              ),
+
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              right: _isSidebarOpen ? 0 : -sidebarWidth, 
+              top: 0,
+              bottom: 0,
+              width: sidebarWidth,
+              child: Material(
+                elevation: 16,
+                color: Colors.white,
+                child: SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '棋譜ツリー',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => setState(() => _isSidebarOpen = false),
+                            )
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: KifTreeView(
+                          rootNode: kifTree!.root,
+                          currentNode: kifTree!.currentNode,
+                          onNodeSelected: (selectedNode) {
+                            setState(() {
+                              kifTree!.currentNode = selectedNode;
+                              _selectedFile = null;
+                              _selectedRank = null;
+                              _selectedHandPiece = null;
+
+                              GameNode? temp = selectedNode;
+                              while (temp != null && temp.parent != null) {
+                                final parent = temp.parent!;
+                                parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
+                                temp = parent;
+                              }
+                              
+                              _isSidebarOpen = false;
+                              _syncCommentFromCurrentNode(); 
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 💡 復元されたPlayer情報と駒台を構築するメソッド
+  Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente, required bool isUpper}) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 48), 
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0), 
+      child: Row(
+        children: [
+          if (isUpper) ...[
+            _buildNameLabel(playerName, isSente),
+            const SizedBox(width: 8), 
+          ],
+          Expanded(child: _buildPieceStand(isSente, isUpper)),
+          if (!isUpper) ...[
+            const SizedBox(width: 8), 
+            _buildNameLabel(playerName, isSente),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 💡 復元された名前ラベル構築メソッド
+  Widget _buildNameLabel(String name, bool isSente) {
+    return Text(
+      "${isSente ? '▲' : '△'}$name",
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), 
+    );
+  }
+
+  // 💡 復元された持駒表示メソッド
+  Widget _buildPieceStand(bool isSente, bool isUpper) {
+    final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
+    final assetPrefix = isUpper ? "w" : "b";
+
+    if (hand.isEmpty || hand.values.every((count) => count == 0)) {
+      return Align(
+        alignment: isUpper ? Alignment.centerRight : Alignment.centerLeft,
+        child: Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+      );
+    }
+
+    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi']; 
+
+    var sortedEntries = priorityOrder
+        .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
+        .map((key) => MapEntry(key, hand[key]!))
+        .toList();
+
+    if (!isSente) {
+      sortedEntries = sortedEntries.reversed.toList();
+    }
+
+    return Wrap(
+      alignment: isUpper ? WrapAlignment.end : WrapAlignment.start,
+      spacing: 1.0,
+      runSpacing: 1.0,
+      children: sortedEntries.map((entry) {
+        final isSelected = _selectedHandPiece == entry.key && 
+                          ((kifTree!.currentNode.state.nextPlayer == Player.sente && isSente) ||
+                           (kifTree!.currentNode.state.nextPlayer == Player.gote && !isSente));
+
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              if (isSelected) {
+                _selectedHandPiece = null;
+              } else {
+                final currentPlayer = kifTree!.currentNode.state.nextPlayer;
+                if ((currentPlayer == Player.sente && isSente) || 
+                    (currentPlayer == Player.gote && !isSente)) {
+                  _selectedHandPiece = entry.key;
+                  _selectedFile = null;
+                  _selectedRank = null;
+                }
+              }
+            });
+          },
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 31,
+                height: 31,
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.orange.withOpacity(0.4) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Image.asset(
+                  'assets/images/pieces/$assetPrefix${entry.key}.png',
+                  width: 31,
+                  height: 31,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              if (entry.value > 1)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${entry.value}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Future<void> _saveKifData() async {
+
+  }
+}

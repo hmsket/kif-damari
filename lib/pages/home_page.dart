@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:kifdamari/database/dao/kif_dao.dart';
+import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/pages/kif_editor_page.dart';
+import 'package:kifdamari/settings/kif_reward_setting.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/constants.dart';
 import 'package:kifdamari/widgets/home_drawer.dart';
 import 'package:kifdamari/widgets/mode_badge.dart';
 import 'package:kifdamari/database/dao/tab_dao.dart';
 import 'package:kifdamari/database/entity/tab_entity.dart';
-import 'package:kifdamari/dialogs/add_kif_dialog.dart';
 import 'package:kifdamari/dialogs/add_tab_dialog.dart';
 import 'package:kifdamari/dialogs/delete_tab_dialog.dart';
 import 'package:kifdamari/dialogs/edit_tab_dialog.dart';
@@ -67,6 +72,45 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
       }
     });
+  }
+
+  Future<void> _onAddKifPressed(BuildContext context, int tabId) async {
+    final dao = KifDao();
+    final settings = AppSettings();
+    
+    // 棋譜追加数を超えたら動画広告を出す
+    final currentKifCount = await dao.getTotalKifCount();
+    final kifLimit = (settings.get('kifLimit') ?? defaultKifLimit) as int;
+    if (currentKifCount >= kifLimit) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        KifRewardSetting(settings: settings).showConfirmationDialog(context);
+      }
+      return;
+    }
+
+    final maxKifId = await dao.getMaxKifId(tabId);
+    final kif = KifEntity(
+      tabId: tabId,
+      kifId: maxKifId + 1,
+      title: '',
+      detail: '',
+      kifOrder: maxKifId + 1,
+      kifPath: '',
+      color: colorWhite,
+    );
+    await dao.insertKif(kif);
+
+    if (!context.mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => KifEditorPage(
+          kifEntity: kif,
+        ),
+      ),
+    ).then((_) => _refresh());
   }
 
   @override
@@ -145,20 +189,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   },
                 )
               else ...[
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.add),
-                  tooltip: '追加',
-                  onSelected: (value) {
-                    if (value == 'add_tab') {
-                      showAddTabDialog(context, _refresh);
-                    } else if (value == 'add_kif') {
-                      showAddKifDialog(context, _currentTabIndex, _refresh);
-                    }
+                MenuAnchor(
+                  builder: (BuildContext context, MenuController controller, Widget? child) {
+                    return IconButton(
+                      icon: const Icon(Icons.add),
+                      tooltip: '追加',
+                      onPressed: () {
+                        if (controller.isOpen) {
+                          controller.close();
+                        } else {
+                          controller.open();
+                        }
+                      },
+                    );
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'add_tab', child: Text('タブを追加')),
+                  menuChildren: [
+                    MenuItemButton(
+                      onPressed: () => showAddTabDialog(context, _refresh),
+                      child: const Text('タブを追加'),
+                    ),
                     if (tabs.isNotEmpty)
-                      const PopupMenuItem(value: 'add_kif', child: Text('棋譜を追加')),
+                      MenuItemButton(
+                        onPressed: () => _onAddKifPressed(context, tabs[_currentTabIndex].id!),
+                        child: const Text('棋譜を追加'),
+                      ),
                   ],
                 ),
                 IconButton(
