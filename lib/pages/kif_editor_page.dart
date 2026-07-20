@@ -39,6 +39,11 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isSidebarOpen = false;
   Offset _lastTapGlobalPosition = Offset.zero;
 
+  // 💡 追加：最後にファイルに書き込んだ、または読み込んだ時のKIFテキストの内容
+  String _lastSavedContent = '';
+  // 💡 追加：現在編集中の状態が保存された状態と一致しているか
+  bool _isSaved = true;
+
   // コメント入力欄を制御するコントローラー
   final TextEditingController _commentController = TextEditingController();
 
@@ -61,11 +66,20 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
+  // 💡 追加：現在のメモリ上の状態と、最後に保存された内容を比較してフラグを更新する
+  void _checkSaveStatus() {
+    if (kifTree == null) return;
+    final currentContent = KifParser.encode(kifTree!);
+    _isSaved = currentContent == _lastSavedContent;
+  }
+
   Future<void> _initKifData() async {
     final String? path = widget.kifEntity.kifPath;
     if (path == null || path.isEmpty) {
       setState(() {
         kifTree = KifTree.initial();
+        _lastSavedContent = KifParser.encode(kifTree!); // 初期状態を記憶
+        _isSaved = true;
         _isLoading = false;
         _syncCommentFromCurrentNode();
       });
@@ -85,6 +99,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
         final tree = KifParser.decode(content);
         setState(() {
           kifTree = tree;
+          _lastSavedContent = KifParser.encode(tree); // 読み込み時の状態を記憶
+          _isSaved = true;
           _isLoading = false;
           _syncCommentFromCurrentNode();
         });
@@ -95,6 +111,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
       debugPrint("KIF解析エラー: $e");
       setState(() {
         kifTree = KifTree.initial();
+        _lastSavedContent = KifParser.encode(kifTree!);
+        _isSaved = true;
         _isLoading = false;
         _syncCommentFromCurrentNode();
       });
@@ -281,6 +299,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       kifTree!.currentNode.nextNodes.add(newNode);
       kifTree!.currentNode = newNode;
       _syncCommentFromCurrentNode(); 
+      _checkSaveStatus(); // 💡 状態の変化を検知
     });
   }
 
@@ -310,6 +329,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       kifTree!.currentNode.nextNodes.add(newNode);
       kifTree!.currentNode = newNode;
       _syncCommentFromCurrentNode(); 
+      _checkSaveStatus(); // 💡 状態の変化を検知
     });
   }
 
@@ -483,6 +503,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         kifTree!.currentNode.comments.clear();
         kifTree!.currentNode.comments.addAll(result);
         _syncCommentFromCurrentNode();
+        _checkSaveStatus(); // 💡 コメント変更時も保存状態を走査
       });
     }
   }
@@ -535,6 +556,32 @@ class _KifEditorPageState extends State<KifEditorPage> {
       resizeToAvoidBottomInset: false, 
       appBar: AppBar(
         backgroundColor: const Color(0XFFFFFFFF),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.kifEntity.title.isEmpty ? '棋譜編集' : widget.kifEntity.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isSaved ? Colors.green[600] : Colors.red[600],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                _isSaved ? '保存済み' : '未保存',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
@@ -549,7 +596,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
         ],
       ),
       body: SafeArea(
-        bottom: true,
         child: Stack(
           children: [
             Column(
@@ -799,7 +845,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     if (kifTree == null) return null;
 
     final String kifContent = KifParser.encode(kifTree!); 
-    debugPrint(kifContent);
     final List<int> bytes = await CharsetConverter.encode("Shift_JIS", kifContent);
 
     final String title = widget.kifEntity.title.isEmpty ? "新規棋譜" : widget.kifEntity.title;
@@ -843,6 +888,13 @@ class _KifEditorPageState extends State<KifEditorPage> {
         );
         await KifDao().updateKif(updatedKif);
       }
+      
+      // 💡 追加：保存成功時に、その時点の最新テキストをキャッシュに上書き同期して「保存済み」にする
+      setState(() {
+        _lastSavedContent = KifParser.encode(kifTree!);
+        _isSaved = true;
+      });
+
       if (mounted) {
         ShowSuccessSnackbar.show(context, '棋譜を保存しました');
       }
