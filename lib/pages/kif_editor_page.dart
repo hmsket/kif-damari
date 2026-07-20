@@ -847,8 +847,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final String kifContent = KifParser.encode(kifTree!); 
     final List<int> bytes = await CharsetConverter.encode("Shift_JIS", kifContent);
 
-    final String title = widget.kifEntity.title.isEmpty ? "新規棋譜" : widget.kifEntity.title;
-    final String fileName = "${title}_${DateTime.now().millisecondsSinceEpoch}.kif";
+    final String fileName = "${DateTime.now().millisecondsSinceEpoch}.kif";
 
     return (fileName: fileName, bytes: bytes);
   }
