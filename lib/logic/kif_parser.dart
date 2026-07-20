@@ -5,51 +5,90 @@ class KifParser {
   static const _zenToNum = {'１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9};
   static const _kanToNum = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9};
 
+  static const _numToZen = ['', '１', '２', '３', '４', '５', '６', '７', '８', '９'];
+  static const _numToKan = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
+  static const _codeToKanji = {
+    'fu': '歩', 'ya': '香', 'ke': '桂', 'gi': '銀',
+    'ki': '金', 'ka': '角', 'hi': '飛', 'gy': '玉',
+    'to': 'と', 'ny': '成香', 'nk': '成桂', 'ng': '成銀',
+    'um': '馬', 'ry': '龍'
+  };
+
+  static String convertToJapanese(String rawLabel) {
+    if (rawLabel.isEmpty) return '開始局面';
+
+    if (rawLabel.startsWith(RegExp(r'[１-９同]'))) {
+      String clean = rawLabel.replaceAll(RegExp(r'\(.*\)'), '');
+      if (clean.contains('馬成')) clean = clean.replaceAll('馬成', '角成');
+      if (clean.contains('龍成')) clean = clean.replaceAll('龍成', '飛成');
+      return clean;
+    }
+
+    if (rawLabel.startsWith('+')) {
+      final match = RegExp(r"^\+([1-9])([1-9])([a-z]+)").firstMatch(rawLabel);
+      if (match != null) {
+        final file = _numToZen[int.parse(match.group(1)!)];
+        final rank = _numToKan[int.parse(match.group(2)!)];
+        final piece = _codeToKanji[match.group(3)!] ?? '歩';
+        return "$file$rank${piece}打";
+      }
+    }
+
+    final match = RegExp(r"^([1-9])([1-9])([1-9])([1-9])([a-z]+)(\+?)").firstMatch(rawLabel);
+    if (match != null) {
+      final toX = int.parse(match.group(3)!);
+      final toY = int.parse(match.group(4)!);
+      final pieceCode = match.group(5)!;
+      final isPromotedAction = match.group(6)!.isNotEmpty;
+
+      final file = _numToZen[toX];
+      final rank = _numToKan[toY];
+      
+      final piece = _codeToKanji[pieceCode] ?? '歩';
+      final action = isPromotedAction ? '成' : '';
+
+      return "$file$rank$piece$action";
+    }
+
+    return rawLabel;
+  }
+
   static KifTree decode(String text) {
     final lines = text.split(RegExp(r'\r?\n'));
     final tree = KifTree.initial();
     GameNode currentNode = tree.root;
 
-    // ヘッダー情報(キーワード：値)
     final infoRegex = RegExp(r"^([^：:]+)[：:](.*)$");
-    
-    // 指し手解析
-    final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九　]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
-
-    // 「変化：46手目」などの変化行を検出するための正規表現
+    final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九 ]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
     final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
 
     for (var line in lines) {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty) continue;
 
-      // コメント行 (*で始まる)
       if (trimmedLine.startsWith('*')) {
         currentNode.addComment(trimmedLine.substring(1));
         continue;
       }
 
-      // 変化行の検出
       final branchMatch = branchRegex.firstMatch(trimmedLine);
       if (branchMatch != null) {
         final branchMoveNum = int.parse(branchMatch.group(1)!);
-        final targetParentMoveNum = branchMoveNum - 1; // 探したい親ノード自身の「手数」
+        final targetParentMoveNum = branchMoveNum - 1;
 
-        // 現在地からルートに向かって遡り、
-        // 「ノード自身の手数」が、探したい親の手数（例: 31）とピッタリ一致するものを探す
         GameNode? targetParent = currentNode;
         bool found = false;
 
         while (targetParent != null) {
           if (targetParent.moveNumber == targetParentMoveNum) {
-            currentNode = targetParent; // その局面を親にする
+            currentNode = targetParent;
             found = true;
             break;
           }
           targetParent = targetParent.parent;
         }
         
-        // 直系の先祖にいなかった場合のみ、ルートから本譜を辿る
         if (!found) {
           GameNode backup = tree.root;
           for (int i = 0; i < targetParentMoveNum; i++) {
@@ -62,7 +101,6 @@ class KifParser {
         continue;
       }
 
-      // 指し手行 (数字で始まる)
       final moveMatch = moveRegex.firstMatch(trimmedLine);
       if (moveMatch != null) {
         final moveNum = int.parse(moveMatch.group(1)!);
@@ -88,7 +126,6 @@ class KifParser {
         int? fromX = fromXStr != null ? int.parse(fromXStr) : null;
         int? fromY = fromYStr != null ? int.parse(fromYStr) : null;
 
-        // 局面更新
         final nextState = currentNode.state.movePiece(
           fromX: fromX, fromY: fromY,
           toX: toX, toY: toY,
@@ -101,11 +138,11 @@ class KifParser {
             .join(' ')
             .replaceAll('+', '');
 
-        // ノード作成
         final newNode = GameNode(
           moveNumber: moveNum,
           moveLabel: cleanMoveLabel,
           state: nextState,
+          parent: currentNode, // 💡 修正点：親への参照を紐付けることで変化のデコードを正常化
         );
 
         currentNode.addChild(newNode);
@@ -128,13 +165,11 @@ class KifParser {
   static String encode(KifTree tree) {
     final buffer = StringBuffer();
 
-    // ヘッダー情報の書き出し
     tree.info.forEach((key, value) {
       buffer.writeln('$key：$value');
     });
     buffer.writeln('手数----指手----消費時間--');
 
-    // 本譜（メインライン）の指手を再帰的に書き出す
     _writeNodes(buffer, tree.root.nextNodes);
 
     return buffer.toString();
@@ -143,18 +178,54 @@ class KifParser {
   static void _writeNodes(StringBuffer buffer, List<GameNode> nodes) {
     if (nodes.isEmpty) return;
 
-    // メインライン（インデックス0）を優先して出力
     final primaryNode = nodes.first;
-    final cleanLabel = primaryNode.moveLabel ?? '';
+    String cleanLabel = primaryNode.moveLabel ?? '';
+
+    if (cleanLabel.startsWith(RegExp(r'[１-９同]'))) {
+      if (cleanLabel.contains('馬成')) cleanLabel = cleanLabel.replaceAll('馬成', '角成');
+      if (cleanLabel.contains('龍成')) cleanLabel = cleanLabel.replaceAll('龍成', '飛成');
+    } else {
+      if (cleanLabel.startsWith('+')) {
+        final match = RegExp(r"^\+([1-9])([1-9])([a-z]+)").firstMatch(cleanLabel);
+        if (match != null) {
+          final file = _numToZen[int.parse(match.group(1)!)];
+          final rank = _numToKan[int.parse(match.group(2)!)];
+          final piece = _codeToKanji[match.group(3)!] ?? '歩';
+          cleanLabel = "$file$rank${piece}打";
+        }
+      } else {
+        final match = RegExp(r"^([1-9])([1-9])([1-9])([1-9])([a-z]+)(\+?)").firstMatch(cleanLabel);
+        if (match != null) {
+          final fromX = match.group(1)!;
+          final fromY = match.group(2)!;
+          final toX = int.parse(match.group(3)!);
+          final toY = int.parse(match.group(4)!);
+          final pieceCode = match.group(5)!;
+          final isPromotedAction = match.group(6)!.isNotEmpty;
+
+          final file = _numToZen[toX];
+          final rank = _numToKan[toY];
+          final piece = _codeToKanji[pieceCode] ?? '歩';
+          final action = isPromotedAction ? '成' : '';
+
+          // 正しいKIF規格「２六歩(27)」に変換
+          cleanLabel = "$file$rank$piece$action($fromX$fromY)";
+        }
+      }
+    }
     
-    // 手数を4桁右詰めで整形して指手を出力
     buffer.writeln('${primaryNode.moveNumber.toString().padLeft(4)} $cleanLabel');
 
-    // コメントがある場合は `*` を頭につけて出力
     for (var comment in primaryNode.comments) {
       buffer.writeln('*$comment');
     }
 
     _writeNodes(buffer, primaryNode.nextNodes);
+
+    for (int i = 1; i < nodes.length; i++) {
+      final branchReplyNode = nodes[i];
+      buffer.writeln('\n変化：${branchReplyNode.moveNumber}手目');
+      _writeNodes(buffer, [branchReplyNode]);
+    }
   }
 }

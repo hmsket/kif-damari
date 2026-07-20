@@ -2,16 +2,20 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/logic/shogi_rule_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
+import 'package:kifdamari/snackbars/show_error_snackbar.dart';
+import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 class KifEditorPage extends StatefulWidget {
@@ -219,10 +223,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
     if (movingPiece == null) return;
 
     final isSente = movingPiece.startsWith('b');
-    final String type = movingPiece.substring(1);
+    final String originalType = movingPiece.substring(1);
     
     const cannotPromoteTypes = {'ki', 'gy', 'to', 'ny', 'nk', 'ng', 'um', 'ry'};
-    final bool canPromoteType = !cannotPromoteTypes.contains(type);
+    final bool canPromoteType = !cannotPromoteTypes.contains(originalType);
 
     final bool isFromInEnemyCamp = isSente ? (fromRank <= 3) : (fromRank >= 7);
     final bool isToInEnemyCamp = isSente ? (toRank <= 3) : (toRank >= 7);
@@ -231,8 +235,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
     bool shouldPromote = false;
 
     if (canPromoteType && isPromotionZone) {
-      final bool mustPromote = (type == 'fu' || type == 'ya') && (isSente ? toRank == 1 : toRank == 9) ||
-                               (type == 'ke' && (isSente ? toRank <= 2 : toRank >= 8));
+      final bool mustPromote = (originalType == 'fu' || originalType == 'ya') && (isSente ? toRank == 1 : toRank == 9) ||
+                               (originalType == 'ke' && (isSente ? toRank <= 2 : toRank >= 8));
 
       if (mustPromote) {
         shouldPromote = true;
@@ -263,8 +267,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     setState(() {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
-      final String promoteLabel = shouldPromote ? '成' : '';
-      final String label = "$fromFile$fromRank$pieceKanji$promoteLabel(${toFile}${toRank})"; 
+      final String promoteFlag = shouldPromote ? '+' : '';
+      
+      final String label = "$fromFile$fromRank$toFile${toRank}$originalType$promoteFlag"; 
 
       final newNode = GameNode(
         moveNumber: nextMoveNumber,
@@ -293,7 +298,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     setState(() {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
-      final String label = "${pieceKanji}打(${toFile}${toRank})";
+      final String label = "+$toFile${toRank}$pieceType";
 
       final newNode = GameNode(
         moveNumber: nextMoveNumber,
@@ -384,6 +389,11 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 builder: (context) {
                   final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
 
+                  final rawLabel = kifTree!.currentNode.moveLabel;
+                  final displayLabel = rawLabel != null && rawLabel.isNotEmpty 
+                      ? KifParser.convertToJapanese(rawLabel) 
+                      : '開始局面';
+
                   return GestureDetector(
                     onTap: () {
                       setState(() {
@@ -416,7 +426,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                kifTree!.currentNode.moveLabel?.replaceAll(RegExp(r'\(.*\)'), '') ?? '開始局面',
+                                displayLabel,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 11,
@@ -525,19 +535,15 @@ class _KifEditorPageState extends State<KifEditorPage> {
       resizeToAvoidBottomInset: false, 
       appBar: AppBar(
         backgroundColor: const Color(0XFFFFFFFF),
-        // title: Text(
-        //   '棋譜編集: ${widget.kifEntity.title.isEmpty ? "新規棋譜" : widget.kifEntity.title}',
-        //   style: GoogleFonts.notoSansJp(fontSize: 16, fontWeight: FontWeight.bold),
-        // ),
         actions: [
-          // IconButton(
-          //   icon: const Icon(Icons.cached),
-          //   tooltip: '盤面反転',
-          //   onPressed: () => setState(() => _isReversed = !_isReversed),
-          // ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: '共有',
+            onPressed: _shareKifData,
+          ),
           IconButton(
             icon: const Icon(Icons.save),
-            tooltip: '保存',
+            tooltip: 'ローカル保存',
             onPressed: _saveKifData,
           ),
         ],
@@ -670,7 +676,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  // 💡 復元されたPlayer情報と駒台を構築するメソッド
   Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente, required bool isUpper}) {
     return Container(
       constraints: const BoxConstraints(minHeight: 48), 
@@ -691,7 +696,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  // 💡 復元された名前ラベル構築メソッド
   Widget _buildNameLabel(String name, bool isSente) {
     return Text(
       "${isSente ? '▲' : '△'}$name",
@@ -700,7 +704,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  // 💡 復元された持駒表示メソッド
   Widget _buildPieceStand(bool isSente, bool isUpper) {
     final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
     final assetPrefix = isUpper ? "w" : "b";
@@ -792,11 +795,83 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  Future<void> _saveKifData() async {
+  Future<({String fileName, List<int> bytes})?> _prepareKifData() async {
+    if (kifTree == null) return null;
 
+    final String kifContent = KifParser.encode(kifTree!); 
+    debugPrint(kifContent);
+    final List<int> bytes = await CharsetConverter.encode("Shift_JIS", kifContent);
+
+    final String title = widget.kifEntity.title.isEmpty ? "新規棋譜" : widget.kifEntity.title;
+    final String fileName = "${title}_${DateTime.now().millisecondsSinceEpoch}.kif";
+
+    return (fileName: fileName, bytes: bytes);
   }
 
-Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offset tapPosition) {
+  Future<void> _saveKifData() async {
+    final kifData = await _prepareKifData();
+    if (kifData == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      String targetPath = widget.kifEntity.kifPath ?? "";
+      bool isNewFile = targetPath.isEmpty || !await File(targetPath).exists();
+
+      if (isNewFile) {
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final Directory saveDir = Directory(p.join(appDocDir.path, 'Kifdamari'));
+        if (!await saveDir.exists()) {
+          await saveDir.create(recursive: true);
+        }
+        targetPath = p.join(saveDir.path, kifData.fileName);
+      }
+
+      final file = File(targetPath);
+      await file.writeAsBytes(kifData.bytes, flush: true);
+
+      if (isNewFile) {
+        final updatedKif = KifEntity(
+          id: widget.kifEntity.id,
+          tabId: widget.kifEntity.tabId,
+          kifId: widget.kifEntity.kifId,
+          title: widget.kifEntity.title,
+          detail: widget.kifEntity.detail,
+          kifOrder: widget.kifEntity.kifOrder,
+          kifPath: targetPath,
+          color: widget.kifEntity.color,
+        );
+        await KifDao().updateKif(updatedKif);
+      }
+      if (mounted) {
+        ShowSuccessSnackbar.show(context, '棋譜を保存しました');
+      }
+    } catch (e) {
+      ShowErrorSnackbar.show(context, '棋譜の保存に失敗しました');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _shareKifData() async {
+    final kifData = await _prepareKifData();
+    if (kifData == null) return;
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(p.join(tempDir.path, kifData.fileName));
+      await tempFile.writeAsBytes(kifData.bytes, flush: true);
+
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        subject: widget.kifEntity.title.isEmpty ? "将棋棋譜" : widget.kifEntity.title,
+      );
+    } catch (e) {
+      debugPrint("KIF共有エラー: $e");
+    }
+  }
+
+  Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offset tapPosition) {
     final isSente = movingPiece.startsWith('b');
     final String prefix = isSente ? 'b' : 'w';
     final String type = movingPiece.substring(1);
@@ -817,8 +892,8 @@ Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offse
     return showMenu<bool>(
       context: context,
       position: RelativeRect.fromLTRB(
-        tapPosition.dx - 60, // メモメニューの幅に合わせて中央寄せ調整
-        tapPosition.dy - 100, // タップした位置の「上」に表示するために引く
+        tapPosition.dx - 60,
+        tapPosition.dy - 100,
         tapPosition.dx + 60,
         tapPosition.dy,
       ),
@@ -826,11 +901,10 @@ Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offse
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
         PopupMenuItem<bool>(
-          enabled: false, // 項目全体のクリックは無効化し、中のInkWellで個別にタップを取る
+          enabled: false,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-                            // 成る
               InkWell(
                 onTap: () => Navigator.of(context).pop(true),
                 borderRadius: BorderRadius.circular(8),
@@ -854,7 +928,6 @@ Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offse
                 ),
               ),
               const SizedBox(width: 8),
-              // 成らない（元の駒）
               InkWell(
                 onTap: () => Navigator.of(context).pop(false),
                 borderRadius: BorderRadius.circular(8),

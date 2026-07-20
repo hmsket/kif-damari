@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/game_node.dart';
 
 class KifTreeView extends StatefulWidget {
@@ -196,7 +197,10 @@ class _KifTreeViewState extends State<KifTreeView> {
 
                 final bool isCurrent = node == widget.currentNode;
                 final bool hasBranch = node.nextNodes.length > 1;
-                final String label = (node.moveLabel ?? '').replaceAll(RegExp(r'\(.*\)'), '');
+
+                final String label = node.moveLabel != null && node.moveLabel!.isNotEmpty
+                    ? KifParser.convertToJapanese(node.moveLabel!)
+                    : '開始局面';
 
                 return Positioned(
                   left: left,
