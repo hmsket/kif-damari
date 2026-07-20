@@ -33,6 +33,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   double _dragDistance = 0.0;
   bool _isSidebarOpen = false;
+  Offset _lastTapGlobalPosition = Offset.zero;
 
   // コメント入力欄を制御するコントローラー
   final TextEditingController _commentController = TextEditingController();
@@ -98,6 +99,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _onBoardTap(TapUpDetails details, BoxConstraints constraints) {
     if (kifTree == null) return;
+    
+    _lastTapGlobalPosition = details.globalPosition;
 
     final double boardWidth = constraints.maxWidth;
     final double boardHeight = constraints.maxHeight;
@@ -235,7 +238,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
         shouldPromote = true;
       } else {
         if (mounted) {
-          shouldPromote = await _showPromotionDialog(context) ?? false;
+          final bool? result = await _showPromotionMenu(context, movingPiece, _lastTapGlobalPosition);
+          if (result == null) return;          
+          shouldPromote = result;
         }
       }
     }
@@ -272,29 +277,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
       kifTree!.currentNode = newNode;
       _syncCommentFromCurrentNode(); 
     });
-  }
-
-  Future<bool?> _showPromotionDialog(BuildContext context) {
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('成りますか？', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('成らない', style: TextStyle(color: Colors.black54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('成る', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _dropPiece({required String pieceType, required int toFile, required int toRank}) {
@@ -812,5 +794,93 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   Future<void> _saveKifData() async {
 
+  }
+
+Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offset tapPosition) {
+    final isSente = movingPiece.startsWith('b');
+    final String prefix = isSente ? 'b' : 'w';
+    final String type = movingPiece.substring(1);
+
+    final String normalPieceAsset = '$prefix$type';
+    String promotedPieceType = '';
+    switch (type) {
+      case 'fu': promotedPieceType = 'to'; break;
+      case 'ya': promotedPieceType = 'ny'; break;
+      case 'ke': promotedPieceType = 'nk'; break;
+      case 'gi': promotedPieceType = 'ng'; break;
+      case 'ka': promotedPieceType = 'um'; break;
+      case 'hi': promotedPieceType = 'ry'; break;
+      default: promotedPieceType = type;
+    }
+    final String promotedPieceAsset = '$prefix$promotedPieceType';
+
+    return showMenu<bool>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        tapPosition.dx - 60, // メモメニューの幅に合わせて中央寄せ調整
+        tapPosition.dy - 100, // タップした位置の「上」に表示するために引く
+        tapPosition.dx + 60,
+        tapPosition.dy,
+      ),
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        PopupMenuItem<bool>(
+          enabled: false, // 項目全体のクリックは無効化し、中のInkWellで個別にタップを取る
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+                            // 成る
+              InkWell(
+                onTap: () => Navigator.of(context).pop(true),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Image.asset(
+                          'assets/images/pieces/$promotedPieceAsset.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('成', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 成らない（元の駒）
+              InkWell(
+                onTap: () => Navigator.of(context).pop(false),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Image.asset(
+                          'assets/images/pieces/$normalPieceAsset.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('不成', style: TextStyle(fontSize: 11, color: Colors.black87)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
