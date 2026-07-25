@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
@@ -116,6 +117,40 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _isLoading = false;
         _syncCommentFromCurrentNode();
       });
+    }
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = clipboardData?.text;
+
+    if (text == null || text.trim().isEmpty) {
+      if (mounted) {
+        ShowErrorSnackbar.show(context, 'クリップボードにテキストがありません');
+      }
+      return;
+    }
+
+    try {
+      final tree = KifParser.decode(text);
+
+      setState(() {
+        kifTree = tree;
+        _selectedFile = null;
+        _selectedRank = null;
+        _selectedHandPiece = null;
+        _syncCommentFromCurrentNode();
+        _checkSaveStatus();
+      });
+
+      if (mounted) {
+        ShowSuccessSnackbar.show(context, 'クリップボードから棋譜を読み込みました');
+      }
+    } catch (e) {
+      debugPrint("クリップボードからの棋譜解析エラー: $e");
+      if (mounted) {
+        ShowErrorSnackbar.show(context, '棋譜データの解析に失敗しました');
+      }
     }
   }
 
@@ -596,6 +631,11 @@ class _KifEditorPageState extends State<KifEditorPage> {
           ),
           actions: [
             IconButton(
+              icon: const Icon(Icons.content_paste),
+              tooltip: 'クリップボードから貼り付け',
+              onPressed: _pasteFromClipboard,
+            ),
+            IconButton(
               icon: const Icon(Icons.share),
               tooltip: '共有',
               onPressed: _shareKifData,
@@ -731,7 +771,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
             ],
           ),
         ),
-      )
+      ),
     );
   }
 
@@ -901,7 +941,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         await KifDao().updateKif(updatedKif);
       }
       
-      // 💡 追加：保存成功時に、その時点の最新テキストをキャッシュに上書き同期して「保存済み」にする
+      // 💡 保存成功時に、その時点の最新テキストをキャッシュに上書き同期して「保存済み」にする
       setState(() {
         _lastSavedContent = KifParser.encode(kifTree!);
         _isSaved = true;
