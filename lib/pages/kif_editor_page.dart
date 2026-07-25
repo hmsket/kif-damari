@@ -551,174 +551,187 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
-    return Scaffold(
-      backgroundColor: const Color(0XFFF1F1F5),
-      resizeToAvoidBottomInset: false, 
-      appBar: AppBar(
-        backgroundColor: const Color(0XFFFFFFFF),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.kifEntity.title.isEmpty ? '棋譜編集' : widget.kifEntity.title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(width: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: _isSaved ? Colors.green[600] : Colors.red[600],
-                borderRadius: BorderRadius.circular(4),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
+        if (didPop) return;
+        Navigator.of(context).pop(widget.kifEntity);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0XFFF1F1F5),
+        resizeToAvoidBottomInset: false, 
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.of(context).pop(widget.kifEntity);
+            },
+          ),
+          backgroundColor: const Color(0XFFFFFFFF),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.kifEntity.title.isEmpty ? '棋譜編集' : widget.kifEntity.title,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              child: Text(
-                _isSaved ? '保存済み' : '未保存',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: 8),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isSaved ? Colors.green[600] : Colors.red[600],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  _isSaved ? '保存済み' : '未保存',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.share),
+              tooltip: '共有',
+              onPressed: _shareKifData,
+            ),
+            IconButton(
+              icon: const Icon(Icons.save),
+              tooltip: 'ローカル保存',
+              onPressed: _saveKifData,
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: '共有',
-            onPressed: _shareKifData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.save),
-            tooltip: 'ローカル保存',
-            onPressed: _saveKifData,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                _buildPlayerAndKomaDai(
-                  playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
-                  isSente: _isReversed, 
-                  isUpper: true,
-                ),
-                
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: AspectRatio(
-                    aspectRatio: 0.93,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return GestureDetector(
-                          onTapUp: (details) => _onBoardTap(details, constraints),
-                          child: KifBoard(
-                            state: kifTree!.currentNode.state,
-                            isReversed: _isReversed,
-                            selectedX: _selectedFile,
-                            selectedY: _selectedRank,
-                            validMoves: (_selectedFile != null && _selectedRank != null) 
-                                ? _getValidMoves(_selectedFile!, _selectedRank!) 
-                                : (_selectedHandPiece != null)
-                                    ? _getValidDropMoves(_selectedHandPiece!)
-                                    : null,
-                          ),
-                        );
-                      },
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  _buildPlayerAndKomaDai(
+                    playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
+                    isSente: _isReversed, 
+                    isUpper: true,
+                  ),
+                  
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: AspectRatio(
+                      aspectRatio: 0.93,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return GestureDetector(
+                            onTapUp: (details) => _onBoardTap(details, constraints),
+                            child: KifBoard(
+                              state: kifTree!.currentNode.state,
+                              isReversed: _isReversed,
+                              selectedX: _selectedFile,
+                              selectedY: _selectedRank,
+                              validMoves: (_selectedFile != null && _selectedRank != null) 
+                                  ? _getValidMoves(_selectedFile!, _selectedRank!) 
+                                  : (_selectedHandPiece != null)
+                                      ? _getValidDropMoves(_selectedHandPiece!)
+                                      : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  _buildPlayerAndKomaDai(
+                    playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
+                    isSente: !_isReversed,
+                    isUpper: false,
+                  ),
+                  
+                  Expanded(
+                    child: _buildCommentField(),
+                  ),
+                  
+                  _buildControlPanel(),
+                ],
+              ),
+
+              if (_isSidebarOpen)
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _isSidebarOpen = false),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      color: Colors.black.withOpacity(0.4),
                     ),
                   ),
                 ),
 
-                _buildPlayerAndKomaDai(
-                  playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
-                  isSente: !_isReversed,
-                  isUpper: false,
-                ),
-                
-                Expanded(
-                  child: _buildCommentField(),
-                ),
-                
-                _buildControlPanel(),
-              ],
-            ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                right: _isSidebarOpen ? 0 : -sidebarWidth, 
+                top: 0,
+                bottom: 0,
+                width: sidebarWidth,
+                child: Material(
+                  elevation: 16,
+                  color: Colors.white,
+                  child: SafeArea(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '棋譜ツリー',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => setState(() => _isSidebarOpen = false),
+                              )
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: KifTreeView(
+                            rootNode: kifTree!.root,
+                            currentNode: kifTree!.currentNode,
+                            onNodeSelected: (selectedNode) {
+                              setState(() {
+                                kifTree!.currentNode = selectedNode;
+                                _selectedFile = null;
+                                _selectedRank = null;
+                                _selectedHandPiece = null;
 
-            if (_isSidebarOpen)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isSidebarOpen = false),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    color: Colors.black.withOpacity(0.4),
+                                GameNode? temp = selectedNode;
+                                while (temp != null && temp.parent != null) {
+                                  final parent = temp.parent!;
+                                  parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
+                                  temp = parent;
+                                }
+                                
+                                _isSidebarOpen = false;
+                                _syncCommentFromCurrentNode(); 
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              right: _isSidebarOpen ? 0 : -sidebarWidth, 
-              top: 0,
-              bottom: 0,
-              width: sidebarWidth,
-              child: Material(
-                elevation: 16,
-                color: Colors.white,
-                child: SafeArea(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '棋譜ツリー',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () => setState(() => _isSidebarOpen = false),
-                            )
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: KifTreeView(
-                          rootNode: kifTree!.root,
-                          currentNode: kifTree!.currentNode,
-                          onNodeSelected: (selectedNode) {
-                            setState(() {
-                              kifTree!.currentNode = selectedNode;
-                              _selectedFile = null;
-                              _selectedRank = null;
-                              _selectedHandPiece = null;
-
-                              GameNode? temp = selectedNode;
-                              while (temp != null && temp.parent != null) {
-                                final parent = temp.parent!;
-                                parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
-                                temp = parent;
-                              }
-                              
-                              _isSidebarOpen = false;
-                              _syncCommentFromCurrentNode(); 
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+      )
     );
   }
 
@@ -915,7 +928,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
       await Share.shareXFiles(
         [XFile(tempFile.path)],
-        subject: widget.kifEntity.title.isEmpty ? "将棋棋譜" : widget.kifEntity.title,
+        subject: widget.kifEntity.title.isEmpty ? "${DateTime.now().millisecondsSinceEpoch}.kif" : widget.kifEntity.title,
       );
     } catch (e) {
       debugPrint("KIF共有エラー: $e");

@@ -41,16 +41,20 @@ class _KifViewerPageState extends State<KifViewerPage> {
   int _dragStartMoveNumber = 0; 
   String? _rawKifContent;
 
+  // 💡 編集画面で保存された最新の Entity を保持・参照するための変数
+  late KifEntity _currentKifEntity;
+
   bool _isSidebarOpen = false;
 
   @override
   void initState() {
     super.initState();
+    _currentKifEntity = widget.kifEntity;
     _initKifData();
   }
 
   Future<void> _initKifData() async {
-    final String? path = widget.kifEntity.kifPath;
+    final String? path = _currentKifEntity.kifPath;
     if (path == null) {
       setState(() {
         kifTree = KifTree.initial();
@@ -104,24 +108,25 @@ class _KifViewerPageState extends State<KifViewerPage> {
         final Uint8List pngBytes = byteData.buffer.asUint8List();
         
         final savedPath = await ThumbnailManager.saveThumbnail(
-          widget.kifEntity.tabId, 
-          widget.kifEntity.kifId, 
+          _currentKifEntity.tabId, 
+          _currentKifEntity.kifId, 
           pngBytes
         );
 
         final updatedKif = KifEntity(
-          id: widget.kifEntity.id,
-          tabId: widget.kifEntity.tabId,
-          kifId: widget.kifEntity.kifId,
-          title: widget.kifEntity.title,
-          detail: widget.kifEntity.detail,
-          kifOrder: widget.kifEntity.kifOrder,
-          kifPath: widget.kifEntity.kifPath,
+          id: _currentKifEntity.id,
+          tabId: _currentKifEntity.tabId,
+          kifId: _currentKifEntity.kifId,
+          title: _currentKifEntity.title,
+          detail: _currentKifEntity.detail,
+          kifOrder: _currentKifEntity.kifOrder,
+          kifPath: _currentKifEntity.kifPath,
           imgPath: savedPath,
-          color: widget.kifEntity.color,
+          color: _currentKifEntity.color,
         );
 
         await KifDao().updateKif(updatedKif);
+        _currentKifEntity = updatedKif;
 
         ShowSuccessSnackbar.show(context, "サムネイルを更新しました");
       }
@@ -602,13 +607,25 @@ class _KifViewerPageState extends State<KifViewerPage> {
               MenuItemButton(
                 leadingIcon: const Icon(Icons.edit, size: 20, color: Colors.brown),
                 child: const Text('棋譜編集モードに切り替え'),
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  // 💡 編集画面へ遷移し、戻り値（最新の KifEntity）を待つ
+                  final updatedEntity = await Navigator.push<KifEntity>(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => KifEditorPage(kifEntity: widget.kifEntity),
+                      builder: (context) => KifEditorPage(kifEntity: _currentKifEntity),
                     ),
                   );
+
+                  // 💡 編集画面から戻ってきた際、再読み込みを行って画面を最新化する
+                  if (mounted) {
+                    setState(() {
+                      _isLoading = true;
+                      if (updatedEntity != null) {
+                        _currentKifEntity = updatedEntity;
+                      }
+                    });
+                    await _initKifData();
+                  }
                 },
               ),
               MenuItemButton(
@@ -743,7 +760,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
   }
 
-void _navigateToPreviewPage() async {
+  void _navigateToPreviewPage() async {
     try {
       final String initialSente = kifTree!.info['先手'] ?? '先手';
       final String initialGote = kifTree!.info['後手'] ?? '後手';
