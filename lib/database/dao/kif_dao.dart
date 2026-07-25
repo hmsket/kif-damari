@@ -16,8 +16,9 @@ class KifDao {
     return result.map((map) => KifEntity.fromMap(map)).toList();
   }
 
-  Future<void> insertKif(KifEntity kif) async {
+  Future<int> insertKif(KifEntity kif) async {
     final db = await _db;
+    int insertedId = 0;
     await db.transaction((txn) async {
       final result = await txn.rawQuery(
         'SELECT MAX(kif_id) as max_id FROM kif WHERE tab_id = ?',
@@ -26,8 +27,10 @@ class KifDao {
       int nextKifId = (result.first['max_id'] as int? ?? 0) + 1;
       final kifMap = kif.toMap();
       kifMap['kif_id'] = nextKifId;
-      await txn.insert('kif', kifMap);
+
+      insertedId = await txn.insert('kif', kifMap);
     });
+    return insertedId;
   }
 
   Future<int> deleteKif(int tabId, int kifId) async {

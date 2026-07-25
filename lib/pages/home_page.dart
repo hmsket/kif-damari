@@ -99,7 +99,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       kifPath: '',
       color: colorWhite,
     );
-    await dao.insertKif(kif);
+
+    final insertedId = await dao.insertKif(kif);
+
+    final createdKif = KifEntity(
+      id: insertedId,
+      tabId: kif.tabId,
+      kifId: kif.kifId,
+      title: kif.title,
+      detail: kif.detail,
+      kifOrder: kif.kifOrder,
+      kifPath: kif.kifPath,
+      color: kif.color,
+    );
 
     if (!context.mounted) return;
 
@@ -107,7 +119,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       context,
       MaterialPageRoute(
         builder: (context) => KifEditorPage(
-          kifEntity: kif,
+          kifEntity: createdKif,
         ),
       ),
     ).then((_) => _refresh());
