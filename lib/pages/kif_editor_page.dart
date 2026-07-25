@@ -323,7 +323,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
       final String promoteFlag = shouldPromote ? '+' : '';
       final String label = "$fromFile$fromRank$toFile$toRank$originalType$promoteFlag";
 
-      // 💡 確定した盤面状態（着手先座標 & 着手後のマスにある駒）で一致するノードを探す
       final String targetMovedPiece = nextState.grid[toRank - 1][9 - toFile] ?? '';
 
       final existingNodeIndex = kifTree!.currentNode.nextNodes.indexWhere((node) {
@@ -334,11 +333,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
       });
 
       if (existingNodeIndex != -1) {
-        // すでに存在する手なら、その既存ノードに移動して続きから再開する
         kifTree!.currentNode.selectedBranchIndex = existingNodeIndex;
         kifTree!.currentNode = kifTree!.currentNode.nextNodes[existingNodeIndex];
       } else {
-        // 存在しない場合のみ新しいノードとして追加
         final newNode = GameNode(
           moveNumber: nextMoveNumber,
           state: nextState,
@@ -372,7 +369,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
       final String label = "+$toFile$toRank$pieceType";
 
-      // 💡 確定した盤面状態（着手先座標 & 打たれた駒）で一致するノードを探す
       final String targetMovedPiece = nextState.grid[toRank - 1][9 - toFile] ?? '';
 
       final existingNodeIndex = kifTree!.currentNode.nextNodes.indexWhere((node) {
@@ -383,11 +379,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
       });
 
       if (existingNodeIndex != -1) {
-        // すでに存在する手なら、その既存ノードに移動して続きから再開する
         kifTree!.currentNode.selectedBranchIndex = existingNodeIndex;
         kifTree!.currentNode = kifTree!.currentNode.nextNodes[existingNodeIndex];
       } else {
-        // 存在しない場合のみ新しいノードとして追加
         final newNode = GameNode(
           moveNumber: nextMoveNumber,
           state: nextState,
@@ -840,14 +834,78 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
+  // 💡 修正: タップして対局者名を編集できるように InkWell & 編集用ダイアログ呼び出しを追加
   Widget _buildNameLabel(String name, bool isSente) {
-    return Text(
-      "${isSente ? '▲' : '△'}$name",
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), 
+    final String key = isSente ? '先手' : '後手';
+
+    return InkWell(
+      onTap: () => _showEditPlayerNameDialog(key: key, currentName: name),
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "${isSente ? '▲' : '△'}$name",
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), 
+            ),
+            const SizedBox(width: 2),
+            Icon(Icons.edit, size: 12, color: Colors.grey[600]),
+          ],
+        ),
+      ),
     );
   }
 
+// 💡 対局者名編集ダイアログ処理
+  Future<void> _showEditPlayerNameDialog({required String key, required String currentName}) async {
+    final controller = TextEditingController(
+      text: (currentName == '先手' || currentName == '後手') ? '' : currentName,
+    );
+
+    final String? newName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('$keyの氏名変更'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: '$keyの氏名を入力',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'キャンセル',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text(
+                '変更',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newName != null && kifTree != null) {
+      setState(() {
+        final finalName = newName.isEmpty ? key : newName;
+        kifTree!.info[key] = finalName;
+        _checkSaveStatus(); // 未保存フラグを更新
+      });
+    }
+  }
+  
   Widget _buildPieceStand(bool isSente, bool isUpper) {
     final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
     final assetPrefix = isUpper ? "w" : "b";
