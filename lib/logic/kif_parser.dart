@@ -15,9 +15,15 @@ class KifParser {
     'um': '馬', 'ry': '龍'
   };
 
-  static String convertToJapanese(String rawLabel) {
+  /// KIFラベルを日本語に変換する（同の判定用として前手の移動先 coordinates を受け取り可能）
+  static String convertToJapanese(
+    String rawLabel, {
+    int? lastToX,
+    int? lastToY,
+  }) {
     if (rawLabel.isEmpty) return '開始局面';
 
+    // すでに日本語形式の場合（「同」「６四角」など）
     if (rawLabel.startsWith(RegExp(r'[１-９同]'))) {
       String clean = rawLabel.replaceAll(RegExp(r'\(.*\)'), '');
       if (clean.contains('馬成')) clean = clean.replaceAll('馬成', '角成');
@@ -25,16 +31,23 @@ class KifParser {
       return clean;
     }
 
+    // 駒打ちの場合（例: "+24fu"）
     if (rawLabel.startsWith('+')) {
       final match = RegExp(r"^\+([1-9])([1-9])([a-z]+)").firstMatch(rawLabel);
       if (match != null) {
-        final file = _numToZen[int.parse(match.group(1)!)];
-        final rank = _numToKan[int.parse(match.group(2)!)];
+        final toX = int.parse(match.group(1)!);
+        final toY = int.parse(match.group(2)!);
         final piece = _codeToKanji[match.group(3)!] ?? '歩';
-        return "$file$rank${piece}打";
+
+        // 打つ位置が直前の手と同じ場所の場合
+        final isSameSquare = (lastToX != null && lastToY != null) && (lastToX == toX && lastToY == toY);
+        final squareLabel = isSameSquare ? '同' : "${_numToZen[toX]}${_numToKan[toY]}";
+
+        return "$squareLabel${piece}打";
       }
     }
 
+    // 通常の移動の場合（例: "7776fu", "2468um+"）
     final match = RegExp(r"^([1-9])([1-9])([1-9])([1-9])([a-z]+)(\+?)").firstMatch(rawLabel);
     if (match != null) {
       final toX = int.parse(match.group(3)!);
@@ -42,13 +55,14 @@ class KifParser {
       final pieceCode = match.group(5)!;
       final isPromotedAction = match.group(6)!.isNotEmpty;
 
-      final file = _numToZen[toX];
-      final rank = _numToKan[toY];
-      
+      // 💡 直前の手の移動先と同じマスなら「同」、違えば数字マス表記（「６四」など）
+      final isSameSquare = (lastToX != null && lastToY != null) && (lastToX == toX && lastToY == toY);
+      final squareLabel = isSameSquare ? '同' : "${_numToZen[toX]}${_numToKan[toY]}";
+
       final piece = _codeToKanji[pieceCode] ?? '歩';
       final action = isPromotedAction ? '成' : '';
 
-      return "$file$rank$piece$action";
+      return "$squareLabel$piece$action";
     }
 
     return rawLabel;
@@ -142,7 +156,7 @@ class KifParser {
           moveNumber: moveNum,
           moveLabel: cleanMoveLabel,
           state: nextState,
-          parent: currentNode, // 💡 修正点：親への参照を紐付けることで変化のデコードを正常化
+          parent: currentNode,
         );
 
         currentNode.addChild(newNode);
@@ -170,16 +184,19 @@ class KifParser {
     });
     buffer.writeln('手数----指手----消費時間--');
 
-    _writeNodes(buffer, tree.root.nextNodes);
+    _writeNodes(buffer, tree.root.nextNodes, null, null);
 
     return buffer.toString();
   }
 
-  static void _writeNodes(StringBuffer buffer, List<GameNode> nodes) {
+  static void _writeNodes(StringBuffer buffer, List<GameNode> nodes, int? lastToX, int? lastToY) {
     if (nodes.isEmpty) return;
 
     final primaryNode = nodes.first;
     String cleanLabel = primaryNode.moveLabel ?? '';
+
+    int? currentToX = primaryNode.state.lastMoveToX;
+    int? currentToY = primaryNode.state.lastMoveToY;
 
     if (cleanLabel.startsWith(RegExp(r'[１-９同]'))) {
       if (cleanLabel.contains('馬成')) cleanLabel = cleanLabel.replaceAll('馬成', '角成');
@@ -188,10 +205,16 @@ class KifParser {
       if (cleanLabel.startsWith('+')) {
         final match = RegExp(r"^\+([1-9])([1-9])([a-z]+)").firstMatch(cleanLabel);
         if (match != null) {
-          final file = _numToZen[int.parse(match.group(1)!)];
-          final rank = _numToKan[int.parse(match.group(2)!)];
+          final toX = int.parse(match.group(1)!);
+          final toY = int.parse(match.group(2)!);
           final piece = _codeToKanji[match.group(3)!] ?? '歩';
-          cleanLabel = "$file$rank${piece}打";
+
+          final isSameSquare = (lastToX != null && lastToY != null) && (lastToX == toX && lastToY == toY);
+          final squareLabel = isSameSquare ? '同' : "${_numToZen[toX]}${_numToKan[toY]}";
+
+          cleanLabel = "$squareLabel${piece}打";
+          currentToX = toX;
+          currentToY = toY;
         }
       } else {
         final match = RegExp(r"^([1-9])([1-9])([1-9])([1-9])([a-z]+)(\+?)").firstMatch(cleanLabel);
@@ -203,13 +226,16 @@ class KifParser {
           final pieceCode = match.group(5)!;
           final isPromotedAction = match.group(6)!.isNotEmpty;
 
-          final file = _numToZen[toX];
-          final rank = _numToKan[toY];
+          final isSameSquare = (lastToX != null && lastToY != null) && (lastToX == toX && lastToY == toY);
+          final squareLabel = isSameSquare ? '同' : "${_numToZen[toX]}${_numToKan[toY]}";
+
           final piece = _codeToKanji[pieceCode] ?? '歩';
           final action = isPromotedAction ? '成' : '';
 
-          // 正しいKIF規格「２六歩(27)」に変換
-          cleanLabel = "$file$rank$piece$action($fromX$fromY)";
+          // 正しいKIF規格（例: "同 馬(27)" や "６四角(27)"）に変換
+          cleanLabel = "$squareLabel$piece$action($fromX$fromY)";
+          currentToX = toX;
+          currentToY = toY;
         }
       }
     }
@@ -220,12 +246,12 @@ class KifParser {
       buffer.writeln('*$comment');
     }
 
-    _writeNodes(buffer, primaryNode.nextNodes);
+    _writeNodes(buffer, primaryNode.nextNodes, currentToX, currentToY);
 
     for (int i = 1; i < nodes.length; i++) {
       final branchReplyNode = nodes[i];
       buffer.writeln('\n変化：${branchReplyNode.moveNumber}手目');
-      _writeNodes(buffer, [branchReplyNode]);
+      _writeNodes(buffer, [branchReplyNode], lastToX, lastToY);
     }
   }
 }

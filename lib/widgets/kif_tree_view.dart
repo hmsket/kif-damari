@@ -201,8 +201,14 @@ class _KifTreeViewState extends State<KifTreeView> {
                 final bool hasBranch = node.nextNodes.length > 1;
                 final bool isRoot = node.moveNumber == 0;
 
+                // 💡 修正点: 1手前（親ノード）の着手先座標を取得して「同」の判定に引き渡す
+                final parentState = node.parent?.state;
                 final String label = node.moveLabel != null && node.moveLabel!.isNotEmpty
-                    ? KifParser.convertToJapanese(node.moveLabel!)
+                    ? KifParser.convertToJapanese(
+                        node.moveLabel!,
+                        lastToX: parentState?.lastMoveToX,
+                        lastToY: parentState?.lastMoveToY,
+                      )
                     : '開始局面';
 
                 return Positioned(
@@ -277,23 +283,23 @@ class _KifTreeViewState extends State<KifTreeView> {
                                 color: Colors.orange,
                               ),
                             ),
-                            // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
-                            if (!isRoot && widget.onNodeDeleted != null)
-                              Positioned(
-                                top: -5,
-                                right: -5,
-                                child: GestureDetector(
-                                  onTap: () => widget.onNodeDeleted!(node),
-                                  child: const Padding(
-                                    padding: EdgeInsets.all(4), // タップ領域の確保
-                                    child: Icon(
-                                      Icons.cancel,
-                                      size: 20,
-                                      color: Colors.red,
-                                    ),
+                          // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
+                          if (!isRoot && widget.onNodeDeleted != null)
+                            Positioned(
+                              top: -5,
+                              right: -5,
+                              child: GestureDetector(
+                                onTap: () => widget.onNodeDeleted!(node),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4), // タップ領域の確保
+                                  child: Icon(
+                                    Icons.cancel,
+                                    size: 20,
+                                    color: Colors.red,
                                   ),
                                 ),
                               ),
+                            ),
                         ],
                       ),
                     ),

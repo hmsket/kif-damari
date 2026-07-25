@@ -322,7 +322,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
       final String promoteFlag = shouldPromote ? '+' : '';
       
-      final String label = "$fromFile$fromRank$toFile${toRank}$originalType$promoteFlag"; 
+      // 💡 修正：1-4桁に fromFile, fromRank, toFile, toRank をすべて保持するフォーマット（例: "7776fu"）
+      final String label = "$fromFile$fromRank$toFile$toRank$originalType$promoteFlag"; 
 
       final newNode = GameNode(
         moveNumber: nextMoveNumber,
@@ -352,7 +353,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     setState(() {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
-      final String label = "+$toFile${toRank}$pieceType";
+      
+      // 💡 修正：打つ場合も統一フォーマット（例: "+24fu"）に合わせる
+      final String label = "+$toFile$toRank$pieceType";
 
       final newNode = GameNode(
         moveNumber: nextMoveNumber,
@@ -445,8 +448,15 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
 
                   final rawLabel = kifTree!.currentNode.moveLabel;
+                  
+                  // 💡 修正：親ノード（1手前）の着手先座標を取得して「同」の判定に引き渡す
+                  final parentState = kifTree!.currentNode.parent?.state;
                   final displayLabel = rawLabel != null && rawLabel.isNotEmpty 
-                      ? KifParser.convertToJapanese(rawLabel) 
+                      ? KifParser.convertToJapanese(
+                          rawLabel,
+                          lastToX: parentState?.lastMoveToX,
+                          lastToY: parentState?.lastMoveToY,
+                        ) 
                       : '開始局面';
 
                   return GestureDetector(
@@ -761,7 +771,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                                 _syncCommentFromCurrentNode(); 
                               });
                             },
-                            // 💡 追加：編集画面のツリーでのみ削除コールバックを紐付け
                             onNodeDeleted: (nodeToDelete) {
                               _deleteGameNode(nodeToDelete);
                             },
