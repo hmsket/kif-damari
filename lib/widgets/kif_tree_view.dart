@@ -8,12 +8,14 @@ class KifTreeView extends StatefulWidget {
   final GameNode rootNode;
   final GameNode currentNode;
   final Function(GameNode) onNodeSelected;
+  final Function(GameNode)? onNodeDeleted; // 💡 削除用コールバック（nullの場合は閲覧モードとして動作）
 
   const KifTreeView({
     super.key,
     required this.rootNode,
     required this.currentNode,
     required this.onNodeSelected,
+    this.onNodeDeleted, // 💡 編集画面でのみ渡す
   });
 
   @override
@@ -197,6 +199,7 @@ class _KifTreeViewState extends State<KifTreeView> {
 
                 final bool isCurrent = node == widget.currentNode;
                 final bool hasBranch = node.nextNodes.length > 1;
+                final bool isRoot = node.moveNumber == 0;
 
                 final String label = node.moveLabel != null && node.moveLabel!.isNotEmpty
                     ? KifParser.convertToJapanese(node.moveLabel!)
@@ -235,13 +238,14 @@ class _KifTreeViewState extends State<KifTreeView> {
                               ],
                       ),
                       child: Stack(
+                        clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                node.moveNumber == 0 ? '開始局' : '${node.moveNumber}手目',
+                                isRoot ? '開始局' : '${node.moveNumber}手目',
                                 style: TextStyle(
                                   fontSize: 9,
                                   color: isCurrent ? Colors.brown[900] : Colors.grey[600],
@@ -250,7 +254,7 @@ class _KifTreeViewState extends State<KifTreeView> {
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                node.moveNumber == 0 ? '開始局面' : label,
+                                isRoot ? '開始局面' : label,
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -262,16 +266,34 @@ class _KifTreeViewState extends State<KifTreeView> {
                               ),
                             ],
                           ),
+                          // 💡 分岐アイコン（×ボタンと重ならないよう左上に配置）
                           if (hasBranch && !isCurrent)
                             const Positioned(
                               top: 2,
-                              right: 2,
+                              left: 2,
                               child: Icon(
                                 Icons.alt_route,
                                 size: 10,
                                 color: Colors.orange,
                               ),
                             ),
+                            // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
+                            if (!isRoot && widget.onNodeDeleted != null)
+                              Positioned(
+                                top: -5,
+                                right: -5,
+                                child: GestureDetector(
+                                  onTap: () => widget.onNodeDeleted!(node),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4), // タップ領域の確保
+                                    child: Icon(
+                                      Icons.cancel,
+                                      size: 20,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                              ),
                         ],
                       ),
                     ),

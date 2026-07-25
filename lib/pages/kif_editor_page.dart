@@ -40,9 +40,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isSidebarOpen = false;
   Offset _lastTapGlobalPosition = Offset.zero;
 
-  // 💡 追加：最後にファイルに書き込んだ、または読み込んだ時のKIFテキストの内容
+  // 最後にファイルに書き込んだ、または読み込んだ時のKIFテキストの内容
   String _lastSavedContent = '';
-  // 💡 追加：現在編集中の状態が保存された状態と一致しているか
+  // 現在編集中の状態が保存された状態と一致しているか
   bool _isSaved = true;
 
   // コメント入力欄を制御するコントローラー
@@ -67,7 +67,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
-  // 💡 追加：現在のメモリ上の状態と、最後に保存された内容を比較してフラグを更新する
+  // 現在のメモリ上の状態と、最後に保存された内容を比較してフラグを更新する
   void _checkSaveStatus() {
     if (kifTree == null) return;
     final currentContent = KifParser.encode(kifTree!);
@@ -334,7 +334,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       kifTree!.currentNode.nextNodes.add(newNode);
       kifTree!.currentNode = newNode;
       _syncCommentFromCurrentNode(); 
-      _checkSaveStatus(); // 💡 状態の変化を検知
+      _checkSaveStatus();
     });
   }
 
@@ -364,7 +364,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       kifTree!.currentNode.nextNodes.add(newNode);
       kifTree!.currentNode = newNode;
       _syncCommentFromCurrentNode(); 
-      _checkSaveStatus(); // 💡 状態の変化を検知
+      _checkSaveStatus();
     });
   }
 
@@ -538,7 +538,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         kifTree!.currentNode.comments.clear();
         kifTree!.currentNode.comments.addAll(result);
         _syncCommentFromCurrentNode();
-        _checkSaveStatus(); // 💡 コメント変更時も保存状態を走査
+        _checkSaveStatus();
       });
     }
   }
@@ -761,6 +761,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
                                 _syncCommentFromCurrentNode(); 
                               });
                             },
+                            // 💡 追加：編集画面のツリーでのみ削除コールバックを紐付け
+                            onNodeDeleted: (nodeToDelete) {
+                              _deleteGameNode(nodeToDelete);
+                            },
                           ),
                         ),
                       ],
@@ -941,7 +945,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         await KifDao().updateKif(updatedKif);
       }
       
-      // 💡 保存成功時に、その時点の最新テキストをキャッシュに上書き同期して「保存済み」にする
+      // 保存成功時に、その時点の最新テキストをキャッシュに上書き同期して「保存済み」にする
       setState(() {
         _lastSavedContent = KifParser.encode(kifTree!);
         _isSaved = true;
@@ -1059,5 +1063,70 @@ class _KifEditorPageState extends State<KifEditorPage> {
         ),
       ],
     );
+  }
+
+  /// 指定されたノードとその配下の手をツリーから削除する
+  void _deleteGameNode(GameNode node) async {
+    // 親がいない（ルートノード/開始局面）場合は削除不可
+    if (node.parent == null) return;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('指し手の削除'),
+        content: Text('${node.moveNumber}手目以降の手をすべて削除しますか？\n（この操作は取り消せません）'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final parent = node.parent!;
+
+    setState(() {
+      // 1. 親の nextNodes から該当ノードを削除（配下の子ノードも一括切り離し）
+      parent.nextNodes.remove(node);
+
+      // 2. もし削除されたノード（またはその配下）に現在滞在していた場合、親ノードへ退避
+      if (_isNodeOrDescendantCurrent(node)) {
+        kifTree!.currentNode = parent;
+      }
+
+      // 3. 選択肢インデックスの補正
+      if (parent.selectedBranchIndex >= parent.nextNodes.length) {
+        parent.selectedBranchIndex = (parent.nextNodes.length - 1).clamp(0, 999);
+      }
+
+      // 4. 選択状態・コメント・保存状態の同期
+      _selectedFile = null;
+      _selectedRank = null;
+      _selectedHandPiece = null;
+      _syncCommentFromCurrentNode();
+      _checkSaveStatus();
+    });
+
+    if (mounted) {
+      ShowSuccessSnackbar.show(context, '指定した手を削除しました');
+    }
+  }
+
+  /// 対象ノードまたはその子孫ノードが現在地(currentNode)かどうか判定する
+  bool _isNodeOrDescendantCurrent(GameNode targetNode) {
+    GameNode? temp = kifTree?.currentNode;
+    while (temp != null) {
+      if (temp == targetNode) return true;
+      temp = temp.parent;
+    }
+    return false;
   }
 }
