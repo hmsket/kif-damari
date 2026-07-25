@@ -321,19 +321,36 @@ class _KifEditorPageState extends State<KifEditorPage> {
     setState(() {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
       final String promoteFlag = shouldPromote ? '+' : '';
-      
-      // 💡 修正：1-4桁に fromFile, fromRank, toFile, toRank をすべて保持するフォーマット（例: "7776fu"）
-      final String label = "$fromFile$fromRank$toFile$toRank$originalType$promoteFlag"; 
+      final String label = "$fromFile$fromRank$toFile$toRank$originalType$promoteFlag";
 
-      final newNode = GameNode(
-        moveNumber: nextMoveNumber,
-        state: nextState,
-        moveLabel: label,
-        parent: kifTree!.currentNode,
-      );
+      // 💡 確定した盤面状態（着手先座標 & 着手後のマスにある駒）で一致するノードを探す
+      final String targetMovedPiece = nextState.grid[toRank - 1][9 - toFile] ?? '';
 
-      kifTree!.currentNode.nextNodes.add(newNode);
-      kifTree!.currentNode = newNode;
+      final existingNodeIndex = kifTree!.currentNode.nextNodes.indexWhere((node) {
+        final state = node.state;
+        if (state.lastMoveToX != toFile || state.lastMoveToY != toRank) return false;
+        final nodePiece = state.grid[toRank - 1][9 - toFile] ?? '';
+        return nodePiece == targetMovedPiece;
+      });
+
+      if (existingNodeIndex != -1) {
+        // すでに存在する手なら、その既存ノードに移動して続きから再開する
+        kifTree!.currentNode.selectedBranchIndex = existingNodeIndex;
+        kifTree!.currentNode = kifTree!.currentNode.nextNodes[existingNodeIndex];
+      } else {
+        // 存在しない場合のみ新しいノードとして追加
+        final newNode = GameNode(
+          moveNumber: nextMoveNumber,
+          state: nextState,
+          moveLabel: label,
+          parent: kifTree!.currentNode,
+        );
+
+        kifTree!.currentNode.nextNodes.add(newNode);
+        kifTree!.currentNode.selectedBranchIndex = kifTree!.currentNode.nextNodes.length - 1;
+        kifTree!.currentNode = newNode;
+      }
+
       _syncCommentFromCurrentNode(); 
       _checkSaveStatus();
     });
@@ -353,19 +370,36 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     setState(() {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
-      
-      // 💡 修正：打つ場合も統一フォーマット（例: "+24fu"）に合わせる
       final String label = "+$toFile$toRank$pieceType";
 
-      final newNode = GameNode(
-        moveNumber: nextMoveNumber,
-        state: nextState,
-        moveLabel: label,
-        parent: kifTree!.currentNode,
-      );
+      // 💡 確定した盤面状態（着手先座標 & 打たれた駒）で一致するノードを探す
+      final String targetMovedPiece = nextState.grid[toRank - 1][9 - toFile] ?? '';
 
-      kifTree!.currentNode.nextNodes.add(newNode);
-      kifTree!.currentNode = newNode;
+      final existingNodeIndex = kifTree!.currentNode.nextNodes.indexWhere((node) {
+        final state = node.state;
+        if (state.lastMoveToX != toFile || state.lastMoveToY != toRank) return false;
+        final nodePiece = state.grid[toRank - 1][9 - toFile] ?? '';
+        return nodePiece == targetMovedPiece;
+      });
+
+      if (existingNodeIndex != -1) {
+        // すでに存在する手なら、その既存ノードに移動して続きから再開する
+        kifTree!.currentNode.selectedBranchIndex = existingNodeIndex;
+        kifTree!.currentNode = kifTree!.currentNode.nextNodes[existingNodeIndex];
+      } else {
+        // 存在しない場合のみ新しいノードとして追加
+        final newNode = GameNode(
+          moveNumber: nextMoveNumber,
+          state: nextState,
+          moveLabel: label,
+          parent: kifTree!.currentNode,
+        );
+
+        kifTree!.currentNode.nextNodes.add(newNode);
+        kifTree!.currentNode.selectedBranchIndex = kifTree!.currentNode.nextNodes.length - 1;
+        kifTree!.currentNode = newNode;
+      }
+
       _syncCommentFromCurrentNode(); 
       _checkSaveStatus();
     });
@@ -448,8 +482,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
 
                   final rawLabel = kifTree!.currentNode.moveLabel;
-                  
-                  // 💡 修正：親ノード（1手前）の着手先座標を取得して「同」の判定に引き渡す
                   final parentState = kifTree!.currentNode.parent?.state;
                   final displayLabel = rawLabel != null && rawLabel.isNotEmpty 
                       ? KifParser.convertToJapanese(
