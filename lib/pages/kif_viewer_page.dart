@@ -646,6 +646,15 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 onPressed: () => _navigateToPreviewPage(),
               ),
               MenuItemButton(
+                leadingIcon: const Icon(Icons.account_tree, size: 20),
+                child: const Text('棋譜ツリーを表示'),
+                onPressed: () {
+                  setState(() {
+                    _isSidebarOpen = true;
+                  });
+                },
+              ),
+              MenuItemButton(
                 leadingIcon: const Icon(Icons.cached, size: 20),
                 child: const Text('盤面を反転'),
                 onPressed: () {
