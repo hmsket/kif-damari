@@ -810,13 +810,15 @@ Widget _buildPlayerAndKomaDai({
   Widget _buildNameLabel(String name, bool isSente, Alignment alignment) {
     return Align(
       alignment: alignment,
-      child: Text(
-        "${isSente ? '▲' : '△'}$name",
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          "${isSente ? '▲' : '△'}$name",
+          maxLines: 1,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
