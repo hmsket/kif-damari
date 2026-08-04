@@ -606,7 +606,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
             menuChildren: [
               MenuItemButton(
                 leadingIcon: const Icon(Icons.edit, size: 20),
-                child: const Text('棋譜編集モードに切り替え'),
+                child: const Text('棋譜を編集する'),
                 onPressed: () async {
                   // 💡 編集画面へ遷移し、戻り値（最新の KifEntity）を待つ
                   final updatedEntity = await Navigator.push<KifEntity>(
