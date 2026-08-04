@@ -682,91 +682,144 @@ class _KifViewerPageState extends State<KifViewerPage> {
     );
   }
 
-  Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente, required bool isUpper}) {
+Widget _buildPlayerAndKomaDai({
+    required String playerName,
+    required bool isSente,
+    required bool isUpper,
+  }) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
       child: Row(
         children: [
-          if (isUpper) ...[
-            _buildNameLabel(playerName, isSente),
-            const SizedBox(width: 8),
-          ],
-          Expanded(child: _buildPieceStand(isSente, isUpper)),
-          if (!isUpper) ...[
-            const SizedBox(width: 8),
-            _buildNameLabel(playerName, isSente),
+          // 💡 先手（下段）は左に持ち駒（2/3）、右に対局者名（1/3）
+          // 💡 後手（上段）は左に対局者名（1/3）、右に持ち駒（2/3）
+          if (isSente) ...[
+            Expanded(
+              flex: 2, // 持ち駒（2/3）
+              child: _buildPieceStand7Slots(isSente, isUpper),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 1, // 対局者名（1/3）
+              child: _buildNameLabel(playerName, isSente, Alignment.centerRight),
+            ),
+          ] else ...[
+            Expanded(
+              flex: 1, // 対局者名（1/3）
+              child: _buildNameLabel(playerName, isSente, Alignment.centerLeft),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2, // 持ち駒（2/3）
+              child: _buildPieceStand7Slots(isSente, isUpper),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildPieceStand(bool isSente, bool isUpper) {
-    final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
+  /// 持ち駒エリア（2/3）を 7 等分し、先手は左詰め・後手は右詰めで表示する Widget
+  Widget _buildPieceStand7Slots(bool isSente, bool isUpper) {
+    final hand = isSente
+        ? kifTree!.currentNode.state.senteHand
+        : kifTree!.currentNode.state.goteHand;
     final assetPrefix = isUpper ? "w" : "b";
 
-    if (hand.isEmpty || hand.values.every((count) => count == 0)) {
-      return Align(
-        alignment: isUpper ? Alignment.centerRight : Alignment.centerLeft,
-        child: Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 11)),
-      );
-    }
-
+    // 駒の標準的な持ち駒優先順位（歩, 香, 桂, 銀, 金, 角, 飛）
     const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi'];
 
-    var sortedEntries = priorityOrder
+    // 💡 現在持っている駒の種類のみを取得
+    final activeEntries = priorityOrder
         .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
         .map((key) => MapEntry(key, hand[key]!))
         .toList();
 
-    if (!isSente) {
-      sortedEntries = sortedEntries.reversed.toList();
+    // 7スロット分の空枠リストを作成
+    final List<MapEntry<String, int>?> slots = List.filled(7, null);
+
+    if (isSente) {
+      // 💡 先手：左詰め（インデックス 0 から順に格納）
+      for (int i = 0; i < activeEntries.length; i++) {
+        slots[i] = activeEntries[i];
+      }
+    } else {
+      // 💡 後手：右詰め（右端インデックス 6 から順に格納）
+      final reversedEntries = activeEntries.reversed.toList();
+      for (int i = 0; i < reversedEntries.length; i++) {
+        slots[6 - i] = reversedEntries[i];
+      }
     }
 
-    return Wrap(
-      alignment: isUpper ? WrapAlignment.end : WrapAlignment.start,
-      spacing: 1.0,
-      runSpacing: 1.0,
-      children: sortedEntries.map((entry) {
-        return Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            Image.asset(
-              'assets/images/pieces/$assetPrefix${entry.key}.png',
-              width: 31,
-              height: 31,
-              fit: BoxFit.contain,
-            ),
-            if (entry.value > 1)
-              Positioned(
-                right: -2,
-                bottom: -2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${entry.value}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: slots.map((entry) {
+        return Expanded(
+          flex: 1, // 2/3 の幅をさらに 7 等分
+          child: entry != null
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double size = constraints.maxWidth.clamp(16.0, 32.0);
+
+                    return FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Image.asset(
+                            'assets/images/pieces/$assetPrefix${entry.key}.png',
+                            width: size,
+                            height: size,
+                            fit: BoxFit.contain,
+                          ),
+                          if (entry.value > 1)
+                            Positioned(
+                              right: -1,
+                              bottom: -1,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${entry.value}',
+                                  style: TextStyle(
+                                    fontSize: (size * 0.45).clamp(9.0, 12.0),
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                )
+              : const SizedBox.shrink(), // 空スロット（スペースは均等に保持）
         );
       }).toList(),
     );
   }
 
-  Widget _buildNameLabel(String name, bool isSente) {
-    return Text("${isSente ? '▲' : '△'}$name",
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold));
+  Widget _buildNameLabel(String name, bool isSente, Alignment alignment) {
+    return Align(
+      alignment: alignment,
+      child: Text(
+        "${isSente ? '▲' : '△'}$name",
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 
   void _navigateToPreviewPage() async {
