@@ -196,6 +196,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       
                       await state.saveOrder();
                       ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
+                    } else if (_currentMode == AppMode.delete) {
+                      if (tabs.isNotEmpty) {
+                        final currentTabId = tabs[_currentTabIndex].id;
+                        final state = _listKeys[currentTabId]?.currentState;
+                        if (state != null) {
+                          await state.deleteSelectedKifs();
+                        }
+                      }
                     }
                     _updateMode(AppMode.normal);
                   },

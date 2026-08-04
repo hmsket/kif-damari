@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
-import 'package:kifdamari/dialogs/delete_kif_dialog.dart';
 import 'package:kifdamari/dialogs/edit_kif_dialog.dart';
 import 'package:kifdamari/pages/home_page.dart';
 import 'package:kifdamari/pages/kif_viewer_page.dart';
@@ -10,12 +9,17 @@ class KifListItem extends StatelessWidget {
   final KifEntity kif;
   final AppMode mode;
   final VoidCallback onRefresh;
+  
+  final bool isSelected;
+  final ValueChanged<bool?>? onChanged;
 
   const KifListItem({
     super.key,
     required this.kif,
     required this.mode,
     required this.onRefresh,
+    this.isSelected = false,
+    this.onChanged,
   });
 
   @override
@@ -31,7 +35,9 @@ class KifListItem extends StatelessWidget {
       child: InkWell(
         onTap: () {
           if (mode == AppMode.delete) {
-            showDeleteKifDialog(context, kif, onRefresh);
+            if (onChanged != null) {
+              onChanged!(!isSelected);
+            }
           } else if (mode == AppMode.edit) {
             showEditKifDialog(context, kif, onRefresh);
           } else if (mode == AppMode.sort) {
@@ -45,16 +51,35 @@ class KifListItem extends StatelessWidget {
             ).then((_) => onRefresh());
           }
         },
-        child: KifItemWidget(
-          title: kif.title,
-          detail: kif.detail,
-          imgPath: kif.imgPath,
-          trailing: switch (mode) {
-            AppMode.delete => const Icon(Icons.cancel, color: Colors.red),
-            AppMode.edit => const Icon(Icons.edit, color: Colors.green),
-            AppMode.sort => const Icon(Icons.drag_handle, color: Colors.grey),
-            AppMode.normal => null,
-          },
+        child: Row(
+          children: [
+            if (mode == AppMode.delete)
+              Padding(
+                padding: const EdgeInsets.only(left: 10.0),
+                child: SizedBox(
+                  width: 10,
+                  child: Checkbox(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    value: isSelected,
+                    onChanged: onChanged,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: KifItemWidget(
+                title: kif.title,
+                detail: kif.detail,
+                imgPath: kif.imgPath,
+                trailing: switch (mode) {
+                  AppMode.delete => null,
+                  AppMode.edit => const Icon(Icons.edit, color: Colors.green),
+                  AppMode.sort => const Icon(Icons.drag_handle, color: Colors.grey),
+                  AppMode.normal => null,
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

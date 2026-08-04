@@ -42,6 +42,18 @@ class KifDao {
     );
   }
 
+  Future<void> deleteKifs(List<int> ids) async {
+    if (ids.isEmpty) return;
+    final db = await _db;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'kif',
+        where: 'id IN (${List.filled(ids.length, '?').join(',')})',
+        whereArgs: ids,
+      );
+    });
+  }
+
   Future<void> updateKif(KifEntity kif) async {
     final db = await DatabaseHelper.instance.database;
     await db.update(

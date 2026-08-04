@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/dialogs/delete_kif_dialog.dart';
 import 'package:kifdamari/pages/home_page.dart';
 import 'kif_list_item.dart';
 
@@ -26,6 +27,8 @@ class KifListWidgetState extends State<KifListWidget> {
   
   int _lastKifCount = 0;
   bool _isFirstLoadDone = false;
+
+  final Set<int> _selectedKifIds = {};
 
   bool get isKifEmpty {
     if (_tempKifs != null) return _tempKifs!.isEmpty;
@@ -66,6 +69,16 @@ class KifListWidgetState extends State<KifListWidget> {
       _loadKifu(); 
       widget.onRefresh();
     }
+  }
+
+  Future<void> deleteSelectedKifs() async {
+    if (_selectedKifIds.isEmpty) return;
+    showDeleteSelectedKifsDialog(context, _selectedKifIds.length, () async {
+      await KifDao().deleteKifs(_selectedKifIds.toList());
+      _selectedKifIds.clear();
+      _loadKifu();
+      widget.onRefresh();
+    });
   }
 
   @override
@@ -139,11 +152,25 @@ class KifListWidgetState extends State<KifListWidget> {
           itemCount: kifs.length,
           itemBuilder: (context, index) {
             final kif = kifs[index];
+            final isSelected = _selectedKifIds.contains(kif.id);
+
             return KifListItem(
               key: ValueKey('list_${kif.id}'),
               kif: kif,
               mode: widget.mode,
               onRefresh: _loadKifu,
+              isSelected: isSelected,
+              onChanged: widget.mode == AppMode.delete
+                  ? (selected) {
+                      setState(() {
+                        if (selected == true) {
+                          _selectedKifIds.add(kif.id!);
+                        } else {
+                          _selectedKifIds.remove(kif.id!);
+                        }
+                      });
+                    }
+                  : null,
             );
           },
         );
