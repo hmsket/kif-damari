@@ -69,32 +69,28 @@ class _SortTabsDialogContentState extends State<SortTabsDialogContent> {
             );
           },
           itemBuilder: (context, index) {
-            final tab = tempTabs[index];
-            return Container(
+            final tab = tempTabs[index];  
+            return ReorderableDragStartListener(
               key: ValueKey(tab.id),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.grey.withOpacity(0.3),
-                    width: 1,
+              index: index,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.grey.withOpacity(0.3),
+                      width: 1,
+                    ),
                   ),
                 ),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                title: Text(
-                  tab.title,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                ),
-                // ハンドル部分をタッチした瞬間にすぐドラッグを開始できるようにする
-                trailing: ReorderableDragStartListener(
-                  index: index,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Icon(
-                      Icons.drag_handle,
-                      color: Colors.grey,
-                    ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: Text(
+                    tab.title,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                  trailing: const Icon(
+                    Icons.drag_handle,
+                    color: Colors.grey,
                   ),
                 ),
               ),
