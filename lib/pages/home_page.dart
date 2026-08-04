@@ -74,11 +74,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
   }
 
+  // 現在のタブにおける選択件数を取得
+  int _getSelectedCount(List<TabEntity> tabs) {
+    if (tabs.isEmpty || _currentMode != AppMode.delete) return 0;
+    if (_currentTabIndex >= tabs.length) return 0;
+    final currentTabId = tabs[_currentTabIndex].id;
+    final state = _listKeys[currentTabId]?.currentState;
+    return state?.selectedCount ?? 0;
+  }
+
   Future<void> _onAddKifPressed(BuildContext context, int tabId) async {
     final dao = KifDao();
     final settings = AppSettings();
     
-    // 棋譜追加数を超えたら動画広告を出す
     final currentKifCount = await dao.getTotalKifCount();
     final kifLimit = (settings.get('kifLimit') ?? defaultKifLimit) as int;
     if (currentKifCount >= kifLimit) {
@@ -141,6 +149,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
 
         final tabs = snapshot.data ?? [];
+        final selectedCount = _getSelectedCount(tabs);
+        final hasSelection = selectedCount > 0;
 
         if (_tabController == null || _tabController!.length != tabs.length) {
           _tabController?.dispose();
@@ -196,6 +206,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       
                       await state.saveOrder();
                       ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
+                      _updateMode(AppMode.normal);
                     } else if (_currentMode == AppMode.delete) {
                       if (tabs.isNotEmpty) {
                         final currentTabId = tabs[_currentTabIndex].id;
@@ -205,7 +216,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         }
                       }
                     }
-                    _updateMode(AppMode.normal);
                   },
                 )
               else ...[
@@ -261,7 +271,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     final state = _listKeys[currentTabId]?.currentState;
                     final bool hasKif = state != null && !state.isKifEmpty;
                     return [
-                      const PopupMenuItem(value: 'sort_tabs', child: Text('タブを並び替え')),                      
+                      const PopupMenuItem(value: 'sort_tabs', child: Text('タブを並び替え')),                     
                       if (hasKif)
                         const PopupMenuItem(value: 'sort_kifs', child: Text('棋譜を並び替え')),
                     ];
@@ -290,6 +300,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         unselectedLabelColor: Colors.grey[600], 
                         labelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.bold),
                         unselectedLabelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.normal),
+                        onTap: (index) {
+                          // 削除モードで棋譜選択中の場合は他のタブに遷移できない
+                          if (hasSelection && index != _currentTabIndex) {
+                            _tabController?.animateTo(_currentTabIndex);
+                          }
+                        },
                         tabs: tabs.map((t) {
                           return Tab(
                             child: Row(
@@ -320,6 +336,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
           ),
+          bottomNavigationBar: hasSelection
+              ? SafeArea(
+                  child: Container(
+                    color: Colors.red.shade50,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$selectedCount件選択中、他のタブには移動できません',
+                          style: GoogleFonts.notoSansJp(
+                            color: Colors.red.shade800,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
           body: SafeArea(
             child: tabs.isEmpty
                 ? const Center(
@@ -333,6 +372,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   )
                 : TabBarView(
                     controller: _tabController,
+                    // 選択中はスワイプによるタブ移動をブロック
+                    physics: hasSelection
+                        ? const NeverScrollableScrollPhysics()
+                        : const BouncingScrollPhysics(),
                     children: tabs.map((t) {
                       final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
                       return KifListWidget(
@@ -340,6 +383,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         tabId: t.id!,
                         mode: _currentMode,
                         onRefresh: _refresh,
+                        onSelectionChanged: () {
+                          setState(() {});
+                        },
                       );
                     }).toList(),
                   ),

@@ -9,12 +9,14 @@ class KifListWidget extends StatefulWidget {
   final int tabId;
   final AppMode mode;
   final VoidCallback onRefresh;
+  final VoidCallback? onSelectionChanged;
 
   const KifListWidget({
     super.key,
     required this.tabId,
     required this.mode,
     required this.onRefresh,
+    this.onSelectionChanged,
   });
 
   @override
@@ -29,6 +31,8 @@ class KifListWidgetState extends State<KifListWidget> {
   bool _isFirstLoadDone = false;
 
   final Set<int> _selectedKifIds = {};
+
+  int get selectedCount => _selectedKifIds.length; // 選択件数を公開
 
   bool get isKifEmpty {
     if (_tempKifs != null) return _tempKifs!.isEmpty;
@@ -48,6 +52,9 @@ class KifListWidgetState extends State<KifListWidget> {
   void didUpdateWidget(KifListWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mode != widget.mode || oldWidget.tabId != widget.tabId) {
+      if (widget.mode != AppMode.delete) {
+        _selectedKifIds.clear(); // モードが変わったら選択をクリア
+      }
       _loadKifu();
     }
   }
@@ -76,6 +83,7 @@ class KifListWidgetState extends State<KifListWidget> {
     showDeleteSelectedKifsDialog(context, _selectedKifIds.length, () async {
       await KifDao().deleteKifs(_selectedKifIds.toList());
       _selectedKifIds.clear();
+      widget.onSelectionChanged?.call();
       _loadKifu();
       widget.onRefresh();
     });
@@ -169,6 +177,7 @@ class KifListWidgetState extends State<KifListWidget> {
                           _selectedKifIds.remove(kif.id!);
                         }
                       });
+                      widget.onSelectionChanged?.call(); // 親に選択状態の変化を通知
                     }
                   : null,
             );
