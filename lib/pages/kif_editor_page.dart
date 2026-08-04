@@ -1101,12 +1101,17 @@ class _KifEditorPageState extends State<KifEditorPage> {
       await file.writeAsBytes(kifData.bytes, flush: true);
 
       if (isNewFile) {
+        final sente = kifTree?.info['先手'] ?? '先手';
+        final gote = kifTree?.info['後手'] ?? '後手';
+        final totalMoves = kifTree?.totalMoveCount ?? 0;
+        final detailText = '▲$sente vs △$gote ($totalMoves手)';
+
         final updatedKif = KifEntity(
           id: widget.kifEntity.id,
           tabId: widget.kifEntity.tabId,
           kifId: widget.kifEntity.kifId,
           title: widget.kifEntity.title,
-          detail: widget.kifEntity.detail,
+          detail: detailText,
           kifOrder: widget.kifEntity.kifOrder,
           kifPath: targetPath,
           color: widget.kifEntity.color,
