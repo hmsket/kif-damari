@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:charset_converter/charset_converter.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
@@ -127,6 +128,67 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _isLoading = false;
         _syncCommentFromCurrentNode();
       });
+    }
+  }
+
+// 💡 修正: 拡張子制限の不具合を回避するため FileType.any で開き、アプリ側で検証
+  Future<void> _openLocalFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any, // 💡 FileType.custom ではなく FileType.any に変更
+      );
+
+      if (result == null || result.files.single.path == null) {
+        // キャンセルされた場合
+        return;
+      }
+
+      final String filePath = result.files.single.path!;
+      final extension = p.extension(filePath).toLowerCase();
+
+      // 💡 許可する拡張子のチェック
+      const allowedExtensions = ['.kif', '.kifu', '.txt'];
+      if (!allowedExtensions.contains(extension)) {
+        if (mounted) {
+          ShowErrorSnackbar.show(context, '対応していないファイル形式です (.kif, .kifu, .txt)');
+        }
+        return;
+      }
+
+      final file = File(filePath);
+
+      if (!await file.exists()) {
+        if (mounted) ShowErrorSnackbar.show(context, 'ファイルが存在しません');
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      String content;
+      try {
+        content = utf8.decode(bytes, allowMalformed: false);
+      } catch (_) {
+        content = await CharsetConverter.decode("Shift_JIS", bytes);
+      }
+
+      final tree = KifParser.decode(content);
+
+      setState(() {
+        kifTree = tree;
+        _selectedFile = null;
+        _selectedRank = null;
+        _selectedHandPiece = null;
+        _syncCommentFromCurrentNode();
+        _checkSaveStatus();
+      });
+
+      if (mounted) {
+        ShowSuccessSnackbar.show(context, '棋譜ファイルを読み込みました');
+      }
+    } catch (e) {
+      debugPrint("ファイル読み込みエラー: $e");
+      if (mounted) {
+        ShowErrorSnackbar.show(context, 'ファイルの読み込み・解析に失敗しました');
+      }
     }
   }
 
@@ -676,6 +738,12 @@ class _KifEditorPageState extends State<KifEditorPage> {
             ],
           ),
           actions: [
+            // 💡 追記: ローカルのファイルを開くアイコンボタン
+            IconButton(
+              icon: const Icon(Icons.folder_open),
+              tooltip: 'ファイルを開く',
+              onPressed: _openLocalFile,
+            ),
             IconButton(
               icon: const Icon(Icons.content_paste),
               tooltip: 'クリップボードから貼り付け',
