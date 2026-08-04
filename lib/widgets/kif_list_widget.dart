@@ -128,6 +128,7 @@ class KifListWidgetState extends State<KifListWidget> {
         if (widget.mode == AppMode.sort) {
           return ReorderableListView.builder(
             itemCount: kifs.length,
+            buildDefaultDragHandles: false,
             proxyDecorator: (child, index, animation) {
               return Material(
                 elevation: 80,
@@ -151,6 +152,7 @@ class KifListWidgetState extends State<KifListWidget> {
                 kif: kif,
                 mode: widget.mode,
                 onRefresh: _loadKifu,
+                index: index,
               );
             },
           );

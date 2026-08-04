@@ -9,6 +9,7 @@ class KifListItem extends StatelessWidget {
   final KifEntity kif;
   final AppMode mode;
   final VoidCallback onRefresh;
+  final int? index;
   
   final bool isSelected;
   final ValueChanged<bool?>? onChanged;
@@ -18,13 +19,14 @@ class KifListItem extends StatelessWidget {
     required this.kif,
     required this.mode,
     required this.onRefresh,
+    this.index,
     this.isSelected = false,
     this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final cardWidget = Card(
       color: Color(kif.color!),
       elevation: 0,
       clipBehavior: Clip.antiAlias,
@@ -40,8 +42,6 @@ class KifListItem extends StatelessWidget {
             }
           } else if (mode == AppMode.edit) {
             showEditKifDialog(context, kif, onRefresh);
-          } else if (mode == AppMode.sort) {
-            // 並び替えモード時は遷移しないようにする
           } else {
             Navigator.push(
               context,
@@ -83,5 +83,12 @@ class KifListItem extends StatelessWidget {
         ),
       ),
     );
+    if (mode == AppMode.sort && index != null) {
+      return ReorderableDragStartListener(
+        index: index!,
+        child: cardWidget,
+      );
+    }
+    return cardWidget;
   }
 }
