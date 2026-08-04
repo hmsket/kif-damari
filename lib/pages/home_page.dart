@@ -188,35 +188,49 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
             actions: [
               if (_currentMode != AppMode.normal)
-                IconButton(
-                  icon: const Icon(Icons.check, size: 30),
-                  onPressed: () async {
-                    if (_currentMode == AppMode.sort) {
-                      if (tabs.isEmpty) {
-                        _updateMode(AppMode.normal);
-                        return;
-                      }
-                      final currentTabId = tabs[_currentTabIndex].id;
-                      final state = _listKeys[currentTabId]?.currentState;
-                      
-                      if (state == null || state.isKifEmpty) {
-                        _updateMode(AppMode.normal);
-                        return;
-                      }
-                      
-                      await state.saveOrder();
-                      ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
-                      _updateMode(AppMode.normal);
-                    } else if (_currentMode == AppMode.delete) {
-                      if (tabs.isNotEmpty) {
-                        final currentTabId = tabs[_currentTabIndex].id;
-                        final state = _listKeys[currentTabId]?.currentState;
-                        if (state != null) {
-                          await state.deleteSelectedKifs();
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 削除モードのときはチェックボタンの左にキャンセルボタンを表示
+                    if (_currentMode == AppMode.delete)
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 30),
+                        tooltip: 'キャンセル',
+                        onPressed: () {
+                          _updateMode(AppMode.normal);
+                        },
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.check, size: 30),
+                      onPressed: () async {
+                        if (_currentMode == AppMode.sort) {
+                          if (tabs.isEmpty) {
+                            _updateMode(AppMode.normal);
+                            return;
+                          }
+                          final currentTabId = tabs[_currentTabIndex].id;
+                          final state = _listKeys[currentTabId]?.currentState;
+                          
+                          if (state == null || state.isKifEmpty) {
+                            _updateMode(AppMode.normal);
+                            return;
+                          }
+                          
+                          await state.saveOrder();
+                          ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
+                          _updateMode(AppMode.normal);
+                        } else if (_currentMode == AppMode.delete) {
+                          if (tabs.isNotEmpty) {
+                            final currentTabId = tabs[_currentTabIndex].id;
+                            final state = _listKeys[currentTabId]?.currentState;
+                            if (state != null) {
+                              await state.deleteSelectedKifs();
+                            }
+                          }
                         }
-                      }
-                    }
-                  },
+                      },
+                    ),
+                  ],
                 )
               else ...[
                 MenuAnchor(
@@ -301,7 +315,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         labelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.bold),
                         unselectedLabelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.normal),
                         onTap: (index) {
-                          // 削除モードで棋譜選択中の場合は他のタブに遷移できない
                           if (hasSelection && index != _currentTabIndex) {
                             _tabController?.animateTo(_currentTabIndex);
                           }
@@ -372,7 +385,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   )
                 : TabBarView(
                     controller: _tabController,
-                    // 選択中はスワイプによるタブ移動をブロック
                     physics: hasSelection
                         ? const NeverScrollableScrollPhysics()
                         : const BouncingScrollPhysics(),
