@@ -233,6 +233,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                   await state.deleteSelectedKifs();
                                 }
                               }
+                            } else if (_currentMode == AppMode.edit) {
+                              // 編集モードのときはチェックボタンでノーマルモードに戻る
+                              _updateMode(AppMode.normal);
                             }
                           },
                         ),
