@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:kifdamari/database/entity/tab_entity.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 
 class KifFormContent extends StatefulWidget {
   final KifEntity? initialKif;
@@ -63,6 +64,10 @@ class _KifFormContentState extends State<KifFormContent> {
     super.dispose();
   }
 
+  void _showThumbnailInfoSnackBar() {
+    ShowErrorSnackbar.show(context, '盤面サムネイルは棋譜再生画面から変更してください');
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -82,14 +87,17 @@ class _KifFormContentState extends State<KifFormContent> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.asset('assets/images/initial.png', fit: BoxFit.contain),
+                    GestureDetector(
+                      onTap: _showThumbnailInfoSnackBar,
+                      child: SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.asset('assets/images/initial.png', fit: BoxFit.contain),
+                          ),
                         ),
                       ),
                     ),
