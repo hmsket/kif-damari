@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
@@ -35,13 +35,12 @@ class KifViewerPage extends StatefulWidget {
 class _KifViewerPageState extends State<KifViewerPage> {
   KifTree? kifTree;
   bool _isLoading = true;
-  bool _isSeeking = false; 
+  bool _isSeeking = false;
   bool _isReversed = false;
-  double _dragStartX = 0.0; 
-  int _dragStartMoveNumber = 0; 
+  double _dragStartX = 0.0;
+  int _dragStartMoveNumber = 0;
   String? _rawKifContent;
 
-  // 💡 編集画面で保存された最新の Entity を保持・参照するための変数
   late KifEntity _currentKifEntity;
 
   bool _isSidebarOpen = false;
@@ -103,14 +102,14 @@ class _KifViewerPageState extends State<KifViewerPage> {
       );
 
       final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
-      
+
       if (byteData != null) {
         final Uint8List pngBytes = byteData.buffer.asUint8List();
-        
+
         final savedPath = await ThumbnailManager.saveThumbnail(
-          _currentKifEntity.tabId, 
-          _currentKifEntity.kifId, 
-          pngBytes
+          _currentKifEntity.tabId,
+          _currentKifEntity.kifId,
+          pngBytes,
         );
 
         final updatedKif = KifEntity(
@@ -157,7 +156,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
 
       if (await file.exists()) {
         await Share.shareXFiles(
-          [XFile(file.path)], 
+          [XFile(file.path)],
           text: shareText,
         );
       }
@@ -186,8 +185,8 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 child: Text(
                   '次の手を選択してください',
                   style: TextStyle(
-                    fontSize: 16, 
-                    fontWeight: FontWeight.bold, 
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                     color: Colors.brown,
                   ),
                 ),
@@ -216,11 +215,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
       },
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final settings = AppSettings();
-    
+
     if (_isLoading || kifTree == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -236,7 +235,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
           GestureDetector(
             behavior: HitTestBehavior.translucent,
             onLongPressStart: (details) {
-              HapticFeedback.mediumImpact(); 
+              HapticFeedback.mediumImpact();
               setState(() {
                 _isSeeking = true;
                 _dragStartX = details.localPosition.dx;
@@ -246,9 +245,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
             onLongPressMoveUpdate: (details) {
               if (!_isSeeking) return;
               double deltaX = details.localPosition.dx - _dragStartX;
-              int sensitivity = 3; 
+              int sensitivity = 3;
               int moveOffset = (deltaX / sensitivity).toInt();
-              
+
               setState(() {
                 kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
               });
@@ -259,7 +258,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 children: [
                   _buildPlayerAndKomaDai(
                     playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
-                    isSente: _isReversed, 
+                    isSente: _isReversed,
                     isUpper: true,
                   ),
                   Padding(
@@ -275,7 +274,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                               final box = context.findRenderObject() as RenderBox?;
                               if (box == null) return;
                               final halfWidth = box.size.width / 2;
-                              
+
                               setState(() {
                                 if (details.localPosition.dx > halfWidth) {
                                   kifTree!.stepNext();
@@ -319,7 +318,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                             child: SelectableLinkify(
                               text: "${kifTree!.currentNode.joinedComment}",
                               style: TextStyle(
-                                fontSize: settings.get<double>('fontSize'), 
+                                fontSize: settings.get<double>('fontSize'),
                               ),
                               strutStyle: StrutStyle(
                                 fontSize: settings.get<double>('fontSize'),
@@ -357,7 +356,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
               ),
             ),
           ),
-
           if (_isSidebarOpen)
             Positioned.fill(
               child: GestureDetector(
@@ -372,11 +370,10 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 ),
               ),
             ),
-
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
-            right: _isSidebarOpen ? 0 : -sidebarWidth, 
+            right: _isSidebarOpen ? 0 : -sidebarWidth,
             top: 0,
             bottom: 0,
             width: sidebarWidth,
@@ -422,7 +419,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                               parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
                               temp = parent;
                             }
-                            
+
                             _isSidebarOpen = false;
                           });
                         },
@@ -541,7 +538,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       decoration: BoxDecoration(
                         color: hasBranch ? Colors.orange[100] : Colors.white,
                         border: Border.all(
-                          color: hasBranch ? Colors.orange[700]! : Colors.black45, 
+                          color: hasBranch ? Colors.orange[700]! : Colors.black45,
                           width: hasBranch ? 2.0 : 1.5,
                         ),
                         borderRadius: BorderRadius.circular(8),
@@ -582,7 +579,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       ),
                     ),
                   );
-                }
+                },
               ),
             ),
           ),
@@ -596,7 +593,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
             onPressed: () => setState(() => kifTree!.jumpTo(kifTree!.totalMoveCount)),
           ),
           MenuAnchor(
-            alignmentOffset: const Offset(0, 0), 
+            alignmentOffset: const Offset(0, 0),
             style: MenuStyle(
               shape: WidgetStateProperty.all(
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -608,15 +605,20 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 leadingIcon: const Icon(Icons.edit, size: 20),
                 child: const Text('棋譜を編集する'),
                 onPressed: () async {
-                  // 💡 編集画面へ遷移し、戻り値（最新の KifEntity）を待つ
+                  // 💡 現在閲覧中の手数を取得
+                  final currentMove = kifTree?.currentNode.moveNumber ?? 0;
+
+                  // 💡 手数を initialMoveNumber として編集画面へ渡す
                   final updatedEntity = await Navigator.push<KifEntity>(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => KifEditorPage(kifEntity: _currentKifEntity),
+                      builder: (context) => KifEditorPage(
+                        kifEntity: _currentKifEntity,
+                        initialMoveNumber: currentMove,
+                      ),
                     ),
                   );
 
-                  // 💡 編集画面から戻ってきた際、再読み込みを行って画面を最新化する
                   if (mounted) {
                     setState(() {
                       _isLoading = true;
@@ -625,6 +627,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       }
                     });
                     await _initKifData();
+                    
+                    // 💡 編集から戻った際にも同じ手数を表示したい場合はジャンプ
+                    kifTree?.jumpTo(currentMove);
                   }
                 },
               ),
@@ -640,11 +645,6 @@ class _KifViewerPageState extends State<KifViewerPage> {
                   Clipboard.setData(ClipboardData(text: _rawKifContent!));
                 },
               ),
-              // MenuItemButton(
-              //   leadingIcon: const Icon(Icons.image, size: 20),
-              //   child: const Text('局面画像を生成・保存'),
-              //   onPressed: () => _navigateToPreviewPage(),
-              // ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.account_tree, size: 20),
                 child: const Text('棋譜ツリーを表示'),
@@ -713,7 +713,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
       );
     }
 
-    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi']; 
+    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi'];
 
     var sortedEntries = priorityOrder
         .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
@@ -811,7 +811,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
           builder: (context) => DiagramPreviewPage(
             initialPngBytes: initialPngBytes,
             moveNumber: kifTree!.currentNode.moveNumber,
-            initialSenteName: initialSente, 
+            initialSenteName: initialSente,
             initialGoteName: initialGote,
             onUpdateDiagram: ({
               required bool highlightLastMove,

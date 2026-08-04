@@ -21,7 +21,13 @@ import 'package:share_plus/share_plus.dart';
 
 class KifEditorPage extends StatefulWidget {
   final KifEntity kifEntity;
-  const KifEditorPage({super.key, required this.kifEntity});
+  final int initialMoveNumber; // 💡 再生画面からの初期表示手数を引き継ぐ
+
+  const KifEditorPage({
+    super.key,
+    required this.kifEntity,
+    this.initialMoveNumber = 0, // 💡 デフォルトは0手目（開始局面）
+  });
 
   @override
   State<KifEditorPage> createState() => _KifEditorPageState();
@@ -32,9 +38,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isLoading = true;
   bool _isReversed = false;
 
-  int? _selectedFile; 
-  int? _selectedRank; 
-  String? _selectedHandPiece; 
+  int? _selectedFile;
+  int? _selectedRank;
+  String? _selectedHandPiece;
 
   double _dragDistance = 0.0;
   bool _isSidebarOpen = false;
@@ -98,6 +104,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
           content = await CharsetConverter.decode("Shift_JIS", bytes);
         }
         final tree = KifParser.decode(content);
+
+        // 💡 遷移元から渡された手数（56手目など）にジャンプする
+        tree.jumpTo(widget.initialMoveNumber);
+
         setState(() {
           kifTree = tree;
           _lastSavedContent = KifParser.encode(tree); // 読み込み時の状態を記憶
@@ -156,7 +166,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _onBoardTap(TapUpDetails details, BoxConstraints constraints) {
     if (kifTree == null) return;
-    
+
     _lastTapGlobalPosition = details.globalPosition;
 
     final double boardWidth = constraints.maxWidth;
@@ -222,7 +232,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
     });
   }
-  
+
   bool _isOwnPiece(String pieceCode, Player player) {
     if (player == Player.sente && pieceCode.startsWith('b')) return true;
     if (player == Player.gote && pieceCode.startsWith('w')) return true;
@@ -277,7 +287,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     final isSente = movingPiece.startsWith('b');
     final String originalType = movingPiece.substring(1);
-    
+
     const cannotPromoteTypes = {'ki', 'gy', 'to', 'ny', 'nk', 'ng', 'um', 'ry'};
     final bool canPromoteType = !cannotPromoteTypes.contains(originalType);
 
@@ -289,14 +299,14 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     if (canPromoteType && isPromotionZone) {
       final bool mustPromote = (originalType == 'fu' || originalType == 'ya') && (isSente ? toRank == 1 : toRank == 9) ||
-                               (originalType == 'ke' && (isSente ? toRank <= 2 : toRank >= 8));
+          (originalType == 'ke' && (isSente ? toRank <= 2 : toRank >= 8));
 
       if (mustPromote) {
         shouldPromote = true;
       } else {
         if (mounted) {
           final bool? result = await _showPromotionMenu(context, movingPiece, _lastTapGlobalPosition);
-          if (result == null) return;          
+          if (result == null) return;
           shouldPromote = result;
         }
       }
@@ -348,7 +358,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         kifTree!.currentNode = newNode;
       }
 
-      _syncCommentFromCurrentNode(); 
+      _syncCommentFromCurrentNode();
       _checkSaveStatus();
     });
   }
@@ -394,7 +404,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         kifTree!.currentNode = newNode;
       }
 
-      _syncCommentFromCurrentNode(); 
+      _syncCommentFromCurrentNode();
       _checkSaveStatus();
     });
   }
@@ -430,7 +440,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
               _selectedFile = null;
               _selectedRank = null;
               _selectedHandPiece = null;
-              _syncCommentFromCurrentNode(); 
+              _syncCommentFromCurrentNode();
             }),
           ),
           IconButton(
@@ -441,7 +451,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
               _selectedFile = null;
               _selectedRank = null;
               _selectedHandPiece = null;
-              _syncCommentFromCurrentNode(); 
+              _syncCommentFromCurrentNode();
             }),
           ),
           GestureDetector(
@@ -455,7 +465,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   _selectedFile = null;
                   _selectedRank = null;
                   _selectedHandPiece = null;
-                  _syncCommentFromCurrentNode(); 
+                  _syncCommentFromCurrentNode();
                 });
               } else if (_dragDistance >= threshold) {
                 setState(() {
@@ -464,7 +474,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   _selectedFile = null;
                   _selectedRank = null;
                   _selectedHandPiece = null;
-                  _syncCommentFromCurrentNode(); 
+                  _syncCommentFromCurrentNode();
                 });
               }
             },
@@ -477,12 +487,12 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
                   final rawLabel = kifTree!.currentNode.moveLabel;
                   final parentState = kifTree!.currentNode.parent?.state;
-                  final displayLabel = rawLabel != null && rawLabel.isNotEmpty 
+                  final displayLabel = rawLabel != null && rawLabel.isNotEmpty
                       ? KifParser.convertToJapanese(
                           rawLabel,
                           lastToX: parentState?.lastMoveToX,
                           lastToY: parentState?.lastMoveToY,
-                        ) 
+                        )
                       : '開始局面';
 
                   return GestureDetector(
@@ -496,7 +506,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                       decoration: BoxDecoration(
                         color: hasBranch ? Colors.orange[100] : Colors.white,
                         border: Border.all(
-                          color: hasBranch ? Colors.orange[700]! : Colors.black45, 
+                          color: hasBranch ? Colors.orange[700]! : Colors.black45,
                           width: hasBranch ? 2.0 : 1.5,
                         ),
                         borderRadius: BorderRadius.circular(8),
@@ -537,7 +547,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                       ),
                     ),
                   );
-                }
+                },
               ),
             ),
           ),
@@ -549,7 +559,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
               _selectedFile = null;
               _selectedRank = null;
               _selectedHandPiece = null;
-              _syncCommentFromCurrentNode(); 
+              _syncCommentFromCurrentNode();
             }),
           ),
           IconButton(
@@ -559,7 +569,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
               _selectedFile = null;
               _selectedRank = null;
               _selectedHandPiece = null;
-              _syncCommentFromCurrentNode(); 
+              _syncCommentFromCurrentNode();
             }),
           ),
         ],
@@ -578,7 +588,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       });
     }
   }
-  
+
   Widget _buildCommentField() {
     final String currentComment = kifTree!.currentNode.joinedComment;
 
@@ -589,13 +599,13 @@ class _KifEditorPageState extends State<KifEditorPage> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: InkWell(
-        onTap: _showCommentEditDialog, 
-        borderRadius: BorderRadius.circular(8), 
+        onTap: _showCommentEditDialog,
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: SizedBox(
             width: double.infinity,
-            height: double.infinity, 
+            height: double.infinity,
             child: SingleChildScrollView(
               child: Text(
                 currentComment.isEmpty ? 'タップしてこの局面のコメントを入力' : currentComment,
@@ -630,7 +640,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       },
       child: Scaffold(
         backgroundColor: const Color(0XFFF1F1F5),
-        resizeToAvoidBottomInset: false, 
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -690,10 +700,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 children: [
                   _buildPlayerAndKomaDai(
                     playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
-                    isSente: _isReversed, 
+                    isSente: _isReversed,
                     isUpper: true,
                   ),
-                  
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: AspectRatio(
@@ -707,8 +716,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
                               isReversed: _isReversed,
                               selectedX: _selectedFile,
                               selectedY: _selectedRank,
-                              validMoves: (_selectedFile != null && _selectedRank != null) 
-                                  ? _getValidMoves(_selectedFile!, _selectedRank!) 
+                              validMoves: (_selectedFile != null && _selectedRank != null)
+                                  ? _getValidMoves(_selectedFile!, _selectedRank!)
                                   : (_selectedHandPiece != null)
                                       ? _getValidDropMoves(_selectedHandPiece!)
                                       : null,
@@ -718,21 +727,17 @@ class _KifEditorPageState extends State<KifEditorPage> {
                       ),
                     ),
                   ),
-
                   _buildPlayerAndKomaDai(
                     playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
                     isSente: !_isReversed,
                     isUpper: false,
                   ),
-                  
                   Expanded(
                     child: _buildCommentField(),
                   ),
-                  
                   _buildControlPanel(),
                 ],
               ),
-
               if (_isSidebarOpen)
                 Positioned.fill(
                   child: GestureDetector(
@@ -743,11 +748,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     ),
                   ),
                 ),
-
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
-                right: _isSidebarOpen ? 0 : -sidebarWidth, 
+                right: _isSidebarOpen ? 0 : -sidebarWidth,
                 top: 0,
                 bottom: 0,
                 width: sidebarWidth,
@@ -792,9 +796,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
                                   parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
                                   temp = parent;
                                 }
-                                
+
                                 _isSidebarOpen = false;
-                                _syncCommentFromCurrentNode(); 
+                                _syncCommentFromCurrentNode();
                               });
                             },
                             onNodeDeleted: (nodeToDelete) {
@@ -816,17 +820,17 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente, required bool isUpper}) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 48), 
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0), 
+      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
       child: Row(
         children: [
           if (isUpper) ...[
             _buildNameLabel(playerName, isSente),
-            const SizedBox(width: 8), 
+            const SizedBox(width: 8),
           ],
           Expanded(child: _buildPieceStand(isSente, isUpper)),
           if (!isUpper) ...[
-            const SizedBox(width: 8), 
+            const SizedBox(width: 8),
             _buildNameLabel(playerName, isSente),
           ],
         ],
@@ -834,7 +838,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  // 💡 修正: タップして対局者名を編集できるように InkWell & 編集用ダイアログ呼び出しを追加
   Widget _buildNameLabel(String name, bool isSente) {
     final String key = isSente ? '先手' : '後手';
 
@@ -849,7 +852,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
             Text(
               "${isSente ? '▲' : '△'}$name",
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), 
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
             const SizedBox(width: 2),
             Icon(Icons.edit, size: 12, color: Colors.grey[600]),
@@ -859,7 +862,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-// 💡 対局者名編集ダイアログ処理
   Future<void> _showEditPlayerNameDialog({required String key, required String currentName}) async {
     final controller = TextEditingController(
       text: (currentName == '先手' || currentName == '後手') ? '' : currentName,
@@ -901,11 +903,11 @@ class _KifEditorPageState extends State<KifEditorPage> {
       setState(() {
         final finalName = newName.isEmpty ? key : newName;
         kifTree!.info[key] = finalName;
-        _checkSaveStatus(); // 未保存フラグを更新
+        _checkSaveStatus();
       });
     }
   }
-  
+
   Widget _buildPieceStand(bool isSente, bool isUpper) {
     final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
     final assetPrefix = isUpper ? "w" : "b";
@@ -917,7 +919,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       );
     }
 
-    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi']; 
+    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi'];
 
     var sortedEntries = priorityOrder
         .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
@@ -933,9 +935,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
       spacing: 1.0,
       runSpacing: 1.0,
       children: sortedEntries.map((entry) {
-        final isSelected = _selectedHandPiece == entry.key && 
-                          ((kifTree!.currentNode.state.nextPlayer == Player.sente && isSente) ||
-                           (kifTree!.currentNode.state.nextPlayer == Player.gote && !isSente));
+        final isSelected = _selectedHandPiece == entry.key &&
+            ((kifTree!.currentNode.state.nextPlayer == Player.sente && isSente) ||
+                (kifTree!.currentNode.state.nextPlayer == Player.gote && !isSente));
 
         return GestureDetector(
           onTap: () {
@@ -944,7 +946,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 _selectedHandPiece = null;
               } else {
                 final currentPlayer = kifTree!.currentNode.state.nextPlayer;
-                if ((currentPlayer == Player.sente && isSente) || 
+                if ((currentPlayer == Player.sente && isSente) ||
                     (currentPlayer == Player.gote && !isSente)) {
                   _selectedHandPiece = entry.key;
                   _selectedFile = null;
@@ -1000,7 +1002,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
   Future<({String fileName, List<int> bytes})?> _prepareKifData() async {
     if (kifTree == null) return null;
 
-    final String kifContent = KifParser.encode(kifTree!); 
+    final String kifContent = KifParser.encode(kifTree!);
     final List<int> bytes = await CharsetConverter.encode("Shift_JIS", kifContent);
 
     final String fileName = "${DateTime.now().millisecondsSinceEpoch}.kif";
@@ -1043,8 +1045,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         );
         await KifDao().updateKif(updatedKif);
       }
-      
-      // 保存成功時に、その時点の最新テキストをキャッシュに上書き同期して「保存済み」にする
+
       setState(() {
         _lastSavedContent = KifParser.encode(kifTree!);
         _isSaved = true;
@@ -1164,9 +1165,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  /// 指定されたノードとその配下の手をツリーから削除する
   void _deleteGameNode(GameNode node) async {
-    // 親がいない（ルートノード/開始局面）場合は削除不可
     if (node.parent == null) return;
 
     final bool? confirm = await showDialog<bool>(
@@ -1193,20 +1192,16 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final parent = node.parent!;
 
     setState(() {
-      // 1. 親の nextNodes から該当ノードを削除（配下の子ノードも一括切り離し）
       parent.nextNodes.remove(node);
 
-      // 2. もし削除されたノード（またはその配下）に現在滞在していた場合、親ノードへ退避
       if (_isNodeOrDescendantCurrent(node)) {
         kifTree!.currentNode = parent;
       }
 
-      // 3. 選択肢インデックスの補正
       if (parent.selectedBranchIndex >= parent.nextNodes.length) {
         parent.selectedBranchIndex = (parent.nextNodes.length - 1).clamp(0, 999);
       }
 
-      // 4. 選択状態・コメント・保存状態の同期
       _selectedFile = null;
       _selectedRank = null;
       _selectedHandPiece = null;
@@ -1219,7 +1214,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
-  /// 対象ノードまたはその子孫ノードが現在地(currentNode)かどうか判定する
   bool _isNodeOrDescendantCurrent(GameNode targetNode) {
     GameNode? temp = kifTree?.currentNode;
     while (temp != null) {
