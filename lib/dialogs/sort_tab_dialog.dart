@@ -36,18 +36,68 @@ class _SortTabsDialogContentState extends State<SortTabsDialogContent> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('タブの並べ替え'),
+      title: const Text('タブの並び替え'),
       content: SizedBox(
         width: double.maxFinite,
-        height: 400,
+        height: 380,
         child: ReorderableListView.builder(
+          padding: EdgeInsets.zero,
           itemCount: tempTabs.length,
+          buildDefaultDragHandles: false, // デフォルトの長押し挙動を無効化
+          proxyDecorator: (child, index, animation) {
+            return AnimatedBuilder(
+              animation: animation,
+              builder: (context, child) {
+                return Material(
+                  elevation: 4,
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.grey.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: child,
+                  ),
+                );
+              },
+              child: child,
+            );
+          },
           itemBuilder: (context, index) {
             final tab = tempTabs[index];
-            return ListTile(
+            return Container(
               key: ValueKey(tab.id),
-              leading: const Icon(Icons.drag_handle),
-              title: Text(tab.title),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.grey.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                title: Text(
+                  tab.title,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                // ハンドル部分をタッチした瞬間にすぐドラッグを開始できるようにする
+                trailing: ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(
+                      Icons.drag_handle,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
             );
           },
           onReorder: (oldIndex, newIndex) {
