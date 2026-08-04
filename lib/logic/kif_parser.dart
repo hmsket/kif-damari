@@ -15,7 +15,7 @@ class KifParser {
     'um': '馬', 'ry': '龍'
   };
 
-  /// KIFラベルを日本語に変換する（同の判定用として前手の移動先 coordinates を受け取り可能）
+  /// KIFラベルを日本語に変換する
   static String convertToJapanese(
     String rawLabel, {
     int? lastToX,
@@ -39,7 +39,6 @@ class KifParser {
         final toY = int.parse(match.group(2)!);
         final piece = _codeToKanji[match.group(3)!] ?? '歩';
 
-        // 打つ位置が直前の手と同じ場所の場合
         final isSameSquare = (lastToX != null && lastToY != null) && (lastToX == toX && lastToY == toY);
         final squareLabel = isSameSquare ? '同' : "${_numToZen[toX]}${_numToKan[toY]}";
 
@@ -55,7 +54,6 @@ class KifParser {
       final pieceCode = match.group(5)!;
       final isPromotedAction = match.group(6)!.isNotEmpty;
 
-      // 💡 直前の手の移動先と同じマスなら「同」、違えば数字マス表記（「６四」など）
       final isSameSquare = (lastToX != null && lastToY != null) && (lastToX == toX && lastToY == toY);
       final squareLabel = isSameSquare ? '同' : "${_numToZen[toX]}${_numToKan[toY]}";
 
@@ -81,7 +79,9 @@ class KifParser {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty) continue;
 
-      if (trimmedLine.startsWith('*')) {
+      // 💡 コメント行の解析（' や * で始まる行）
+      if (trimmedLine.startsWith('*') || trimmedLine.startsWith("'")) {
+        // 指し手が進む前であれば rootNode (0手目) にコメントが追加されます
         currentNode.addComment(trimmedLine.substring(1));
         continue;
       }
@@ -102,7 +102,7 @@ class KifParser {
           }
           targetParent = targetParent.parent;
         }
-        
+
         if (!found) {
           GameNode backup = tree.root;
           for (int i = 0; i < targetParentMoveNum; i++) {
@@ -183,6 +183,11 @@ class KifParser {
       buffer.writeln('$key：$value');
     });
     buffer.writeln('手数----指手----消費時間--');
+
+    // 💡【追記】ルートノード（0手目 / 開始局面）のコメントを最初に出力する
+    for (var comment in tree.root.comments) {
+      buffer.writeln('*$comment');
+    }
 
     _writeNodes(buffer, tree.root.nextNodes, null, null);
 

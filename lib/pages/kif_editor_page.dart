@@ -47,7 +47,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isSidebarOpen = false;
   Offset _lastTapGlobalPosition = Offset.zero;
 
-  // 最後にファイルに書き込んだ、または読み込んだ時のKIFテキストの内容
+  // 最後にファイルに書き込んだ、または読み込んだ時の状態比較用文字列
   String _lastSavedContent = '';
   // 現在編集中の状態が保存された状態と一致しているか
   bool _isSaved = true;
@@ -67,6 +67,26 @@ class _KifEditorPageState extends State<KifEditorPage> {
     super.dispose();
   }
 
+  // 💡 パーサーに含まれない0手目コメント変更等も検知できるよう、全コメントも含めた状態文字列を生成
+  String _getExportContent() {
+    if (kifTree == null) return '';
+    final encoded = KifParser.encode(kifTree!);
+
+    final StringBuffer commentBuffer = StringBuffer();
+    void collectComments(GameNode node) {
+      if (node.comments.isNotEmpty) {
+        commentBuffer.write('node_${node.moveNumber}_${node.comments.join(",")}');
+      }
+      for (final child in node.nextNodes) {
+        collectComments(child);
+      }
+    }
+
+    collectComments(kifTree!.root);
+
+    return '$encoded\n__COMMENTS_HASH__:${commentBuffer.toString()}';
+  }
+
   // GameNodeの仕様（joinedComment）に合わせてコメントを同期
   void _syncCommentFromCurrentNode() {
     if (kifTree != null) {
@@ -77,7 +97,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
   // 現在のメモリ上の状態と、最後に保存された内容を比較してフラグを更新する
   void _checkSaveStatus() {
     if (kifTree == null) return;
-    final currentContent = KifParser.encode(kifTree!);
+    final currentContent = _getExportContent();
     _isSaved = currentContent == _lastSavedContent;
   }
 
@@ -86,7 +106,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     if (path == null || path.isEmpty) {
       setState(() {
         kifTree = KifTree.initial();
-        _lastSavedContent = KifParser.encode(kifTree!); // 初期状態を記憶
+        _lastSavedContent = _getExportContent(); // 初期状態を記憶
         _isSaved = true;
         _isLoading = false;
         _syncCommentFromCurrentNode();
@@ -111,7 +131,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
         setState(() {
           kifTree = tree;
-          _lastSavedContent = KifParser.encode(tree); // 読み込み時の状態を記憶
+          _lastSavedContent = _getExportContent(); // 読み込み時の状態を記憶
           _isSaved = true;
           _isLoading = false;
           _syncCommentFromCurrentNode();
@@ -123,7 +143,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       debugPrint("KIF解析エラー: $e");
       setState(() {
         kifTree = KifTree.initial();
-        _lastSavedContent = KifParser.encode(kifTree!);
+        _lastSavedContent = _getExportContent();
         _isSaved = true;
         _isLoading = false;
         _syncCommentFromCurrentNode();
@@ -131,22 +151,19 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
-// 💡 修正: 拡張子制限の不具合を回避するため FileType.any で開き、アプリ側で検証
   Future<void> _openLocalFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.any, // 💡 FileType.custom ではなく FileType.any に変更
+        type: FileType.any,
       );
 
       if (result == null || result.files.single.path == null) {
-        // キャンセルされた場合
         return;
       }
 
       final String filePath = result.files.single.path!;
       final extension = p.extension(filePath).toLowerCase();
 
-      // 💡 許可する拡張子のチェック
       const allowedExtensions = ['.kif', '.kifu', '.txt'];
       if (!allowedExtensions.contains(extension)) {
         if (mounted) {
@@ -178,7 +195,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        _checkSaveStatus();
+        _lastSavedContent = _getExportContent();
+        _isSaved = true;
       });
 
       if (mounted) {
@@ -212,7 +230,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        _checkSaveStatus();
+        _lastSavedContent = _getExportContent();
+        _isSaved = true;
       });
 
       if (mounted) {
@@ -640,13 +659,14 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   void _showCommentEditDialog() async {
-    final result = await showCommentEditDialog(context, kifTree!.currentNode.joinedComment);
+    final oldComment = kifTree!.currentNode.joinedComment;
+    final result = await showCommentEditDialog(context, oldComment);
     if (result != null) {
       setState(() {
         kifTree!.currentNode.comments.clear();
         kifTree!.currentNode.comments.addAll(result);
         _syncCommentFromCurrentNode();
-        _checkSaveStatus();
+        _checkSaveStatus(); // 💡 0手目の変更もハッシュ化文字列を通じて確実に未保存判定されます
       });
     }
   }
@@ -738,7 +758,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
             ],
           ),
           actions: [
-            // 💡 追記: ローカルのファイルを開くアイコンボタン
             IconButton(
               icon: const Icon(Icons.folder_open),
               tooltip: 'ファイルを開く',
@@ -1120,7 +1139,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
 
       setState(() {
-        _lastSavedContent = KifParser.encode(kifTree!);
+        _lastSavedContent = _getExportContent();
         _isSaved = true;
       });
 
