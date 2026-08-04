@@ -191,7 +191,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 削除モードのときはチェックボタンの左にキャンセルボタンを表示
+                    // 削除モードのときはキャンセルボタンを表示
                     if (_currentMode == AppMode.delete)
                       IconButton(
                         icon: const Icon(Icons.close, size: 30),
@@ -200,35 +200,43 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           _updateMode(AppMode.normal);
                         },
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.check, size: 30),
-                      onPressed: () async {
-                        if (_currentMode == AppMode.sort) {
-                          if (tabs.isEmpty) {
-                            _updateMode(AppMode.normal);
-                            return;
-                          }
-                          final currentTabId = tabs[_currentTabIndex].id;
-                          final state = _listKeys[currentTabId]?.currentState;
-                          
-                          if (state == null || state.isKifEmpty) {
-                            _updateMode(AppMode.normal);
-                            return;
-                          }
-                          
-                          await state.saveOrder();
-                          ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
-                          _updateMode(AppMode.normal);
-                        } else if (_currentMode == AppMode.delete) {
-                          if (tabs.isNotEmpty) {
-                            final currentTabId = tabs[_currentTabIndex].id;
-                            final state = _listKeys[currentTabId]?.currentState;
-                            if (state != null) {
-                              await state.deleteSelectedKifs();
+                    
+                    // チェックボタン（非表示のときもレイアウト上のスペースを維持するために Opacity を利用）
+                    Opacity(
+                      opacity: (_currentMode != AppMode.delete || hasSelection) ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: _currentMode == AppMode.delete && !hasSelection,
+                        child: IconButton(
+                          icon: const Icon(Icons.check, size: 30),
+                          onPressed: () async {
+                            if (_currentMode == AppMode.sort) {
+                              if (tabs.isEmpty) {
+                                _updateMode(AppMode.normal);
+                                return;
+                              }
+                              final currentTabId = tabs[_currentTabIndex].id;
+                              final state = _listKeys[currentTabId]?.currentState;
+                              
+                              if (state == null || state.isKifEmpty) {
+                                _updateMode(AppMode.normal);
+                                return;
+                              }
+                              
+                              await state.saveOrder();
+                              ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
+                              _updateMode(AppMode.normal);
+                            } else if (_currentMode == AppMode.delete) {
+                              if (tabs.isNotEmpty) {
+                                final currentTabId = tabs[_currentTabIndex].id;
+                                final state = _listKeys[currentTabId]?.currentState;
+                                if (state != null) {
+                                  await state.deleteSelectedKifs();
+                                }
+                              }
                             }
-                          }
-                        }
-                      },
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 )
