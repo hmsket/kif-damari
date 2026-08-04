@@ -605,7 +605,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
             ),
             menuChildren: [
               MenuItemButton(
-                leadingIcon: const Icon(Icons.edit, size: 20, color: Colors.brown),
+                leadingIcon: const Icon(Icons.edit, size: 20),
                 child: const Text('棋譜編集モードに切り替え'),
                 onPressed: () async {
                   // 💡 編集画面へ遷移し、戻り値（最新の KifEntity）を待つ
@@ -640,11 +640,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
                   Clipboard.setData(ClipboardData(text: _rawKifContent!));
                 },
               ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.image, size: 20),
-                child: const Text('局面画像を生成・保存'),
-                onPressed: () => _navigateToPreviewPage(),
-              ),
+              // MenuItemButton(
+              //   leadingIcon: const Icon(Icons.image, size: 20),
+              //   child: const Text('局面画像を生成・保存'),
+              //   onPressed: () => _navigateToPreviewPage(),
+              // ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.account_tree, size: 20),
                 child: const Text('棋譜ツリーを表示'),
