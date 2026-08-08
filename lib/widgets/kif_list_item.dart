@@ -26,7 +26,17 @@ class KifListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardWidget = Card(
+    Widget? trailingWidget;
+    if (mode == AppMode.edit) {
+      trailingWidget = const Icon(Icons.edit, color: Colors.green);
+    } else if (mode == AppMode.sort && index != null) {
+      trailingWidget = ReorderableDragStartListener(
+        index: index!,
+        child: Icon(Icons.drag_handle, color: Colors.grey),
+      );
+    }
+
+    return Card(
       color: Color(kif.color!),
       elevation: 0,
       clipBehavior: Clip.antiAlias,
@@ -42,7 +52,7 @@ class KifListItem extends StatelessWidget {
             }
           } else if (mode == AppMode.edit) {
             showEditKifDialog(context, kif, onRefresh);
-          } else {
+          } else if (mode == AppMode.normal) {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -71,24 +81,12 @@ class KifListItem extends StatelessWidget {
                 title: kif.title,
                 detail: kif.detail,
                 imgPath: kif.imgPath,
-                trailing: switch (mode) {
-                  AppMode.delete => null,
-                  AppMode.edit => const Icon(Icons.edit, color: Colors.green),
-                  AppMode.sort => const Icon(Icons.drag_handle, color: Colors.grey),
-                  AppMode.normal => null,
-                },
+                trailing: trailingWidget,
               ),
             ),
           ],
         ),
       ),
     );
-    if (mode == AppMode.sort && index != null) {
-      return ReorderableDragStartListener(
-        index: index!,
-        child: cardWidget,
-      );
-    }
-    return cardWidget;
   }
 }

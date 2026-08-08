@@ -70,27 +70,30 @@ class _SortTabsDialogContentState extends State<SortTabsDialogContent> {
           },
           itemBuilder: (context, index) {
             final tab = tempTabs[index];  
-            return ReorderableDragStartListener(
+            return Container(
               key: ValueKey(tab.id),
-              index: index,
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Colors.grey.withOpacity(0.3),
-                      width: 1,
-                    ),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.grey.withOpacity(0.3),
+                    width: 1,
                   ),
                 ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  title: Text(
-                    tab.title,
-                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  ),
-                  trailing: const Icon(
-                    Icons.drag_handle,
-                    color: Colors.grey,
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                title: Text(
+                  tab.title,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                trailing: ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(
+                      Icons.drag_handle,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               ),
