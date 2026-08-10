@@ -531,200 +531,253 @@ class _KifEditorPageState extends State<KifEditorPage> {
   Widget _buildControlPanel() {
     return Container(
       color: const Color(0XFFF1F1F5),
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          IconButton(
-            icon: const Icon(Icons.first_page),
-            onPressed: () => setState(() {
-              kifTree!.jumpTo(0);
-              _selectedFile = null;
-              _selectedRank = null;
-              _selectedHandPiece = null;
-              _syncCommentFromCurrentNode();
-            }),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            iconSize: 36,
-            onPressed: () => setState(() {
-              kifTree!.stepBack();
-              _selectedFile = null;
-              _selectedRank = null;
-              _selectedHandPiece = null;
-              _syncCommentFromCurrentNode();
-            }),
-          ),
-          GestureDetector(
-            onVerticalDragUpdate: (details) {
-              _dragDistance += details.delta.dy;
-              const double threshold = 10.0;
-              if (_dragDistance <= -threshold) {
-                setState(() {
-                  kifTree!.stepNext();
-                  _dragDistance = 0;
+          // 1. 最初の手へ移動ボタン
+          Expanded(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.first_page),
+                onPressed: () => setState(() {
+                  kifTree!.jumpTo(0);
                   _selectedFile = null;
                   _selectedRank = null;
                   _selectedHandPiece = null;
                   _syncCommentFromCurrentNode();
-                });
-              } else if (_dragDistance >= threshold) {
-                setState(() {
+                }),
+              ),
+            ),
+          ),
+
+          // 2. 1手戻るボタン
+          Expanded(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.chevron_left),
+                iconSize: 36,
+                onPressed: () => setState(() {
                   kifTree!.stepBack();
-                  _dragDistance = 0;
                   _selectedFile = null;
                   _selectedRank = null;
                   _selectedHandPiece = null;
                   _syncCommentFromCurrentNode();
-                });
-              }
-            },
-            onVerticalDragEnd: (_) => _dragDistance = 0,
-            child: SizedBox(
-              width: 90,
-              child: Builder(
-                builder: (context) {
-                  final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
+                }),
+              ),
+            ),
+          ),
 
-                  final rawLabel = kifTree!.currentNode.moveLabel;
-                  final parentState = kifTree!.currentNode.parent?.state;
-                  final displayLabel = rawLabel != null && rawLabel.isNotEmpty
-                      ? KifParser.convertToJapanese(
-                          rawLabel,
-                          lastToX: parentState?.lastMoveToX,
-                          lastToY: parentState?.lastMoveToY,
-                        )
-                      : '開始局面';
+          // 3. 中央の手数表示枠（最大幅90pxまで可変＆文字縮小対応）
+          Expanded(
+            flex: 3,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 90),
+              child: GestureDetector(
+                onVerticalDragUpdate: (details) {
+                  _dragDistance += details.delta.dy;
+                  const double threshold = 10.0;
+                  if (_dragDistance <= -threshold) {
+                    setState(() {
+                      kifTree!.stepNext();
+                      _dragDistance = 0;
+                      _selectedFile = null;
+                      _selectedRank = null;
+                      _selectedHandPiece = null;
+                      _syncCommentFromCurrentNode();
+                    });
+                  } else if (_dragDistance >= threshold) {
+                    setState(() {
+                      kifTree!.stepBack();
+                      _dragDistance = 0;
+                      _selectedFile = null;
+                      _selectedRank = null;
+                      _selectedHandPiece = null;
+                      _syncCommentFromCurrentNode();
+                    });
+                  }
+                },
+                onVerticalDragEnd: (_) => _dragDistance = 0,
+                child: Builder(
+                  builder: (context) {
+                    final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
 
-                  return GestureDetector(
-                    onTap: () {
+                    final rawLabel = kifTree!.currentNode.moveLabel;
+                    final parentState = kifTree!.currentNode.parent?.state;
+                    final displayLabel = rawLabel != null && rawLabel.isNotEmpty
+                        ? KifParser.convertToJapanese(
+                            rawLabel,
+                            lastToX: parentState?.lastMoveToX,
+                            lastToY: parentState?.lastMoveToY,
+                          )
+                        : '開始局面';
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isSidebarOpen = true;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: hasBranch ? Colors.orange[100] : Colors.white,
+                          border: Border.all(
+                            color: hasBranch ? Colors.orange[700]! : Colors.black45,
+                            width: hasBranch ? 2.0 : 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${kifTree!.currentNode.moveNumber}手目',
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.normal,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    displayLabel,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.black,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (hasBranch)
+                                const Positioned(
+                                  top: -2,
+                                  right: 0,
+                                  child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+
+          // 4. 1手進むボタン
+          Expanded(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.chevron_right),
+                iconSize: 36,
+                onPressed: () => setState(() {
+                  kifTree!.stepNext();
+                  _selectedFile = null;
+                  _selectedRank = null;
+                  _selectedHandPiece = null;
+                  _syncCommentFromCurrentNode();
+                }),
+              ),
+            ),
+          ),
+
+          // 5. 最後の手に移動ボタン
+          Expanded(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.last_page),
+                onPressed: () => setState(() {
+                  kifTree!.jumpTo(kifTree!.totalMoveCount);
+                  _selectedFile = null;
+                  _selectedRank = null;
+                  _selectedHandPiece = null;
+                  _syncCommentFromCurrentNode();
+                }),
+              ),
+            ),
+          ),
+
+          // 6. メニュー（三点リーダー）
+          Expanded(
+            flex: 2,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: MenuAnchor(
+                alignmentOffset: const Offset(0, 0),
+                style: MenuStyle(
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  elevation: WidgetStateProperty.all(8),
+                ),
+                menuChildren: [
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.folder_open, size: 20),
+                    child: const Text('棋譜ファイルを開く'),
+                    onPressed: _openLocalFile,
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.content_paste, size: 20),
+                    child: const Text('クリップボードから貼り付け'),
+                    onPressed: _pasteFromClipboard,
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.share, size: 20),
+                    child: const Text('棋譜を共有する'),
+                    onPressed: _shareKifData,
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.save, size: 20),
+                    child: const Text('保存する'),
+                    onPressed: _saveKifData,
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.account_tree, size: 20),
+                    child: const Text('棋譜ツリーを表示'),
+                    onPressed: () {
                       setState(() {
                         _isSidebarOpen = true;
                       });
                     },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: hasBranch ? Colors.orange[100] : Colors.white,
-                        border: Border.all(
-                          color: hasBranch ? Colors.orange[700]! : Colors.black45,
-                          width: hasBranch ? 2.0 : 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${kifTree!.currentNode.moveNumber}手目',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.normal,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                displayLabel,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.black,
-                                  height: 1.1,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (hasBranch)
-                            const Positioned(
-                              top: -2,
-                              right: 0,
-                              child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
-                            ),
-                        ],
-                      ),
-                    ),
+                  ),
+                ],
+                builder: (BuildContext context, MenuController controller, Widget? child) {
+                  return IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
                   );
                 },
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            iconSize: 36,
-            onPressed: () => setState(() {
-              kifTree!.stepNext();
-              _selectedFile = null;
-              _selectedRank = null;
-              _selectedHandPiece = null;
-              _syncCommentFromCurrentNode();
-            }),
-          ),
-          IconButton(
-            icon: const Icon(Icons.last_page),
-            onPressed: () => setState(() {
-              kifTree!.jumpTo(kifTree!.totalMoveCount);
-              _selectedFile = null;
-              _selectedRank = null;
-              _selectedHandPiece = null;
-              _syncCommentFromCurrentNode();
-            }),
-          ),
-          MenuAnchor(
-            alignmentOffset: const Offset(0, 0),
-            style: MenuStyle(
-              shape: WidgetStateProperty.all(
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              elevation: WidgetStateProperty.all(8),
-            ),
-            menuChildren: [
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.folder_open, size: 20),
-                child: const Text('棋譜ファイルを開く'),
-                onPressed: _openLocalFile,
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.content_paste, size: 20),
-                child: const Text('クリップボードから貼り付け'),
-                onPressed: _pasteFromClipboard,
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.share, size: 20),
-                child: const Text('棋譜を共有する'),
-                onPressed: _shareKifData,
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.save, size: 20),
-                child: const Text('保存する'),
-                onPressed: _saveKifData,
-              ),
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.account_tree, size: 20),
-                child: const Text('棋譜ツリーを表示'),
-                onPressed: () {
-                  setState(() {
-                    _isSidebarOpen = true;
-                  });
-                },
-              ),
-            ],
-            builder: (BuildContext context, MenuController controller, Widget? child) {
-              return IconButton(
-                icon: const Icon(Icons.more_vert),
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
-                  }
-                },
-              );
-            },
           ),
         ],
       ),
@@ -804,7 +857,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
             },
           ),
           backgroundColor: const Color(0XFFFFFFFF),
-          // titleSpacing: 0,
           title: Row(
             children: [
               FittedBox(
