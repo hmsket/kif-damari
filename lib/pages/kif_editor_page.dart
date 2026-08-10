@@ -100,7 +100,12 @@ class _KifEditorPageState extends State<KifEditorPage> {
   void _checkSaveStatus() {
     if (kifTree == null) return;
     final currentContent = _getExportContent();
-    _isSaved = currentContent == _lastSavedContent;
+    // 💡 _lastSavedContent が空（未保存の新規読み込み状態等）の場合は未保存状態（false）を維持
+    if (_lastSavedContent.isEmpty) {
+      _isSaved = false;
+    } else {
+      _isSaved = currentContent == _lastSavedContent;
+    }
   }
 
   Future<void> _initKifData() async {
@@ -209,8 +214,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        _lastSavedContent = _getExportContent();
-        _isSaved = true;
+        // 💡 外部棋譜読み込み時は保存比較文字列をクリアし、明確に未保存(false)にする
+        _lastSavedContent = '';
+        _isSaved = false;
       });
 
       if (mounted) {
@@ -244,8 +250,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        _lastSavedContent = _getExportContent();
-        _isSaved = true;
+        // 💡 クリップボード貼り付け時も同様に未保存(false)にする
+        _lastSavedContent = '';
+        _isSaved = false;
       });
 
       if (mounted) {
@@ -687,15 +694,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 onPressed: _pasteFromClipboard,
               ),
               MenuItemButton(
-                leadingIcon: const Icon(Icons.account_tree, size: 20),
-                child: const Text('棋譜ツリーを表示'),
-                onPressed: () {
-                  setState(() {
-                    _isSidebarOpen = true;
-                  });
-                },
-              ),
-              MenuItemButton(
                 leadingIcon: const Icon(Icons.share, size: 20),
                 child: const Text('棋譜を共有する'),
                 onPressed: _shareKifData,
@@ -704,6 +702,15 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 leadingIcon: const Icon(Icons.save, size: 20),
                 child: const Text('保存する'),
                 onPressed: _saveKifData,
+              ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.account_tree, size: 20),
+                child: const Text('棋譜ツリーを表示'),
+                onPressed: () {
+                  setState(() {
+                    _isSidebarOpen = true;
+                  });
+                },
               ),
             ],
             builder: (BuildContext context, MenuController controller, Widget? child) {
@@ -732,7 +739,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         kifTree!.currentNode.comments.clear();
         kifTree!.currentNode.comments.addAll(result);
         _syncCommentFromCurrentNode();
-        _checkSaveStatus(); // 💡 0手目の変更もハッシュ化文字列を通じて確実に未保存判定されます
+        _checkSaveStatus();
       });
     }
   }
