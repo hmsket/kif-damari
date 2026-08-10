@@ -605,16 +605,26 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 leadingIcon: const Icon(Icons.edit, size: 20),
                 child: const Text('棋譜を編集する'),
                 onPressed: () async {
-                  // 💡 現在閲覧中の手数を取得
                   final currentMove = kifTree?.currentNode.moveNumber ?? 0;
 
-                  // 💡 手数を initialMoveNumber として編集画面へ渡す
+                  final List<int> branchPath = [];
+                  GameNode? temp = kifTree?.currentNode;
+                  while (temp != null && temp.parent != null) {
+                    final parent = temp.parent!;
+                    final index = parent.nextNodes.indexOf(temp);
+                    if (index != -1) {
+                      branchPath.insert(0, index); // 親から子への順番にするため先頭に挿入
+                    }
+                    temp = parent;
+                  }
+
                   final updatedEntity = await Navigator.push<KifEntity>(
                     context,
                     MaterialPageRoute(
                       builder: (context) => KifEditorPage(
                         kifEntity: _currentKifEntity,
                         initialMoveNumber: currentMove,
+                        initialBranchPath: branchPath,
                       ),
                     ),
                   );
@@ -627,9 +637,21 @@ class _KifViewerPageState extends State<KifViewerPage> {
                       }
                     });
                     await _initKifData();
-                    
-                    // 💡 編集から戻った際にも同じ手数を表示したい場合はジャンプ
-                    kifTree?.jumpTo(currentMove);
+
+                    if (kifTree != null && branchPath.isNotEmpty) {
+                      GameNode nodeTemp = kifTree!.root;
+                      for (final idx in branchPath) {
+                        if (idx >= 0 && idx < nodeTemp.nextNodes.length) {
+                          nodeTemp.selectedBranchIndex = idx;
+                          nodeTemp = nodeTemp.nextNodes[idx];
+                        } else {
+                          break;
+                        }
+                      }
+                      kifTree!.currentNode = nodeTemp;
+                    } else {
+                      kifTree?.jumpTo(currentMove);
+                    }
                   }
                 },
               ),

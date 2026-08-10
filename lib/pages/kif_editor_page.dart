@@ -22,12 +22,14 @@ import 'package:share_plus/share_plus.dart';
 
 class KifEditorPage extends StatefulWidget {
   final KifEntity kifEntity;
-  final int initialMoveNumber; // 💡 再生画面からの初期表示手数を引き継ぐ
+  final int initialMoveNumber;
+  final List<int>? initialBranchPath;
 
   const KifEditorPage({
     super.key,
     required this.kifEntity,
-    this.initialMoveNumber = 0, // 💡 デフォルトは0手目（開始局面）
+    this.initialMoveNumber = 0,
+    this.initialBranchPath,
   });
 
   @override
@@ -126,12 +128,24 @@ class _KifEditorPageState extends State<KifEditorPage> {
         }
         final tree = KifParser.decode(content);
 
-        // 💡 遷移元から渡された手数（56手目など）にジャンプする
-        tree.jumpTo(widget.initialMoveNumber);
+        if (widget.initialBranchPath != null && widget.initialBranchPath!.isNotEmpty) {
+          GameNode temp = tree.root;
+          for (final branchIndex in widget.initialBranchPath!) {
+            if (branchIndex >= 0 && branchIndex < temp.nextNodes.length) {
+              temp.selectedBranchIndex = branchIndex;
+              temp = temp.nextNodes[branchIndex];
+            } else {
+              break;
+            }
+          }
+          tree.currentNode = temp;
+        } else {
+          tree.jumpTo(widget.initialMoveNumber);
+        }
 
         setState(() {
           kifTree = tree;
-          _lastSavedContent = _getExportContent(); // 読み込み時の状態を記憶
+          _lastSavedContent = _getExportContent();
           _isSaved = true;
           _isLoading = false;
           _syncCommentFromCurrentNode();
