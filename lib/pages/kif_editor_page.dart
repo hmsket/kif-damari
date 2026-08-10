@@ -1189,72 +1189,82 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
     final String promotedPieceAsset = '$prefix$promotedPieceType';
 
-    return showMenu<bool>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        tapPosition.dx - 60,
-        tapPosition.dy - 100,
-        tapPosition.dx + 60,
-        tapPosition.dy,
-      ),
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      items: [
-        PopupMenuItem<bool>(
-          enabled: false,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              InkWell(
-                onTap: () => Navigator.of(context).pop(true),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Image.asset(
-                          'assets/images/pieces/$promotedPieceAsset.png',
-                          fit: BoxFit.contain,
+  return showGeneralDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.transparent, // 背景を暗くしたくない場合は transparent
+    transitionDuration: Duration.zero, // ★ アニメーション時間を0にしてパッと表示
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return Stack(
+        children: [
+          Positioned(
+            left: tapPosition.dx - 60,
+            top: tapPosition.dy - 100,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(8),
+              clipBehavior: Clip.antiAlias,
+              child: Container(
+                color: Theme.of(context).cardColor,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(true),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Image.asset(
+                                'assets/images/pieces/$promotedPieceAsset.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text('成', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      const Text('成', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => Navigator.of(context).pop(false),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Image.asset(
-                          'assets/images/pieces/$normalPieceAsset.png',
-                          fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(false),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Image.asset(
+                                'assets/images/pieces/$normalPieceAsset.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text('不成', style: TextStyle(fontSize: 11, color: Colors.black87)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      const Text('不成', style: TextStyle(fontSize: 11, color: Colors.black87)),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    },
+  );
   }
 
   void _deleteGameNode(GameNode node) async {
