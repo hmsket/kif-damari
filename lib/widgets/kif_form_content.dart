@@ -171,30 +171,6 @@ class _KifFormContentState extends State<KifFormContent> {
                 }).toList(),
               ),
               const SizedBox(height: 20),
-              InputDecorator(
-                decoration: InputDecoration(
-                  labelText: '棋譜ファイル',
-                  errorText: widget.errorMessage,
-                  suffixIcon: Padding(
-                    padding: const EdgeInsets.only(right: 8.0, top: 4.0, bottom: 4.0),
-                    child: ElevatedButton(
-                      onPressed: _pickKifFile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                      ),
-                      child: const Text('選択', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ),
-                child: Text(
-                  _fileNameDisplay,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  softWrap: false,
-                ),
-              ),
-              const SizedBox(height: 20),
               DropdownMenu<int>(
                 label: const Text('色'),
                 menuHeight: 300,
