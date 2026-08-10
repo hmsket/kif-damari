@@ -4,6 +4,7 @@ import 'package:charset_converter/charset_converter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
@@ -12,12 +13,14 @@ import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class KifEditorPage extends StatefulWidget {
   final KifEntity kifEntity;
@@ -786,29 +789,42 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   Widget _buildCommentField() {
+    final settings = AppSettings();
     final String currentComment = kifTree!.currentNode.joinedComment;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: InkWell(
-        onTap: _showCommentEditDialog,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: double.infinity,
-            child: SingleChildScrollView(
-              child: Text(
-                currentComment.isEmpty ? 'タップしてこの局面のコメントを入力' : currentComment,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: currentComment.isEmpty ? Colors.grey[400] : Colors.black87,
-                  height: 1.4,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _showCommentEditDialog,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: SizedBox(
+              width: double.infinity,
+              height: double.infinity,
+              // IgnorePointer で内部のテキスト選択やリンクのタップを無効化し、InkWell のタップを確実に拾わせます
+              child: IgnorePointer(
+                child: SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(), // 無駄なスクロールを抑制
+                  child: Text(
+                    currentComment.isEmpty ? 'タップしてこの局面のコメントを入力' : currentComment,
+                    style: TextStyle(
+                      fontSize: settings.get<double>('fontSize'),
+                      color: currentComment.isEmpty ? Colors.grey[400] : Colors.black87,
+                    ),
+                    strutStyle: StrutStyle(
+                      fontSize: settings.get<double>('fontSize'),
+                      height: 1.5,
+                      forceStrutHeight: true,
+                    ),
+                  ),
                 ),
               ),
             ),
