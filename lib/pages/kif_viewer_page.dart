@@ -18,6 +18,7 @@ import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/logic/diagram_generator.dart';
 import 'package:kifdamari/logic/thumbnail_manager.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -131,6 +132,30 @@ class _KifViewerPageState extends State<KifViewerPage> {
       }
     } catch (e) {
       ShowErrorSnackbar.show(context, "サムネイルの更新に失敗しました");
+    }
+  }
+
+  Future<void> _shareKifData() async {
+    if (kifTree == null) return;
+
+    try {
+      final String kifContent = KifParser.encode(kifTree!);
+      final List<int> bytes = await CharsetConverter.encode("Shift_JIS", kifContent);
+
+      final tempDir = await getTemporaryDirectory();
+      final String fileName = "${_currentKifEntity.title.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : _currentKifEntity.title}.kif";
+      final tempFile = File(p.join(tempDir.path, fileName));
+      await tempFile.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        subject: _currentKifEntity.title.isEmpty ? fileName : _currentKifEntity.title,
+      );
+    } catch (e) {
+      debugPrint("KIF共有エラー: $e");
+      if (mounted) {
+        ShowErrorSnackbar.show(context, "棋譜の共有に失敗しました");
+      }
     }
   }
 
@@ -515,7 +540,7 @@ class _KifViewerPageState extends State<KifViewerPage> {
             ),
           ),
 
-          // 3. 中央の手数表示枠（最大幅90pxまで可変＆内部テキストの自動縮小対応）
+          // 3. 中央の手数表示枠
           Expanded(
             flex: 3,
             child: Container(
@@ -701,6 +726,11 @@ class _KifViewerPageState extends State<KifViewerPage> {
                         }
                       }
                     },
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.share, size: 20),
+                    child: const Text('棋譜ファイルを共有'),
+                    onPressed: _shareKifData,
                   ),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.collections, size: 20),

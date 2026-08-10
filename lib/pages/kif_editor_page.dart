@@ -18,7 +18,6 @@ import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 class KifEditorPage extends StatefulWidget {
   final KifEntity kifEntity;
@@ -69,7 +68,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     super.dispose();
   }
 
-  // 💡 パーサーに含まれない0手目コメント変更等も検知できるよう、全コメントも含めた状態文字列を生成
   String _getExportContent() {
     if (kifTree == null) return '';
     final encoded = KifParser.encode(kifTree!);
@@ -89,18 +87,15 @@ class _KifEditorPageState extends State<KifEditorPage> {
     return '$encoded\n__COMMENTS_HASH__:${commentBuffer.toString()}';
   }
 
-  // GameNodeの仕様（joinedComment）に合わせてコメントを同期
   void _syncCommentFromCurrentNode() {
     if (kifTree != null) {
       _commentController.text = kifTree!.currentNode.joinedComment;
     }
   }
 
-  // 現在のメモリ上の状態と、最後に保存された内容を比較してフラグを更新する
   void _checkSaveStatus() {
     if (kifTree == null) return;
     final currentContent = _getExportContent();
-    // 💡 _lastSavedContent が空（未保存の新規読み込み状態等）の場合は未保存状態（false）を維持
     if (_lastSavedContent.isEmpty) {
       _isSaved = false;
     } else {
@@ -113,7 +108,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     if (path == null || path.isEmpty) {
       setState(() {
         kifTree = KifTree.initial();
-        _lastSavedContent = _getExportContent(); // 初期状態を記憶
+        _lastSavedContent = _getExportContent();
         _isSaved = true;
         _isLoading = false;
         _syncCommentFromCurrentNode();
@@ -214,7 +209,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        // 💡 外部棋譜読み込み時は保存比較文字列をクリアし、明確に未保存(false)にする
         _lastSavedContent = '';
         _isSaved = false;
       });
@@ -250,7 +244,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        // 💡 クリップボード貼り付け時も同様に未保存(false)にする
         _lastSavedContent = '';
         _isSaved = false;
       });
@@ -573,7 +566,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
             ),
           ),
 
-          // 3. 中央の手数表示枠（最大幅90pxまで可変＆文字縮小対応）
+          // 3. 中央の手数表示枠
           Expanded(
             flex: 3,
             child: Container(
@@ -744,11 +737,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     onPressed: _pasteFromClipboard,
                   ),
                   MenuItemButton(
-                    leadingIcon: const Icon(Icons.share, size: 20),
-                    child: const Text('棋譜を共有する'),
-                    onPressed: _shareKifData,
-                  ),
-                  MenuItemButton(
                     leadingIcon: const Icon(Icons.save, size: 20),
                     child: const Text('保存する'),
                     onPressed: _saveKifData,
@@ -849,7 +837,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       child: Scaffold(
         backgroundColor: const Color(0XFFF1F1F5),
         resizeToAvoidBottomInset: false,
-appBar: AppBar(
+        appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
@@ -1284,24 +1272,6 @@ appBar: AppBar(
     }
   }
 
-  Future<void> _shareKifData() async {
-    final kifData = await _prepareKifData();
-    if (kifData == null) return;
-
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File(p.join(tempDir.path, kifData.fileName));
-      await tempFile.writeAsBytes(kifData.bytes, flush: true);
-
-      await Share.shareXFiles(
-        [XFile(tempFile.path)],
-        subject: widget.kifEntity.title.isEmpty ? "${DateTime.now().millisecondsSinceEpoch}.kif" : widget.kifEntity.title,
-      );
-    } catch (e) {
-      debugPrint("KIF共有エラー: $e");
-    }
-  }
-
   Future<bool?> _showPromotionMenu(BuildContext context, String movingPiece, Offset tapPosition) {
     final isSente = movingPiece.startsWith('b');
     final String prefix = isSente ? 'b' : 'w';
@@ -1320,82 +1290,82 @@ appBar: AppBar(
     }
     final String promotedPieceAsset = '$prefix$promotedPieceType';
 
-  return showGeneralDialog<bool>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.transparent, // 背景を暗くしたくない場合は transparent
-    transitionDuration: Duration.zero, // ★ アニメーション時間を0にしてパッと表示
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return Stack(
-        children: [
-          Positioned(
-            left: tapPosition.dx - 60,
-            top: tapPosition.dy - 100,
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(8),
-              clipBehavior: Clip.antiAlias,
-              child: Container(
-                color: Theme.of(context).cardColor,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    InkWell(
-                      onTap: () => Navigator.of(context).pop(true),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: Image.asset(
-                                'assets/images/pieces/$promotedPieceAsset.png',
-                                fit: BoxFit.contain,
+    return showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.transparent,
+      transitionDuration: Duration.zero,
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Stack(
+          children: [
+            Positioned(
+              left: tapPosition.dx - 60,
+              top: tapPosition.dy - 100,
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
+                child: Container(
+                  color: Theme.of(context).cardColor,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      InkWell(
+                        onTap: () => Navigator.of(context).pop(true),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: Image.asset(
+                                  'assets/images/pieces/$promotedPieceAsset.png',
+                                  fit: BoxFit.contain,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text('成', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
-                          ],
+                              const SizedBox(height: 4),
+                              const Text('成', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange)),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () => Navigator.of(context).pop(false),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: Image.asset(
-                                'assets/images/pieces/$normalPieceAsset.png',
-                                fit: BoxFit.contain,
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => Navigator.of(context).pop(false),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: Image.asset(
+                                  'assets/images/pieces/$normalPieceAsset.png',
+                                  fit: BoxFit.contain,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text('不成', style: TextStyle(fontSize: 11, color: Colors.black87)),
-                          ],
+                              const SizedBox(height: 4),
+                              const Text('不成', style: TextStyle(fontSize: 11, color: Colors.black87)),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      );
-    },
-  );
+          ],
+        );
+      },
+    );
   }
 
   void _deleteGameNode(GameNode node) async {
