@@ -67,7 +67,7 @@ class KifRewardSetting extends StatelessWidget {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('動画広告を最後まで視聴すると、追加できる棋譜の上限数が1つ増えます。'),
+                  Text('動画広告を最後まで視聴すると、追加できる棋譜の上限数が${addKifLimit}つ増えます。'),
                   if (!isReady) ...[
                     const SizedBox(height: 16),
                     const SizedBox(
@@ -111,12 +111,12 @@ class KifRewardSetting extends StatelessWidget {
       onRewardEarned: () {
         final rawValue = settings.get('kifLimit');
         final currentLimit = (rawValue ?? defaultKifLimit) as int;
-        final newLimit = currentLimit + 1;
+        final newLimit = currentLimit + addKifLimit;
         
         settings.set('kifLimit', newLimit);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('棋譜の上限数が $newLimit に増えました！')),
+          SnackBar(content: Text('棋譜の上限数が $newLimit に増えました')),
         );
       },
       onFailed: () {
