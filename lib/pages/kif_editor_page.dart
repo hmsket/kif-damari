@@ -1040,45 +1040,180 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
-  Widget _buildPlayerAndKomaDai({required String playerName, required bool isSente, required bool isUpper}) {
+  Widget _buildPlayerAndKomaDai({
+    required String playerName,
+    required bool isSente,
+    required bool isUpper,
+  }) {
     return Container(
       constraints: const BoxConstraints(minHeight: 48),
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
       child: Row(
         children: [
-          if (isUpper) ...[
-            _buildNameLabel(playerName, isSente),
-            const SizedBox(width: 8),
-          ],
-          Expanded(child: _buildPieceStand(isSente, isUpper)),
-          if (!isUpper) ...[
-            const SizedBox(width: 8),
-            _buildNameLabel(playerName, isSente),
+          if (isSente) ...[
+            Expanded(
+              flex: 2,
+              child: _buildPieceStand7Slots(isSente, isUpper),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 1,
+              child: _buildNameLabel(playerName, isSente, Alignment.centerRight),
+            ),
+          ] else ...[
+            Expanded(
+              flex: 1,
+              child: _buildNameLabel(playerName, isSente, Alignment.centerLeft),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: _buildPieceStand7Slots(isSente, isUpper),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildNameLabel(String name, bool isSente) {
+  Widget _buildPieceStand7Slots(bool isSente, bool isUpper) {
+    final hand = isSente
+        ? kifTree!.currentNode.state.senteHand
+        : kifTree!.currentNode.state.goteHand;
+    final assetPrefix = isUpper ? "w" : "b";
+
+    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi'];
+
+    final activeEntries = priorityOrder
+        .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
+        .map((key) => MapEntry(key, hand[key]!))
+        .toList();
+
+    final List<MapEntry<String, int>?> slots = List.filled(7, null);
+
+    if (isSente) {
+      for (int i = 0; i < activeEntries.length; i++) {
+        slots[i] = activeEntries[i];
+      }
+    } else {
+      final reversedEntries = activeEntries.reversed.toList();
+      for (int i = 0; i < reversedEntries.length; i++) {
+        slots[6 - i] = reversedEntries[i];
+      }
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: slots.map((entry) {
+        if (entry == null) {
+          return const Expanded(flex: 1, child: SizedBox.shrink());
+        }
+
+        final isSelected = _selectedHandPiece == entry.key &&
+            ((kifTree!.currentNode.state.nextPlayer == Player.sente && isSente) ||
+                (kifTree!.currentNode.state.nextPlayer == Player.gote && !isSente));
+
+        return Expanded(
+          flex: 1,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double size = constraints.maxWidth.clamp(16.0, 32.0);
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedHandPiece = null;
+                    } else {
+                      final currentPlayer = kifTree!.currentNode.state.nextPlayer;
+                      if ((currentPlayer == Player.sente && isSente) ||
+                          (currentPlayer == Player.gote && !isSente)) {
+                        _selectedHandPiece = entry.key;
+                        _selectedFile = null;
+                        _selectedRank = null;
+                      }
+                    }
+                  });
+                },
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.orange.withOpacity(0.4) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Image.asset(
+                          'assets/images/pieces/$assetPrefix${entry.key}.png',
+                          width: size,
+                          height: size,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      if (entry.value > 1)
+                        Positioned(
+                          right: -1,
+                          bottom: -1,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2,
+                              vertical: 0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${entry.value}',
+                              style: TextStyle(
+                                fontSize: (size * 0.45).clamp(9.0, 12.0),
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildNameLabel(String name, bool isSente, Alignment alignment) {
     final String key = isSente ? '先手' : '後手';
 
-    return InkWell(
-      onTap: () => _showEditPlayerNameDialog(key: key, currentName: name),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "${isSente ? '▲' : '△'}$name",
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+    return Align(
+      alignment: alignment,
+      child: InkWell(
+        onTap: () => _showEditPlayerNameDialog(key: key, currentName: name),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 2.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "${isSente ? '▲' : '△'}$name",
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.edit, size: 12, color: Colors.grey[600]),
+              ],
             ),
-            const SizedBox(width: 2),
-            Icon(Icons.edit, size: 12, color: Colors.grey[600]),
-          ],
+          ),
         ),
       ),
     );
