@@ -745,52 +745,137 @@ class _KifEditorPageState extends State<KifEditorPage> {
             },
           ),
           backgroundColor: const Color(0XFFFFFFFF),
+          // titleSpacing: 0,
           title: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                widget.kifEntity.title.isEmpty ? '棋譜編集' : widget.kifEntity.title,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(width: 8),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _isSaved ? Colors.green[600] : Colors.red[600],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  _isSaved ? '保存済み' : '未保存',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _isSaved ? Colors.green[600] : Colors.red[600],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _isSaved ? '保存済み' : '未保存',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.folder_open),
-              tooltip: 'ファイルを開く',
-              onPressed: _openLocalFile,
-            ),
-            IconButton(
-              icon: const Icon(Icons.content_paste),
-              tooltip: 'クリップボードから貼り付け',
-              onPressed: _pasteFromClipboard,
-            ),
-            IconButton(
-              icon: const Icon(Icons.share),
-              tooltip: '共有',
-              onPressed: _shareKifData,
-            ),
-            IconButton(
-              icon: const Icon(Icons.save),
-              tooltip: 'ローカル保存',
-              onPressed: _saveKifData,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final bool isCompact = screenWidth < 310;
+
+                // 画面幅が狭い場合：三点リーダーメニューのみ表示
+                if (isCompact) {
+                  return PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'open':
+                          _openLocalFile();
+                          break;
+                        case 'paste':
+                          _pasteFromClipboard();
+                          break;
+                        case 'share':
+                          _shareKifData();
+                          break;
+                        case 'save':
+                          _saveKifData();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'open',
+                        child: Row(
+                          children: [
+                            Icon(Icons.folder_open, size: 20, color: Colors.black87),
+                            SizedBox(width: 12),
+                            Text('ファイルを開く', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'paste',
+                        child: Row(
+                          children: [
+                            Icon(Icons.content_paste, size: 20, color: Colors.black87),
+                            SizedBox(width: 12),
+                            Text('クリップボードから貼り付け', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'share',
+                        child: Row(
+                          children: [
+                            Icon(Icons.share, size: 20, color: Colors.black87),
+                            SizedBox(width: 12),
+                            Text('共有', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'save',
+                        child: Row(
+                          children: [
+                            Icon(Icons.save, size: 20, color: Colors.black87),
+                            SizedBox(width: 12),
+                            Text('ローカル保存', style: TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                // 画面幅が十分ある場合：全アイコンを通常表示
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.folder_open),
+                      tooltip: 'ファイルを開く',
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(4),
+                      onPressed: _openLocalFile,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.content_paste),
+                      tooltip: 'クリップボードから貼り付け',
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(4),
+                      onPressed: _pasteFromClipboard,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.share),
+                      tooltip: '共有',
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(4),
+                      onPressed: _shareKifData,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.save),
+                      tooltip: 'ローカル保存',
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(4),
+                      onPressed: _saveKifData,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                );
+              },
             ),
           ],
         ),
