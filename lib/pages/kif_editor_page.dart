@@ -752,7 +752,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 fit: BoxFit.scaleDown,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
                     color: _isSaved ? Colors.green[600] : Colors.red[600],
                     borderRadius: BorderRadius.circular(4),
@@ -761,7 +761,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     _isSaved ? '保存済み' : '未保存',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
