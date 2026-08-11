@@ -231,6 +231,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     final text = clipboardData?.text;
 
+    // クリップボードが空の場合
     if (text == null || text.trim().isEmpty) {
       if (mounted) {
         ShowErrorSnackbar.show(context, 'クリップボードにテキストがありません');
@@ -239,6 +240,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
 
     try {
+      // 💡 ここで棋譜テキストを解析（フォーマットが正しくない場合例外が発生する）
       final tree = KifParser.decode(text);
 
       setState(() {
@@ -256,6 +258,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
     } catch (e) {
       debugPrint("クリップボードからの棋譜解析エラー: $e");
+      // 💡 フォーマットエラー等で解析できなかった場合のエラーメッセージ
       if (mounted) {
         ShowErrorSnackbar.show(context, '棋譜データの解析に失敗しました');
       }

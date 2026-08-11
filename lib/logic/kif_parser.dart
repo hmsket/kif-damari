@@ -66,22 +66,25 @@ class KifParser {
     return rawLabel;
   }
 
-  static KifTree decode(String text) {
+static KifTree decode(String text) {
     final lines = text.split(RegExp(r'\r?\n'));
     final tree = KifTree.initial();
     GameNode currentNode = tree.root;
 
-    final infoRegex = RegExp(r"^([^：:]+)[：:](.*)$");
+    // 💡 将棋のKIFヘッダーでよく使われる特定のキーだけを限定して正規表現マッチさせる
+    final infoRegex = RegExp(r"^(手合割|先手|後手|上手|下手|棋戦|対局日|開始日時|終了日時|表題|持ち時間|場所|対局場|執筆者|備考)[：:](.*)$");
     final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九 ]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
     final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
+
+    int parsedMoveCount = 0;
+    int parsedInfoCount = 0;
 
     for (var line in lines) {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty) continue;
 
-      // 💡 コメント行の解析（' や * で始まる行）
+      // コメント行の解析（' や * で始まる行）
       if (trimmedLine.startsWith('*') || trimmedLine.startsWith("'")) {
-        // 指し手が進む前であれば rootNode (0手目) にコメントが追加されます
         currentNode.addComment(trimmedLine.substring(1));
         continue;
       }
@@ -117,6 +120,7 @@ class KifParser {
 
       final moveMatch = moveRegex.firstMatch(trimmedLine);
       if (moveMatch != null) {
+        parsedMoveCount++;
         final moveNum = int.parse(moveMatch.group(1)!);
         final firstChar = moveMatch.group(2)!;
         final secondChar = moveMatch.group(3)?.trim() ?? "";
@@ -170,9 +174,18 @@ class KifParser {
         final value = infoMatch.group(2)!.trim();
         if (!key.startsWith('手数')) {
           tree.info[key] = value;
+          parsedInfoCount++;
         }
       }
     }
+
+    // 💡【判定強化】
+    // 1. 指し手が1手もない場合（ヘッダーだけのテキストやただの文章）はエラーとする
+    // （※開始局面のみで指し手のないKIFファイルを許容したい場合は「parsedMoveCount == 0 && parsedInfoCount == 0」にしてください）
+    if (parsedMoveCount == 0) {
+      throw const FormatException('有効な指し手データが含まれていません。');
+    }
+
     return tree;
   }
 
@@ -184,7 +197,6 @@ class KifParser {
     });
     buffer.writeln('手数----指手----消費時間--');
 
-    // 💡【追記】ルートノード（0手目 / 開始局面）のコメントを最初に出力する
     for (var comment in tree.root.comments) {
       buffer.writeln('*$comment');
     }
@@ -237,7 +249,6 @@ class KifParser {
           final piece = _codeToKanji[pieceCode] ?? '歩';
           final action = isPromotedAction ? '成' : '';
 
-          // 正しいKIF規格（例: "同 馬(27)" や "６四角(27)"）に変換
           cleanLabel = "$squareLabel$piece$action($fromX$fromY)";
           currentToX = toX;
           currentToY = toY;
