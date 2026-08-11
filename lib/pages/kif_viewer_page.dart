@@ -563,14 +563,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
                 },
                 onVerticalDragEnd: (_) => dragDistance = 0,
                 onTap: () {
-                  final nextNodes = kifTree!.currentNode.nextNodes;
-                  if (nextNodes.length > 1) {
-                    _showBranchSelector(nextNodes);
-                  } else {
-                    setState(() {
-                      _isSidebarOpen = true;
-                    });
-                  }
+                  setState(() {
+                    _isSidebarOpen = true;
+                  });
                 },
                 child: Builder(
                   builder: (context) {
