@@ -1444,6 +1444,27 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
     final String promotedPieceAsset = '$prefix$promotedPieceType';
 
+    // ダイアログのおおよそのサイズ（パディングやボタン2つ分の幅・高さ）
+    const double dialogWidth = 150.0;
+    const double dialogHeight = 90.0;
+    const double margin = 12.0; // 画面端からの最小マージン
+
+    final screenSize = MediaQuery.of(context).size;
+
+    // 💡 Tap位置を中心に置こうとした時の基本位置
+    double left = tapPosition.dx - (dialogWidth / 2);
+    double top = tapPosition.dy - dialogHeight - 10; // 指で隠れないよう少し上に表示
+
+    // 💡 画面の左右端で見切れないように補正 (clamp)
+    left = left.clamp(margin, screenSize.width - dialogWidth - margin);
+
+    // 💡 画面の上端で見切れる場合はタップ位置の下に表示する補正
+    if (top < margin) {
+      top = tapPosition.dy + 20;
+    }
+    // 下端も見切れないようにガード
+    top = top.clamp(margin, screenSize.height - dialogHeight - margin);
+
     return showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -1454,16 +1475,16 @@ class _KifEditorPageState extends State<KifEditorPage> {
         return Stack(
           children: [
             Positioned(
-              left: tapPosition.dx - 60,
-              top: tapPosition.dy - 100,
+              left: left,
+              top: top,
               child: Material(
                 elevation: 8,
                 borderRadius: BorderRadius.circular(8),
                 clipBehavior: Clip.antiAlias,
                 child: Container(
+                  width: dialogWidth,
                   color: Theme.of(context).cardColor,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       InkWell(
@@ -1488,7 +1509,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () => Navigator.of(context).pop(false),
                         borderRadius: BorderRadius.circular(8),
