@@ -1244,7 +1244,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'キャンセル',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
             TextButton(
