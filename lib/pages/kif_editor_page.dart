@@ -1370,6 +1370,30 @@ class _KifEditorPageState extends State<KifEditorPage> {
     return (fileName: fileName, bytes: bytes);
   }
 
+  String _generateDetailText() {
+    if (kifTree == null) return widget.kifEntity.detail ?? '';
+
+    final info = kifTree!.info;
+
+    final event = info['棋戦'] ?? info['イベント'];
+    final date = info['対局日'] ?? info['開始日時'] ?? info['対局日時'] ?? info['日付'];
+    final sente = info['先手'] ?? '先手';
+    final gote = info['後手'] ?? '後手';
+
+    final List<String> parts = [];
+
+    if (event != null && event.trim().isNotEmpty) {
+      parts.add('棋戦名：${event.trim()}');
+    }
+
+    if (date != null && date.trim().isNotEmpty) {
+      parts.add('対局日：${date.trim()}');
+    }
+    parts.add('先手名：$sente');
+    parts.add('後手名：$gote');
+    return parts.join('\n');
+  }
+
   Future<void> _saveKifData() async {
     final kifData = await _prepareKifData();
     if (kifData == null) return;
@@ -1392,24 +1416,20 @@ class _KifEditorPageState extends State<KifEditorPage> {
       final file = File(targetPath);
       await file.writeAsBytes(kifData.bytes, flush: true);
 
-      if (isNewFile) {
-        final sente = kifTree?.info['先手'] ?? '先手';
-        final gote = kifTree?.info['後手'] ?? '後手';
-        final totalMoves = kifTree?.totalMoveCount ?? 0;
-        final detailText = '▲$sente vs △$gote ($totalMoves手)';
+      final detailText = _generateDetailText();
+      final fileName = p.basename(targetPath);
 
-        final updatedKif = KifEntity(
-          id: widget.kifEntity.id,
-          tabId: widget.kifEntity.tabId,
-          kifId: widget.kifEntity.kifId,
-          title: widget.kifEntity.title,
-          detail: detailText,
-          kifOrder: widget.kifEntity.kifOrder,
-          kifPath: targetPath,
-          color: widget.kifEntity.color,
-        );
-        await KifDao().updateKif(updatedKif);
-      }
+      final updatedKif = KifEntity(
+        id: widget.kifEntity.id,
+        tabId: widget.kifEntity.tabId,
+        kifId: widget.kifEntity.kifId,
+        title: fileName,
+        detail: detailText,
+        kifOrder: widget.kifEntity.kifOrder,
+        kifPath: targetPath,
+        color: widget.kifEntity.color,
+      );
+      await KifDao().updateKif(updatedKif);
 
       setState(() {
         _lastSavedContent = _getExportContent();
