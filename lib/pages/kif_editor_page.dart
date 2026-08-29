@@ -11,6 +11,7 @@ import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/logic/shogi_rule_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
+import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
@@ -43,6 +44,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isLoading = true;
   bool _isReversed = false;
 
+  late KifEntity _currentEntity;
+
   int? _selectedFile;
   int? _selectedRank;
   String? _selectedHandPiece;
@@ -62,6 +65,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
   @override
   void initState() {
     super.initState();
+    _currentEntity = widget.kifEntity;
     _initKifData();
   }
 
@@ -107,7 +111,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   Future<void> _initKifData() async {
-    final String? path = widget.kifEntity.kifPath;
+    final String? path = _currentEntity.kifPath;
     if (path == null || path.isEmpty) {
       setState(() {
         kifTree = KifTree.initial();
@@ -120,9 +124,17 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
 
     try {
-      final file = File(path);
-      if (await file.exists()) {
-        final bytes = await file.readAsBytes();
+      Uint8List? bytes;
+      if (path.startsWith('content://')) {
+        bytes = await SafHelper.readFileBytes(path);
+      } else {
+        final file = File(path);
+        if (await file.exists()) {
+          bytes = await file.readAsBytes();
+        }
+      }
+
+      if (bytes != null) {
         String content;
         try {
           content = utf8.decode(bytes, allowMalformed: false);
@@ -154,7 +166,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
           _syncCommentFromCurrentNode();
         });
       } else {
-        throw Exception("ファイルが見つかりません");
+        throw Exception("ファイルが見つからないか読み込めません");
       }
     } catch (e) {
       debugPrint("KIF解析エラー: $e");
@@ -170,33 +182,24 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   Future<void> _openLocalFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-      );
+      final String? targetPath = await SafHelper.pickFile();
+      if (targetPath == null || targetPath.isEmpty) return;
 
-      if (result == null || result.files.single.path == null) {
-        return;
-      }
-
-      final String filePath = result.files.single.path!;
-      final extension = p.extension(filePath).toLowerCase();
-
-      const allowedExtensions = ['.kif', '.kifu', '.txt'];
-      if (!allowedExtensions.contains(extension)) {
-        if (mounted) {
-          ShowErrorSnackbar.show(context, '対応していないファイル形式です (.kif, .kifu, .txt)');
+      Uint8List? bytes;
+      if (targetPath.startsWith('content://')) {
+        bytes = await SafHelper.readFileBytes(targetPath);
+      } else {
+        final file = File(targetPath);
+        if (await file.exists()) {
+          bytes = await file.readAsBytes();
         }
+      }
+
+      if (bytes == null) {
+        if (mounted) ShowErrorSnackbar.show(context, 'ファイルの読み込みに失敗しました');
         return;
       }
 
-      final file = File(filePath);
-
-      if (!await file.exists()) {
-        if (mounted) ShowErrorSnackbar.show(context, 'ファイルが存在しません');
-        return;
-      }
-
-      final bytes = await file.readAsBytes();
       String content;
       try {
         content = utf8.decode(bytes, allowMalformed: false);
@@ -212,8 +215,20 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _selectedRank = null;
         _selectedHandPiece = null;
         _syncCommentFromCurrentNode();
-        _lastSavedContent = '';
-        _isSaved = false;
+
+        _currentEntity = KifEntity(
+          id: _currentEntity.id,
+          tabId: _currentEntity.tabId,
+          kifId: _currentEntity.kifId,
+          title: _currentEntity.title,
+          detail: _currentEntity.detail,
+          kifOrder: _currentEntity.kifOrder,
+          kifPath: targetPath,
+          color: _currentEntity.color,
+        );
+
+        _lastSavedContent = _getExportContent();
+        _isSaved = true;
       });
 
       if (mounted) {
@@ -231,7 +246,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     final text = clipboardData?.text;
 
-    // クリップボードが空の場合
     if (text == null || text.trim().isEmpty) {
       if (mounted) {
         ShowErrorSnackbar.show(context, 'クリップボードにテキストがありません');
@@ -240,7 +254,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
 
     try {
-      // 💡 ここで棋譜テキストを解析（フォーマットが正しくない場合例外が発生する）
       final tree = KifParser.decode(text);
 
       setState(() {
@@ -258,7 +271,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
     } catch (e) {
       debugPrint("クリップボードからの棋譜解析エラー: $e");
-      // 💡 フォーマットエラー等で解析できなかった場合のエラーメッセージ
       if (mounted) {
         ShowErrorSnackbar.show(context, '棋譜データの解析に失敗しました');
       }
@@ -533,7 +545,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
-          // 1. 最初の手へ移動ボタン
           Expanded(
             flex: 2,
             child: FittedBox(
@@ -551,8 +562,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
               ),
             ),
           ),
-
-          // 2. 1手戻るボタン
           Expanded(
             flex: 2,
             child: FittedBox(
@@ -571,8 +580,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
               ),
             ),
           ),
-
-          // 3. 中央の手数表示枠
           Expanded(
             flex: 3,
             child: Container(
@@ -678,8 +685,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
               ),
             ),
           ),
-
-          // 4. 1手進むボタン
           Expanded(
             flex: 2,
             child: FittedBox(
@@ -698,8 +703,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
               ),
             ),
           ),
-
-          // 5. 最後の手に移動ボタン
           Expanded(
             flex: 2,
             child: FittedBox(
@@ -717,8 +720,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
               ),
             ),
           ),
-
-          // 6. メニュー（三点リーダー）
           Expanded(
             flex: 2,
             child: FittedBox(
@@ -812,10 +813,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
             child: SizedBox(
               width: double.infinity,
               height: double.infinity,
-              // IgnorePointer で内部のテキスト選択やリンクのタップを無効化し、InkWell のタップを確実に拾わせます
               child: IgnorePointer(
                 child: SingleChildScrollView(
-                  physics: const NeverScrollableScrollPhysics(), // 無駄なスクロールを抑制
+                  physics: const NeverScrollableScrollPhysics(),
                   child: Text(
                     currentComment.isEmpty ? 'タップしてこの局面のコメントを入力' : currentComment,
                     style: TextStyle(
@@ -851,7 +851,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
-        Navigator.of(context).pop(widget.kifEntity);
+        Navigator.of(context).pop(_currentEntity);
       },
       child: Scaffold(
         backgroundColor: const Color(0XFFF1F1F5),
@@ -860,7 +860,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              Navigator.of(context).pop(widget.kifEntity);
+              Navigator.of(context).pop(_currentEntity);
             },
           ),
           backgroundColor: const Color(0XFFFFFFFF),
@@ -906,7 +906,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.save),
-                      tooltip: 'ローカル保存',
+                      tooltip: '保存',
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.all(4),
                       onPressed: _saveKifData,
@@ -1268,97 +1268,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
-  Widget _buildPieceStand(bool isSente, bool isUpper) {
-    final hand = isSente ? kifTree!.currentNode.state.senteHand : kifTree!.currentNode.state.goteHand;
-    final assetPrefix = isUpper ? "w" : "b";
-
-    if (hand.isEmpty || hand.values.every((count) => count == 0)) {
-      return Align(
-        alignment: isUpper ? Alignment.centerRight : Alignment.centerLeft,
-        child: Text("持駒なし", style: TextStyle(color: Colors.grey[600], fontSize: 11)),
-      );
-    }
-
-    const priorityOrder = ['fu', 'ya', 'ke', 'gi', 'ki', 'ka', 'hi'];
-
-    var sortedEntries = priorityOrder
-        .where((key) => hand.containsKey(key) && (hand[key] ?? 0) > 0)
-        .map((key) => MapEntry(key, hand[key]!))
-        .toList();
-
-    if (!isSente) {
-      sortedEntries = sortedEntries.reversed.toList();
-    }
-
-    return Wrap(
-      alignment: isUpper ? WrapAlignment.end : WrapAlignment.start,
-      spacing: 1.0,
-      runSpacing: 1.0,
-      children: sortedEntries.map((entry) {
-        final isSelected = _selectedHandPiece == entry.key &&
-            ((kifTree!.currentNode.state.nextPlayer == Player.sente && isSente) ||
-                (kifTree!.currentNode.state.nextPlayer == Player.gote && !isSente));
-
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              if (isSelected) {
-                _selectedHandPiece = null;
-              } else {
-                final currentPlayer = kifTree!.currentNode.state.nextPlayer;
-                if ((currentPlayer == Player.sente && isSente) ||
-                    (currentPlayer == Player.gote && !isSente)) {
-                  _selectedHandPiece = entry.key;
-                  _selectedFile = null;
-                  _selectedRank = null;
-                }
-              }
-            });
-          },
-          child: Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              Container(
-                width: 31,
-                height: 31,
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.orange.withOpacity(0.4) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Image.asset(
-                  'assets/images/pieces/$assetPrefix${entry.key}.png',
-                  width: 31,
-                  height: 31,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              if (entry.value > 1)
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${entry.value}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   Future<({String fileName, List<int> bytes})?> _prepareKifData() async {
     if (kifTree == null) return null;
 
@@ -1373,7 +1282,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
   Map<String, String> _generateValueMap() {
     final info = kifTree?.info ?? {};
     
-    // 1. 基本となるデフォルト値（未設定時のフォールバック）を定義
     final Map<String, String> values = {
       '先手': info['先手'] ?? '先手',
       '後手': info['後手'] ?? '後手',
@@ -1382,7 +1290,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
       '対局日': info['対局日'] ?? info['開始日時'] ?? info['対局日時'] ?? info['日付'] ?? '',
     };
 
-    // 2. info に存在する全てのキー（「さあさ」等）を上書き・自動追加
     info.forEach((key, value) {
       values[key] = value;
     });
@@ -1391,11 +1298,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   String _applyTemplate(String template, Map<String, String> values) {
-    // {波括弧} で囲まれた文字列（例: {あああ}）を正規表現で検出して置換
     return template.replaceAllMapped(RegExp(r'\{([^}]+)\}'), (match) {
       final key = match.group(1)!;
-      // values にキーが存在し、値も空でない場合はその値を返す
-      // 存在しない場合や値が空の場合は空文字に置換
       return values[key] ?? '';
     });
   }
@@ -1421,8 +1325,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
     setState(() => _isLoading = true);
 
     try {
-      String targetPath = widget.kifEntity.kifPath ?? "";
-      bool isNewFile = targetPath.isEmpty || !await File(targetPath).exists();
+      String targetPath = _currentEntity.kifPath ?? "";
+      bool isNewFile = targetPath.isEmpty || 
+          (!targetPath.startsWith('content://') && !await File(targetPath).exists());
 
       if (isNewFile) {
         final Directory appDocDir = await getApplicationDocumentsDirectory();
@@ -1433,23 +1338,35 @@ class _KifEditorPageState extends State<KifEditorPage> {
         targetPath = p.join(saveDir.path, kifData.fileName);
       }
 
-      final file = File(targetPath);
-      await file.writeAsBytes(kifData.bytes, flush: true);
+      if (targetPath.startsWith('content://')) {
+        final success = await SafHelper.writeFileBytes(
+          targetPath,
+          Uint8List.fromList(kifData.bytes),
+        );
+        if (!success) {
+          throw Exception("Google Drive 上書き保存に失敗しました");
+        }
+      } else {
+        final file = File(targetPath);
+        await file.writeAsBytes(kifData.bytes, flush: true);
+      }
 
       final titleText = _generateTitleText();
       final detailText = _generateDetailText();
 
       final updatedKif = KifEntity(
-        id: widget.kifEntity.id,
-        tabId: widget.kifEntity.tabId,
-        kifId: widget.kifEntity.kifId,
+        id: _currentEntity.id,
+        tabId: _currentEntity.tabId,
+        kifId: _currentEntity.kifId,
         title: titleText,
         detail: detailText,
-        kifOrder: widget.kifEntity.kifOrder,
+        kifOrder: _currentEntity.kifOrder,
         kifPath: targetPath,
-        color: widget.kifEntity.color,
+        color: _currentEntity.color,
       );
       await KifDao().updateKif(updatedKif);
+
+      _currentEntity = updatedKif;
 
       setState(() {
         _lastSavedContent = _getExportContent();
@@ -1460,7 +1377,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
         ShowSuccessSnackbar.show(context, '棋譜を保存しました');
       }
     } catch (e) {
-      ShowErrorSnackbar.show(context, '棋譜の保存に失敗しました');
+      debugPrint("保存エラー: $e");
+      if (mounted) {
+        ShowErrorSnackbar.show(context, '棋譜の保存に失敗しました');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1484,25 +1404,20 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
     final String promotedPieceAsset = '$prefix$promotedPieceType';
 
-    // ダイアログのおおよそのサイズ（パディングやボタン2つ分の幅・高さ）
     const double dialogWidth = 150.0;
     const double dialogHeight = 90.0;
-    const double margin = 12.0; // 画面端からの最小マージン
+    const double margin = 12.0;
 
     final screenSize = MediaQuery.of(context).size;
 
-    // 💡 Tap位置を中心に置こうとした時の基本位置
     double left = tapPosition.dx - (dialogWidth / 2);
-    double top = tapPosition.dy - dialogHeight - 10; // 指で隠れないよう少し上に表示
+    double top = tapPosition.dy - dialogHeight - 10;
 
-    // 💡 画面の左右端で見切れないように補正 (clamp)
     left = left.clamp(margin, screenSize.width - dialogWidth - margin);
 
-    // 💡 画面の上端で見切れる場合はタップ位置の下に表示する補正
     if (top < margin) {
       top = tapPosition.dy + 20;
     }
-    // 下端も見切れないようにガード
     top = top.clamp(margin, screenSize.height - dialogHeight - margin);
 
     return showGeneralDialog<bool>(

@@ -7,6 +7,7 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
+import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/pages/diagram_preview_page.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
@@ -53,9 +54,9 @@ class _KifViewerPageState extends State<KifViewerPage> {
     _initKifData();
   }
 
-  Future<void> _initKifData() async {
+Future<void> _initKifData() async {
     final String? path = _currentKifEntity.kifPath;
-    if (path == null) {
+    if (path == null || path.isEmpty) {
       setState(() {
         kifTree = KifTree.initial();
         _isLoading = false;
@@ -64,9 +65,18 @@ class _KifViewerPageState extends State<KifViewerPage> {
     }
 
     try {
-      final file = File(path);
-      if (await file.exists()) {
-        final bytes = await file.readAsBytes();
+      Uint8List? bytes;
+      // 💡 content:// (Google Drive等) の場合は SafHelper を経由してバイトデータを取得する
+      if (path.startsWith('content://')) {
+        bytes = await SafHelper.readFileBytes(path);
+      } else {
+        final file = File(path);
+        if (await file.exists()) {
+          bytes = await file.readAsBytes();
+        }
+      }
+
+      if (bytes != null) {
         String content;
 
         try {
