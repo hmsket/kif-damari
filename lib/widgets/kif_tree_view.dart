@@ -251,7 +251,7 @@ class _KifTreeViewState extends State<KifTreeView> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                isRoot ? '開始局' : '${node.moveNumber}手目',
+                                isRoot ? '0手目' : '${node.moveNumber}手目',
                                 style: TextStyle(
                                   fontSize: 9,
                                   color: isCurrent ? Colors.brown[900] : Colors.grey[600],
