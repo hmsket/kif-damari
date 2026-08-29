@@ -66,13 +66,14 @@ class KifParser {
     return rawLabel;
   }
 
-static KifTree decode(String text) {
+  static KifTree decode(String text) {
     final lines = text.split(RegExp(r'\r?\n'));
     final tree = KifTree.initial();
     GameNode currentNode = tree.root;
 
-    // 💡 将棋のKIFヘッダーでよく使われる特定のキーだけを限定して正規表現マッチさせる
-    final infoRegex = RegExp(r"^(手合割|先手|後手|上手|下手|棋戦|対局日|開始日時|終了日時|表題|持ち時間|場所|対局場|執筆者|備考)[：:](.*)$");
+    // 💡 修正箇所：先頭が「キー：値」になっている任意のヘッダー行にマッチさせる
+    // ただし指し手行（数字で始まる行）やコメント行等と誤検知しないよう除外指定
+    final infoRegex = RegExp(r"^([^0-9\s\*\'\=\-\#\&\/].*?)[：:](.*)$");
     final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九 ]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
     final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
 

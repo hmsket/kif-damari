@@ -83,6 +83,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return state?.selectedCount ?? 0;
   }
 
+  /// テンプレート文字列からタグ（{先手} 等）を置換するヘルパー関数
+  String _applyTemplate(String template, Map<String, String> values) {
+    String result = template;
+    values.forEach((key, value) {
+      result = result.replaceAll('{$key}', value);
+    });
+    return result;
+  }
+
   Future<void> _onAddKifPressed(BuildContext context, int tabId) async {
     final dao = KifDao();
     final settings = AppSettings();
@@ -97,12 +106,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       return;
     }
 
+    // 設定された自動フォーマットテンプレートの取得
+    final String titleTemplate = settings.get<String>('kifTitle') ?? '{先手} vs {後手}';
+    final String detailTemplate = settings.get<String>('kifDetail') ?? '{棋戦} / {戦型} / {対局日}';
+
+    // 新規作成時の初期値マッピング（ファイル読み込み前のためプレースホルダー値を設定）
+    final Map<String, String> defaultHeaderValues = {
+      '先手': '先手',
+      '後手': '後手',
+      '棋戦': '棋戦未設定',
+      '戦型': '戦型未設定',
+      '対局日': '',
+    };
+
+    final initialTitle = _applyTemplate(titleTemplate, defaultHeaderValues);
+    final initialDetail = _applyTemplate(detailTemplate, defaultHeaderValues);
+
     final maxKifId = await dao.getMaxKifId(tabId);
     final kif = KifEntity(
       tabId: tabId,
       kifId: maxKifId + 1,
-      title: '',
-      detail: '',
+      title: initialTitle,
+      detail: initialDetail,
       kifOrder: maxKifId + 1,
       kifPath: '',
       color: colorWhite,
@@ -234,7 +259,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 }
                               }
                             } else if (_currentMode == AppMode.edit) {
-                              // 編集モードのときはチェックボタンでノーマルモードに戻る
                               _updateMode(AppMode.normal);
                             }
                           },

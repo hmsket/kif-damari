@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/settings/font_size_setting.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
+import 'package:kifdamari/settings/kif_template_setting.dart';
 import 'package:kifdamari/settings/thumbnail_size_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 
@@ -33,6 +34,12 @@ class SettingPage extends StatelessWidget {
 
               const SizedBox(height: 12),
 
+              _buildSectionTitle('棋譜追加'),
+
+              KifTemplateSetting(settings: settings),
+
+              const SizedBox(height: 12),
+
               _buildSectionTitle('棋譜再生画面'),
 
               FontSizeSetting(settings: settings),
@@ -48,21 +55,6 @@ class SettingPage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 8),
       child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54)),
-    );
-  }
-
-  Widget _buildSettingCard({required String title, required String subtitle, required Widget trailing, VoidCallback? onTap}) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black87)),
-        subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-        trailing: trailing,
-        onTap: onTap,
-      ),
     );
   }
 }

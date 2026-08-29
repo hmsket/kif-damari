@@ -11,6 +11,8 @@ class AppSettings {
     'kifLimit': defaultKifLimit,
     'thumbnailSize': 120,
     'defaultPlayerName': 'プレイヤー',
+    'kifTitle': '{先手} vs {後手}',
+    'kifDetail': '{棋戦} / {戦型} / {対局日}',
   };
 
   ValueListenable<Box<dynamic>> get listenable => _box.listenable();

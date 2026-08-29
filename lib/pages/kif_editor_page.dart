@@ -1370,28 +1370,48 @@ class _KifEditorPageState extends State<KifEditorPage> {
     return (fileName: fileName, bytes: bytes);
   }
 
+  Map<String, String> _generateValueMap() {
+    final info = kifTree?.info ?? {};
+    
+    // 1. 基本となるデフォルト値（未設定時のフォールバック）を定義
+    final Map<String, String> values = {
+      '先手': info['先手'] ?? '先手',
+      '後手': info['後手'] ?? '後手',
+      '棋戦': info['棋戦'] ?? info['イベント'] ?? '',
+      '戦型': info['戦型'] ?? '',
+      '対局日': info['対局日'] ?? info['開始日時'] ?? info['対局日時'] ?? info['日付'] ?? '',
+    };
+
+    // 2. info に存在する全てのキー（「さあさ」等）を上書き・自動追加
+    info.forEach((key, value) {
+      values[key] = value;
+    });
+
+    return values;
+  }
+
+  String _applyTemplate(String template, Map<String, String> values) {
+    // {波括弧} で囲まれた文字列（例: {あああ}）を正規表現で検出して置換
+    return template.replaceAllMapped(RegExp(r'\{([^}]+)\}'), (match) {
+      final key = match.group(1)!;
+      // values にキーが存在し、値も空でない場合はその値を返す
+      // 存在しない場合や値が空の場合は空文字に置換
+      return values[key] ?? '';
+    });
+  }
+
+  String _generateTitleText() {
+    final settings = AppSettings();
+    final String titleTemplate = settings.get<String>('kifTitle') ?? '{先手} vs {後手}';
+    return _applyTemplate(titleTemplate, _generateValueMap());
+  }
+
   String _generateDetailText() {
     if (kifTree == null) return widget.kifEntity.detail ?? '';
 
-    final info = kifTree!.info;
-
-    final event = info['棋戦'] ?? info['イベント'];
-    final date = info['対局日'] ?? info['開始日時'] ?? info['対局日時'] ?? info['日付'];
-    final sente = info['先手'] ?? '先手';
-    final gote = info['後手'] ?? '後手';
-
-    final List<String> parts = [];
-
-    if (event != null && event.trim().isNotEmpty) {
-      parts.add('棋戦名：${event.trim()}');
-    }
-
-    if (date != null && date.trim().isNotEmpty) {
-      parts.add('対局日：${date.trim()}');
-    }
-    parts.add('先手名：$sente');
-    parts.add('後手名：$gote');
-    return parts.join('\n');
+    final settings = AppSettings();
+    final String detailTemplate = settings.get<String>('kifDetail') ?? '{棋戦} / {戦型} / {対局日}';
+    return _applyTemplate(detailTemplate, _generateValueMap());
   }
 
   Future<void> _saveKifData() async {
@@ -1416,14 +1436,14 @@ class _KifEditorPageState extends State<KifEditorPage> {
       final file = File(targetPath);
       await file.writeAsBytes(kifData.bytes, flush: true);
 
+      final titleText = _generateTitleText();
       final detailText = _generateDetailText();
-      final fileName = p.basename(targetPath);
 
       final updatedKif = KifEntity(
         id: widget.kifEntity.id,
         tabId: widget.kifEntity.tabId,
         kifId: widget.kifEntity.kifId,
-        title: fileName,
+        title: titleText,
         detail: detailText,
         kifOrder: widget.kifEntity.kifOrder,
         kifPath: targetPath,
