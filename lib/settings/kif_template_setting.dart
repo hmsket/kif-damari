@@ -13,9 +13,6 @@ class KifTemplateSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String titleTemplate = settings.get<String>('kifTitle');
-    final String detailTemplate = settings.get<String>('kifDetail');
-
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -26,9 +23,9 @@ class KifTemplateSetting extends StatelessWidget {
           'フォーマットを変更する',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black87),
         ),
-        subtitle: Text(
+        subtitle: const Text(
           '棋譜カードのタイトルや詳細の形式を設定',
-          style: const TextStyle(color: Colors.grey, fontSize: 13),
+          style: TextStyle(color: Colors.grey, fontSize: 13),
         ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
         onTap: () {
@@ -89,6 +86,16 @@ class _KifTemplateEditPageState extends State<_KifTemplateEditPage> {
 
     // 初回のパースを実行
     _parseTestKif(_sampleKifText);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _detailController.dispose();
+    _kifTestController.dispose();
+    _titleFocusNode.dispose();
+    _detailFocusNode.dispose();
+    super.dispose();
   }
 
   /// テスト用テキストからヘッダー情報を解析する（入力値のみを純粋に解析）
@@ -262,7 +269,7 @@ class _KifTemplateEditPageState extends State<_KifTemplateEditPage> {
               children: [
                 // 1. プレビューカード
                 const Text(
-                  '表示プレビュー',
+                  '棋譜カードのプレビュー',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
                 ),
                 const SizedBox(height: 8),
@@ -400,59 +407,67 @@ class _KifTemplateEditPageState extends State<_KifTemplateEditPage> {
 
                 const SizedBox(height: 20),
 
-                // 4. テスト用 KIF エリアヘッダー
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'テスト用 KIF データ（お試し用）',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54),
-                    ),
-                    InkWell(
-                      onTap: _pasteFromClipboard,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: Colors.black26),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.content_paste, size: 14, color: Colors.black87),
-                            SizedBox(width: 4),
-                            Text(
-                              '貼り付け',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                // 5. テスト用 KIF 入力カード
+// 4 & 5. テスト用 KIF データ（アコーディオン式）
                 Card(
                   margin: EdgeInsets.zero,
                   elevation: 0,
                   color: Colors.white,
+                  clipBehavior: Clip.antiAlias, // 💡 追加：波紋が角からはみ出さないようにクリップする
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      // 💡 閉じた時と開いた時の形に角丸を指定する
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide.none,
+                      ),
+                      collapsedShape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide.none,
+                      ),
+                      title: const Text(
+                        'KIF データ（確認用）',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54),
+                      ),
                       children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            InkWell(
+                              onTap: _pasteFromClipboard,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  border: Border.all(color: Colors.black26),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.content_paste, size: 14, color: Colors.black87),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '貼り付け',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         ValueListenableBuilder<TextEditingValue>(
                           valueListenable: _kifTestController,
                           builder: (context, value, child) {
@@ -464,6 +479,8 @@ class _KifTemplateEditPageState extends State<_KifTemplateEditPage> {
                               onChanged: _parseTestKif,
                               style: const TextStyle(fontSize: 12),
                               decoration: InputDecoration(
+                                hintText: 'ここにKIFデータを貼り付けるとプレビューに反映されます',
+                                hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
                                 border: const OutlineInputBorder(),
                                 contentPadding: const EdgeInsets.all(10),
                                 suffixIcon: value.text.isNotEmpty
