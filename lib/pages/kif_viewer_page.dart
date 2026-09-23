@@ -44,10 +44,11 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
   int _dragStartMoveNumber = 0;
   String? _rawKifContent;
 
-  bool _isDialWindowOpen = false;
-  double _dialPopupRotation = 0.0;
-  double _dialPopupAccumulator = 0.0;
-  final GlobalKey _popupDialKey = GlobalKey();
+  // 💡 ダイヤル操作用の変数
+  double _dialRotation = 0.0;
+  double _dialAccumulator = 0.0;
+  bool _isOverlayDialActive = false; // コメント欄オーバーレイ表示フラグ
+  final GlobalKey _overlayDialKey = GlobalKey();
 
   late KifEntity _currentKifEntity;
 
@@ -256,6 +257,51 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     );
   }
 
+  // ダイヤルの回転操作（ドラッグ計算）ロジック
+  void _processDialPanUpdate(DragUpdateDetails details) {
+    final renderBox = _overlayDialKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final center = renderBox.size.center(Offset.zero);
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+
+    final x = localPos.dx - center.dx;
+    final y = localPos.dy - center.dy;
+    final dx = details.delta.dx;
+    final dy = details.delta.dy;
+
+    final dist = math.sqrt(x * x + y * y);
+    final effectiveDist = math.max(dist, 10.0);
+
+    final rotationDelta = (-y * dx + x * dy) / (effectiveDist * 35.0);
+
+    setState(() {
+      _dialRotation += rotationDelta;
+      _dialAccumulator += rotationDelta;
+    });
+
+    const double threshold = 0.22;
+
+    while (_dialAccumulator >= threshold) {
+      if (kifTree != null && kifTree!.currentNode.nextNodes.isNotEmpty) {
+        setState(() {
+          kifTree!.stepNext();
+        });
+        HapticFeedback.selectionClick();
+      }
+      _dialAccumulator -= threshold;
+    }
+
+    while (_dialAccumulator <= -threshold) {
+      if (kifTree != null && kifTree!.currentNode.parent != null) {
+        setState(() {
+          kifTree!.stepBack();
+        });
+        HapticFeedback.selectionClick();
+      }
+      _dialAccumulator += threshold;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = AppSettings();
@@ -338,56 +384,86 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     isSente: !_isReversed,
                     isUpper: false,
                   ),
+                  // コメント欄＆ダイヤルオーバーレイ領域
                   Expanded(
                     child: Container(
                       width: double.infinity,
                       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                      padding: const EdgeInsets.all(12.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onLongPress: () {},
-                        child: Scrollbar(
-                          controller: _commentScrollController,
-                          thumbVisibility: true,
-                          child: SingleChildScrollView(
-                            controller: _commentScrollController,
-                            child: SelectableLinkify(
-                              text: "${kifTree!.currentNode.joinedComment}",
-                              style: TextStyle(
-                                fontSize: settings.get<double>('fontSize'),
+                      child: Stack(
+                        children: [
+                          // 通常時のコメント欄
+                          Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onLongPress: () {},
+                              child: Scrollbar(
+                                controller: _commentScrollController,
+                                thumbVisibility: true,
+                                child: SingleChildScrollView(
+                                  controller: _commentScrollController,
+                                  child: SelectableLinkify(
+                                    text: "${kifTree!.currentNode.joinedComment}",
+                                    style: TextStyle(
+                                      fontSize: settings.get<double>('fontSize'),
+                                    ),
+                                    strutStyle: StrutStyle(
+                                      fontSize: settings.get<double>('fontSize'),
+                                      height: 1.5,
+                                      forceStrutHeight: true,
+                                    ),
+                                    linkStyle: const TextStyle(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                    contextMenuBuilder: (context, editableTextState) {
+                                      return AdaptiveTextSelectionToolbar.editableText(
+                                        editableTextState: editableTextState,
+                                      );
+                                    },
+                                    onOpen: (link) async {
+                                      final url = Uri.parse(link.url);
+                                      if (await canLaunchUrl(url)) {
+                                        await launchUrl(
+                                          url,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      } else {
+                                        ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                                      }
+                                    },
+                                  ),
+                                ),
                               ),
-                              strutStyle: StrutStyle(
-                                fontSize: settings.get<double>('fontSize'),
-                                height: 1.5,
-                                forceStrutHeight: true,
-                              ),
-                              linkStyle: const TextStyle(
-                                color: Colors.blue,
-                                decoration: TextDecoration.none,
-                              ),
-                              contextMenuBuilder: (context, editableTextState) {
-                                return AdaptiveTextSelectionToolbar.editableText(
-                                  editableTextState: editableTextState,
-                                );
-                              },
-                              onOpen: (link) async {
-                                final url = Uri.parse(link.url);
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(
-                                    url,
-                                    mode: LaunchMode.externalApplication,
-                                  );
-                                } else {
-                                  ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
-                                }
-                              },
                             ),
                           ),
-                        ),
+                          // 💡 ドラッグ時にコメント欄の上に浮かび上がる文字なしシンプル大型ダイヤル
+                          if (_isOverlayDialActive)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.95),
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.12),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: _buildLargeOverlayDial(),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -470,170 +546,70 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
               ),
             ),
           ),
-// 💡 中の文字は回転せず固定、外側のリングだけが回るダイヤルウィンドウ
-          if (_isDialWindowOpen)
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 60,
-              child: Material(
-                color: Colors.transparent,
+        ],
+      ),
+    );
+  }
+
+  // 💡 文字なし仕様の大型ダイヤルウィジェット
+  Widget _buildLargeOverlayDial() {
+    final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
+
+    return Container(
+      key: _overlayDialKey,
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hasBranch ? Colors.orange[50] : Colors.blue[50],
+        border: Border.all(
+          color: hasBranch ? Colors.orange[600]! : Colors.blue[400]!,
+          width: 2.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Transform.rotate(
+        angle: _dialRotation,
+        child: SizedBox.expand(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 回転ポインター（ツマミ）
+              Positioned(
+                top: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[400]!),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 上へ落として閉じられるバー
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onVerticalDragUpdate: (details) {
-                          if (details.delta.dy > 6) {
-                            HapticFeedback.lightImpact();
-                            _toggleDialWindow();
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                          child: Container(
-                            width: 40,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[400],
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // ダイヤル本体（ジェスチャーは全体で受け付ける）
-                      Center(
-                        child: GestureDetector(
-                          key: _popupDialKey,
-                          behavior: HitTestBehavior.opaque,
-                          onPanUpdate: (details) {
-                            final renderBox = _popupDialKey.currentContext?.findRenderObject() as RenderBox?;
-                            if (renderBox == null) return;
-                            final center = renderBox.size.center(Offset.zero);
-                            final localPos = renderBox.globalToLocal(details.globalPosition);
-                            
-                            final x = localPos.dx - center.dx;
-                            final y = localPos.dy - center.dy;
-                            final dx = details.delta.dx;
-                            final dy = details.delta.dy;
-
-                            final dist = math.sqrt(x * x + y * y);
-                            final effectiveDist = math.max(dist, 10.0);
-                            
-                            final rotationDelta = (-y * dx + x * dy) / (effectiveDist * 50.0);
-
-                            setState(() {
-                              _dialPopupRotation += rotationDelta;
-                              _dialPopupAccumulator += rotationDelta;
-                            });
-
-                            const double threshold = 0.25;
-
-                            while (_dialPopupAccumulator >= threshold) {
-                              if (kifTree != null && kifTree!.currentNode.nextNodes.isNotEmpty) {
-                                setState(() {
-                                  kifTree!.stepNext();
-                                });
-                                HapticFeedback.selectionClick();
-                              }
-                              _dialPopupAccumulator -= threshold;
-                            }
-
-                            while (_dialPopupAccumulator <= -threshold) {
-                              if (kifTree != null && kifTree!.currentNode.parent != null) {
-                                setState(() {
-                                  kifTree!.stepBack();
-                                });
-                                HapticFeedback.selectionClick();
-                              }
-                              _dialPopupAccumulator += threshold;
-                            }
-                          },
-                          onPanEnd: (_) {
-                            _dialPopupAccumulator = 0.0;
-                          },
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.blue[50],
-                              border: Border.all(color: Colors.blue[300]!, width: 2.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // 💡 外側のリング（ツマミを含めて）だけが回転する
-                                Transform.rotate(
-                                  angle: _dialPopupRotation,
-                                  child: SizedBox.expand(
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        Positioned(
-                                          top: 6,
-                                          child: Container(
-                                            width: 12,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: Colors.blue[400],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // 💡 中央の手数表示は常に真っ直ぐ固定で読みやすい
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '${kifTree?.currentNode.moveNumber ?? 0}手目',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+                    shape: BoxShape.circle,
+                    color: hasBranch ? Colors.orange[700] : Colors.blue[600],
                   ),
                 ),
               ),
-            ),
-        ],
+              // 周囲の目盛りドット
+              Positioned(bottom: 8, child: _buildDialDot()),
+              Positioned(left: 8, child: _buildDialDot()),
+              Positioned(right: 8, child: _buildDialDot()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialDot() {
+    return Container(
+      width: 5,
+      height: 5,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey[400],
       ),
     );
   }
@@ -716,26 +692,38 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
             ),
           ),
 
-          // 3. 中央の手数表示枠（上スワイプでダイヤルウィンドウ呼び出し）
+          // 3. 中央の手数表示枠（ドラッグでコメント欄に大型ダイヤル表示）
           Expanded(
             flex: 3,
             child: Container(
               constraints: const BoxConstraints(maxWidth: 90),
               child: GestureDetector(
-                onVerticalDragEnd: (details) {
-                  if (details.velocity.pixelsPerSecond.dy < -200) {
-                    HapticFeedback.mediumImpact();
-                    _toggleDialWindow();
-                  }
-                },
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  if (_isDialWindowOpen) {
-                    _toggleDialWindow();
-                  } else {
+                  if (!_isOverlayDialActive) {
                     setState(() {
                       _isSidebarOpen = true;
                     });
                   }
+                },
+                onPanStart: (_) {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _isOverlayDialActive = true;
+                  });
+                },
+                onPanUpdate: _processDialPanUpdate,
+                onPanEnd: (_) {
+                  setState(() {
+                    _isOverlayDialActive = false;
+                    _dialAccumulator = 0.0;
+                  });
+                },
+                onPanCancel: () {
+                  setState(() {
+                    _isOverlayDialActive = false;
+                    _dialAccumulator = 0.0;
+                  });
                 },
                 child: Builder(
                   builder: (context) {
@@ -743,13 +731,18 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     final int currentMove = kifTree!.currentNode.moveNumber;
                     final String moveLabel = kifTree!.currentNode.moveLabel?.replaceAll(RegExp(r'\(.*\)'), '') ?? '';
 
-                    return Container(
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
                       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                       decoration: BoxDecoration(
-                        color: hasBranch ? Colors.orange[100] : Colors.white,
+                        color: hasBranch
+                            ? Colors.orange[100]
+                            : (_isOverlayDialActive ? Colors.blue[50] : Colors.white),
                         border: Border.all(
-                          color: hasBranch ? Colors.orange[700]! : Colors.black45,
-                          width: hasBranch ? 2.0 : 1.5,
+                          color: hasBranch
+                              ? Colors.orange[700]!
+                              : (_isOverlayDialActive ? Colors.blue[500]! : Colors.black45),
+                          width: (hasBranch || _isOverlayDialActive) ? 2.0 : 1.5,
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -1138,14 +1131,5 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
         ShowErrorSnackbar.show(context, "画像の生成に失敗しました");
       }
     }
-  }
-
-  void _toggleDialWindow() {
-    setState(() {
-      _isDialWindowOpen = !_isDialWindowOpen;
-      if (_isDialWindowOpen) {
-        _dialPopupAccumulator = 0.0;
-      }
-    });
   }
 }
