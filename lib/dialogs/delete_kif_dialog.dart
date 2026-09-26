@@ -4,6 +4,7 @@ import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 void showDeleteSelectedKifsDialog(BuildContext context, int count, Future<void> Function() onDeleteConfirmed) {
   showDialog(
     context: context,
+    barrierDismissible: false, // ダイアログ外タップで閉じないように統一
     builder: (context) => DeleteSelectedKifsDialogContent(
       count: count,
       onDeleteConfirmed: onDeleteConfirmed,
@@ -25,7 +26,7 @@ class DeleteSelectedKifsDialogContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: BorderRadius.circular(28.0), // ダイアログ全体の角丸(28px)に統一
       ),
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -51,7 +52,7 @@ class DeleteSelectedKifsDialogContent extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: const BoxDecoration(
-                color: Color(0xFFFF2D46), // 明るい赤
+                color: Color(0xFFFF2D46),
                 shape: BoxShape.circle,
               ),
               child: const Center(
@@ -69,25 +70,24 @@ class DeleteSelectedKifsDialogContent extends StatelessWidget {
               '選択した棋譜：$count 件',
               style: const TextStyle(
                 fontSize: 15,
+                fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
-            // 右寄せ横並びのボタンエリア
+            // 右寄せ横並びのボタンエリア（カプセル型ボタン）
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // キャンセル（やめる）ボタン (枠線あり)
+                // キャンセル（やめる）ボタン (カプセル型)
                 OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.black87,
                     side: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: const StadiumBorder(), // 完全な丸み（カプセル型）
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 12,
@@ -103,7 +103,7 @@ class DeleteSelectedKifsDialogContent extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // 削除ボタン (黒塗りつぶし)
+                // 削除ボタン (カプセル型)
                 ElevatedButton(
                   onPressed: () async {
                     await onDeleteConfirmed();
@@ -114,11 +114,9 @@ class DeleteSelectedKifsDialogContent extends StatelessWidget {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF222222), // シックな黒色
+                    backgroundColor: const Color(0xFF222222),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: const StadiumBorder(), // 完全な丸み（カプセル型）
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 12,

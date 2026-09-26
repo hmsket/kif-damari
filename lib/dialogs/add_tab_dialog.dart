@@ -166,7 +166,6 @@ class _AddTabDialogContentState extends State<AddTabDialogContent> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF222222),
                       foregroundColor: Colors.white,
-                      elevation: 0,
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
