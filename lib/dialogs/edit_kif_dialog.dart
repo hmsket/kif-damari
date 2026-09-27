@@ -9,6 +9,7 @@ import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 void showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefresh) {
   showDialog(
     context: context,
+    barrierDismissible: false, // 背景タップで閉じないように統一
     builder: (context) {
       return FutureBuilder<List<TabEntity>>(
         future: TabDao().getAllTabs(),
@@ -17,7 +18,60 @@ void showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefre
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return const AlertDialog(content: Text('データの読み込みに失敗しました'));
+            // エラー表示用ダイアログも統一デザインに変更
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28.0),
+              ),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'エラー',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'データの読み込みに失敗しました',
+                      style: TextStyle(fontSize: 15, color: Colors.black87),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black87,
+                          side: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: const Text(
+                          '閉じる',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final tabs = snapshot.data!;
@@ -55,12 +109,12 @@ void showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefre
                   );
 
                   await KifDao().updateKif(updatedKif);
-                  ShowSuccessSnackbar.show(context, "棋譜を更新しました");
                   if (context.mounted) {
+                    ShowSuccessSnackbar.show(context, "棋譜を更新しました");
                     Navigator.pop(context);
                     onRefresh();
                   }
-                }
+                },
               );
             },
           );
