@@ -10,6 +10,7 @@ class KifListWidget extends StatefulWidget {
   final AppMode mode;
   final VoidCallback onRefresh;
   final VoidCallback? onSelectionChanged;
+  final VoidCallback? onAddKifPressed; // ★ コールバックを追加
 
   const KifListWidget({
     super.key,
@@ -17,6 +18,7 @@ class KifListWidget extends StatefulWidget {
     required this.mode,
     required this.onRefresh,
     this.onSelectionChanged,
+    this.onAddKifPressed, // ★ コールバックを追加
   });
 
   @override
@@ -32,7 +34,7 @@ class KifListWidgetState extends State<KifListWidget> {
 
   final Set<int> _selectedKifIds = {};
 
-  int get selectedCount => _selectedKifIds.length; // 選択件数を公開
+  int get selectedCount => _selectedKifIds.length;
 
   bool get isKifEmpty {
     if (_tempKifs != null) return _tempKifs!.isEmpty;
@@ -53,7 +55,7 @@ class KifListWidgetState extends State<KifListWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mode != widget.mode || oldWidget.tabId != widget.tabId) {
       if (widget.mode != AppMode.delete) {
-        _selectedKifIds.clear(); // モードが変わったら選択をクリア
+        _selectedKifIds.clear();
       }
       _loadKifu();
     }
@@ -113,14 +115,35 @@ class KifListWidgetState extends State<KifListWidget> {
             }
           });
         }
-
+        // 棋譜が空のときの表示
         if (kifs.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.only(bottom: 40.0),
-              child: Text(
-                '棋譜がありません\n＋ボタンから追加してください',
-                textAlign: TextAlign.center,
+              padding: const EdgeInsets.only(bottom: 40.0),
+              child: OutlinedButton.icon(
+                onPressed: widget.onAddKifPressed,
+                icon: const Icon(Icons.add, size: 20), // ＋アイコン
+                label: const Text(
+                  '棋譜を追加する',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white, // 背景色を白に設定
+                  foregroundColor: Colors.black87, // 文字・アイコン色を濃いグレー/黒系に設定
+                  side: BorderSide(
+                    color: Colors.grey.shade400, // 枠線の色
+                    width: 1.5, // 枠線の太さ
+                  ),
+                  elevation: 0, // 影なし（フラットな見た目）
+                  shape: const StadiumBorder(), // カプセル型の丸み
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
               ),
             ),
           );
@@ -179,7 +202,7 @@ class KifListWidgetState extends State<KifListWidget> {
                           _selectedKifIds.remove(kif.id!);
                         }
                       });
-                      widget.onSelectionChanged?.call(); // 親に選択状態の変化を通知
+                      widget.onSelectionChanged?.call();
                     }
                   : null,
             );

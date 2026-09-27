@@ -430,6 +430,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         tabId: t.id!,
                         mode: _currentMode,
                         onRefresh: _refresh,
+                        onAddKifPressed: () => _onAddKifPressed(context, t.id!),
                         onSelectionChanged: () {
                           setState(() {});
                         },
