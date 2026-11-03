@@ -224,6 +224,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
           detail: _currentEntity.detail,
           kifOrder: _currentEntity.kifOrder,
           kifPath: targetPath,
+          imgPath: _currentEntity.imgPath,
           color: _currentEntity.color,
         );
 
@@ -1362,6 +1363,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         detail: detailText,
         kifOrder: _currentEntity.kifOrder,
         kifPath: targetPath,
+        imgPath: _currentEntity.imgPath,
         color: _currentEntity.color,
       );
       await KifDao().updateKif(updatedKif);

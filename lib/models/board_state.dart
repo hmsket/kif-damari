@@ -63,6 +63,17 @@ class BoardState {
     required int toY,
     required String pieceName,
   }) {
+    // 盤面範囲外の指定は例外にする（不正データでのクラッシュ防止）
+    if (toX < 1 || toX > 9 || toY < 1 || toY > 9) {
+      throw ArgumentError('盤面の範囲外が指定されました (toX=$toX, toY=$toY)');
+    }
+    if ((fromX != null) != (fromY != null)) {
+      throw ArgumentError('fromX と fromY は同時に指定してください (fromX=$fromX, fromY=$fromY)');
+    }
+    if (fromX != null && (fromX < 1 || fromX > 9 || fromY! < 1 || fromY > 9)) {
+      throw ArgumentError('盤面の範囲外が指定されました (fromX=$fromX, fromY=$fromY)');
+    }
+
     // 現在の盤面をディープコピー
     List<List<String?>> newGrid = grid.map((row) => List<String?>.from(row)).toList();
     
@@ -131,8 +142,8 @@ class BoardState {
   }
 
   String _convertToAssetCode(String kanji) {
-    // 「成」の文字がある成駒
-    if (kanji.contains("成")) {
+    // 「成」の文字がある成駒（「不成」は成りではないので除外）
+    if (kanji.contains("成") && !kanji.contains("不成")) {
       if (kanji.contains("飛")) return "ry";
       if (kanji.contains("角")) return "um";
       if (kanji.contains("銀")) return "ng";

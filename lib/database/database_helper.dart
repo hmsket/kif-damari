@@ -4,14 +4,29 @@ import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
-  static Database? _database;
+  static Future<Database>? _databaseFuture;
 
   DatabaseHelper._init();
 
+  /// 初期化を一行で行い、複数の同時アクセスでも必ず同じ接続を共有する。
+  /// 失敗した場合はキャッシュを破棄して、次回アクセス時に再試行できるようにする。
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('kifdamari.db');
-    return _database!;
+    if (_databaseFuture != null) {
+      try {
+        return await _databaseFuture!;
+      } catch (_) {
+        _databaseFuture = null;
+        rethrow;
+      }
+    }
+    final future = _initDB('kifdamari.db');
+    _databaseFuture = future;
+    try {
+      return await future;
+    } catch (_) {
+      _databaseFuture = null;
+      rethrow;
+    }
   }
 
   Future<Database> _initDB(String filePath) async {

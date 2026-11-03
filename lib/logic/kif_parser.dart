@@ -132,11 +132,10 @@ class KifParser {
         int toX, toY;
         if (firstChar == '同') {
           if (currentNode.state.lastMoveToX == null || currentNode.state.lastMoveToY == null) {
-            toX = 0; toY = 0;
-          } else {
-            toX = currentNode.state.lastMoveToX!;
-            toY = currentNode.state.lastMoveToY!;
+            throw FormatException('「同」の指し手の直前に移動先が不明な行があります: $trimmedLine');
           }
+          toX = currentNode.state.lastMoveToX!;
+          toY = currentNode.state.lastMoveToY!;
         } else {
           toX = _zenToNum[firstChar]!;
           toY = _kanToNum[secondChar]!;

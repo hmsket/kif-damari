@@ -135,7 +135,7 @@ class KifListWidgetState extends State<KifListWidget> {
                   foregroundColor: Colors.black87, // 文字・アイコン色を濃いグレー/黒系に設定
                   side: BorderSide(
                     color: Colors.grey.shade400, // 枠線の色
-                    width: 1.5, // 枠線の太さ
+                    // width: 1.5, // 枠線の太さ
                   ),
                   elevation: 0, // 影なし（フラットな見た目）
                   shape: const StadiumBorder(), // カプセル型の丸み

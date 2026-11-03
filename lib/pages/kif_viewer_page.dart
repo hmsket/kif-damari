@@ -54,11 +54,19 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
   bool _isSidebarOpen = false;
 
+  final ScrollController _commentScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _currentKifEntity = widget.kifEntity;
     _initKifData();
+  }
+
+  @override
+  void dispose() {
+    _commentScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _initKifData() async {
@@ -313,7 +321,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     }
 
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
-    final ScrollController _commentScrollController = ScrollController();
 
     return Scaffold(
       body: Stack(
@@ -890,7 +897,13 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     leadingIcon: const Icon(Icons.copy, size: 20),
                     child: const Text('棋譜ファイルをコピー'),
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _rawKifContent!));
+                      final kifContent = _rawKifContent;
+                      if (kifContent == null || kifContent.isEmpty) {
+                        ShowErrorSnackbar.show(context, 'コピーできる棋譜ファイルがありません');
+                        return;
+                      }
+                      Clipboard.setData(ClipboardData(text: kifContent));
+                      ShowSuccessSnackbar.show(context, '棋譜ファイルをコピーしました');
                     },
                   ),
                   MenuItemButton(
