@@ -8,6 +8,7 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
+import 'package:kifdamari/dialogs/discard_changes_dialog.dart';
 import 'package:kifdamari/logic/shogi_rule_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
@@ -209,6 +210,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
       final tree = KifParser.decode(content);
 
+      if (!mounted) return;
+
       setState(() {
         kifTree = tree;
         _selectedFile = null;
@@ -256,6 +259,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     try {
       final tree = KifParser.decode(text);
+
+      if (!mounted) return;
 
       setState(() {
         kifTree = tree;
@@ -441,6 +446,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
       toY: toRank,
       pieceName: pieceKanji,
     );
+
+    if (!mounted) return;
 
     setState(() {
       final int nextMoveNumber = kifTree!.currentNode.moveNumber + 1;
@@ -783,14 +790,13 @@ class _KifEditorPageState extends State<KifEditorPage> {
   void _showCommentEditDialog() async {
     final oldComment = kifTree!.currentNode.joinedComment;
     final result = await showCommentEditDialog(context, oldComment);
-    if (result != null) {
-      setState(() {
-        kifTree!.currentNode.comments.clear();
-        kifTree!.currentNode.comments.addAll(result);
-        _syncCommentFromCurrentNode();
-        _checkSaveStatus();
-      });
-    }
+    if (result == null || !mounted) return;
+    setState(() {
+      kifTree!.currentNode.comments.clear();
+      kifTree!.currentNode.comments.addAll(result);
+      _syncCommentFromCurrentNode();
+      _checkSaveStatus();
+    });
   }
 
   Widget _buildCommentField() {
@@ -838,6 +844,17 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
+  /// 戻る操作（PopScope / AppBarの戻るボタン）からの共通の終了処理。
+  /// 未保存の変更がある場合は確認ダイアログを表示する。
+  Future<void> _handleBackNavigation() async {
+    if (!_isSaved) {
+      final bool confirmed = await showDiscardChangesDialog(context);
+      if (!confirmed) return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop(_currentEntity);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading || kifTree == null) {
@@ -852,7 +869,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
-        Navigator.of(context).pop(_currentEntity);
+        _handleBackNavigation();
       },
       child: Scaffold(
         backgroundColor: const Color(0XFFF1F1F5),
@@ -861,7 +878,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              Navigator.of(context).pop(_currentEntity);
+              _handleBackNavigation();
             },
           ),
           backgroundColor: const Color(0XFFFFFFFF),

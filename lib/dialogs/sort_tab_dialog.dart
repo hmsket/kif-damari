@@ -125,11 +125,10 @@ class _SortTabsDialogContentState extends State<SortTabsDialogContent> {
 
   Future<void> _updateTabOrders(BuildContext context) async {
     await TabDao().updateAllTabOrders(tempTabs);
-    ShowSuccessSnackbar.show(context, "タブの並び順を更新しました");
-
     if (!context.mounted) return;
+    ShowSuccessSnackbar.show(context, "タブの並び順を更新しました");
     Navigator.pop(context);
 
-    widget.onRefresh(); 
+    widget.onRefresh();
   }
 }

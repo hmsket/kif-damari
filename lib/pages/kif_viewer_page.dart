@@ -152,10 +152,10 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
         await KifDao().updateKif(updatedKif);
         _currentKifEntity = updatedKif;
 
-        ShowSuccessSnackbar.show(context, "サムネイルを更新しました");
+        if (mounted) ShowSuccessSnackbar.show(context, "サムネイルを更新しました");
       }
     } catch (e) {
-      ShowErrorSnackbar.show(context, "サムネイルの更新に失敗しました");
+      if (mounted) ShowErrorSnackbar.show(context, "サムネイルの更新に失敗しました");
     }
   }
 

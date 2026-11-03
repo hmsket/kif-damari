@@ -155,7 +155,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           kifEntity: createdKif,
         ),
       ),
-    ).then((_) => _refresh());
+    ).then((_) {
+      if (mounted) _refresh();
+    });
   }
 
   @override
@@ -248,7 +250,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               }
                               
                               await state.saveOrder();
-                              ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
+                              if (mounted) ShowSuccessSnackbar.show(context, "棋譜の並び順を更新しました");
                               _updateMode(AppMode.normal);
                             } else if (_currentMode == AppMode.delete) {
                               if (tabs.isNotEmpty) {

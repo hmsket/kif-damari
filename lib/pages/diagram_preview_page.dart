@@ -65,13 +65,15 @@ class _DiagramPreviewPageState extends State<DiagramPreviewPage> {
         senteName: targetSente,
         goteName: targetGote,
       );
-      setState(() {
-        _currentPngBytes = newBytes;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPngBytes = newBytes;
+        });
+      }
     } catch (e) {
       if (mounted) ShowErrorSnackbar.show(context, '画像の再生成に失敗しました');
     } finally {
-      setState(() => _isGenerating = false);
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
 
@@ -137,7 +139,7 @@ void _showEditNameDialog() {
     } catch (e) {
       if (mounted) ShowErrorSnackbar.show(context, '画像の保存に失敗しました');
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
