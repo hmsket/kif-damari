@@ -5,7 +5,7 @@
 ## 全体の流れ
 1. 修正したいことを GitHub Issue に書く（= 台帳 GitHub Projects の1行になる）
 2. Issue に `/opencode 直してほしい内容` とコメントする（スマホのGitHubアプリでOK）
-3. OpenCode（無料モデル `opencode/big-pickle`）が Actions の中で修正し、PR を作る
+3. OpenCode（無料モデル `opencode/glm-5.3-flash-free`（GLM-5.3-Flash Free））が Actions の中で修正し、PR を作る
 4. Flutter CI がその PR で解析・テスト・APK ビルドを行い、APK を Artifacts に置く
 5. スマホで PR → Actions の Artifacts から APK をダウンロードしてインストール、実機確認
 6. 問題なければ PR をマージ（Issue は自動で閉じる）。NG なら PR を閉じて Issue に理由を書く
@@ -72,6 +72,6 @@ storeFile=upload-keystore.jks
 ## ファイル構成（このPRで追加・変更したもの）
 - `.github/workflows/opencode.yml` — /opencode コメントで OpenCode を起動
 - `.github/workflows/flutter-ci.yml` — 解析・テスト・APK ビルド + Artifacts アップロード
-- `opencode.json` — モデルを無料の big-pickle に固定（小さい内部タスク用モデルも同じ）
+- `opencode.json` — モデルを無料の GLM-5.3-Flash Free に固定（小さい内部タスク用モデルも同じ）
 - `android/app/build.gradle.kts` — key.properties がある場合だけ release 署名を使うよう変更
 - `.gitignore` — key.properties / *.jks / *.keystore をコミット対象外に追加
