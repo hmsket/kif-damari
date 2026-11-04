@@ -2,7 +2,7 @@ name: opencode
 
 # Issue / PR に /opencode または /oc とコメントすると、OpenCode が
 # GitHub Actions の中で修正してブランチ + PR を作る。
-# モデルは無料の opencode/big-pickle に固定（有料モデルは使わない）。
+# モデルは無料の opencode/glm-5.3-flash-free に固定（有料モデルは使わない）。
 # 公開リポジトリなので、起動できるのはリポジトリ所有者 (hmsket) のコメントだけに制限する。
 
 on:
@@ -39,5 +39,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: opencode/big-pickle
+          model: opencode/glm-5.3-flash-free
           use_github_token: true
