@@ -1,1 +1,1 @@
-{"$schema":"https://opencode.ai/config.json","model":"opencode/big-pickle","small_model":"opencode/big-pickle"}
+{"$schema":"https://opencode.ai/config.json","model":"opencode/glm-5.3-flash-free","small_model":"opencode/glm-5.3-flash-free"}
