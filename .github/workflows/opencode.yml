@@ -1,0 +1,43 @@
+name: opencode
+
+# Issue / PR に /opencode または /oc とコメントすると、OpenCode が
+# GitHub Actions の中で修正してブランチ + PR を作る。
+# モデルは無料の opencode/glm-5.3-flash-free に固定（有料モデルは使わない）。
+# 公開リポジトリなので、起動できるのはリポジトリ所有者 (hmsket) のコメントだけに制限する。
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  opencode:
+    if: >-
+      github.event.comment.user.login == 'hmsket' &&
+      (contains(github.event.comment.body, '/oc') ||
+       contains(github.event.comment.body, '/opencode'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Configure git
+        run: |
+          git config --global user.name "opencode-agent[bot]"
+          git config --global user.email "opencode-agent@users.noreply.github.com"
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/glm-5.3-flash-free
+          use_github_token: true
