@@ -1,1 +1,1 @@
-{"$schema":"https://opencode.ai/config.json","model":"opencode/glm-5.3-flash-free","small_model":"opencode/glm-5.3-flash-free"}
+{"$schema": "https://opencode.ai/config.json", "model": "opencode/glm-5.3-flash-free", "small_model": "opencode/deepseek-v4.1-flash-free"}
