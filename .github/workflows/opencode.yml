@@ -15,6 +15,7 @@ name: opencode
 #   2段目: opencode/deepseek-v4.1-flash-free (DeepSeek V4.1 Flash Free)
 # 指示は AGENTS.md に集約 (SDK取得・検証コマンド禁止, 検証はCI)。
 # 認証情報は保持する (persist-credentials 既定true): エージェントの git push に必要。
+# PR作成には専用PAT (OPENCODE_PAT) を使い、後段CIが自動開始されるようにする。
 # 無料枠が上限 (429) のとき OpenCode は長時間リトライし続けるため、
 # 各段に制限時間 (25分) を付けて見切り、次段へ切り替える。
 # 公開リポジトリなので、起動できるのはリポジトリ所有者 (hmsket) のコメントだけに制限する。
@@ -42,6 +43,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+          token: ${{ secrets.OPENCODE_PAT }}
 
       - name: Configure git
         run: |
@@ -74,7 +76,7 @@ jobs:
         continue-on-error: true
         uses: anomalyco/opencode/github@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.OPENCODE_PAT }}
         with:
           model: opencode/glm-5.3-flash-free
           use_github_token: true
@@ -84,7 +86,7 @@ jobs:
         timeout-minutes: 40
         uses: anomalyco/opencode/github@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.OPENCODE_PAT }}
         with:
           model: opencode/deepseek-v4.1-flash-free
           use_github_token: true
