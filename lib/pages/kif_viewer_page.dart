@@ -10,7 +10,6 @@ import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
-import 'package:kifdamari/pages/diagram_preview_page.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
@@ -181,88 +180,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
         ShowErrorSnackbar.show(context, "棋譜の共有に失敗しました");
       }
     }
-  }
-
-  Future<void> _shareCurrentDiagramWithHand() async {
-    try {
-      final uiImage = await DiagramGenerator.generateForShare(
-        state: kifTree!.currentNode.state,
-        info: Map<String, String>.from(kifTree!.info),
-        isReversed: _isReversed,
-      );
-
-      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw Exception("画像の変換に失敗しました");
-      final Uint8List pngBytes = byteData.buffer.asUint8List();
-
-      final tempDir = await getTemporaryDirectory();
-      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final file = File('${tempDir.path}/kif_share_$timestamp.png');
-      await file.writeAsBytes(pngBytes);
-
-      final moveNumber = kifTree!.currentNode.moveNumber;
-      final shareText = "棋譜だまりから局面を共有しています（${moveNumber}手目）\n#将棋 #棋譜だまり";
-
-      if (await file.exists()) {
-        await Share.shareXFiles(
-          [XFile(file.path)],
-          text: shareText,
-        );
-      }
-    } catch (e) {
-      debugPrint("共有失敗: $e");
-      if (mounted) {
-        ShowErrorSnackbar.show(context, "画像の共有に失敗しました");
-      }
-    }
-  }
-
-  void _showBranchSelector(List<GameNode> nextNodes) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  '次の手を選択してください',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.brown,
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              ...nextNodes.map((node) {
-                final cleanLabel = node.moveLabel!.replaceAll(RegExp(r'\(.*\)'), '');
-                return ListTile(
-                  leading: const Icon(Icons.navigation_rounded, color: Colors.orange),
-                  title: Text(
-                    "${node.moveNumber}手目: $cleanLabel",
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      kifTree!.stepNext(chosenNode: node);
-                    });
-                  },
-                );
-              }),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   // ダイヤルの回転操作（ドラッグ計算）ロジック
@@ -1078,71 +995,5 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
         ),
       ),
     );
-  }
-
-  void _navigateToPreviewPage() async {
-    try {
-      final String initialSente = kifTree!.info['先手'] ?? '先手';
-      final String initialGote = kifTree!.info['後手'] ?? '後手';
-
-      Future<Uint8List> generateBytes({
-        required bool highlightLastMove,
-        required String senteName,
-        required String goteName,
-      }) async {
-        final Map<String, String> updatedInfo = Map<String, String>.from(kifTree!.info);
-        updatedInfo['先手'] = senteName;
-        updatedInfo['後手'] = goteName;
-        updatedInfo['sente'] = senteName;
-        updatedInfo['gote'] = goteName;
-
-        final uiImage = await DiagramGenerator.generateForShare(
-          state: kifTree!.currentNode.state,
-          info: updatedInfo,
-          isReversed: _isReversed,
-          highlightLastMove: highlightLastMove,
-        );
-
-        final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
-        if (byteData == null) throw Exception("画像の変換に失敗しました");
-        return byteData.buffer.asUint8List();
-      }
-
-      final initialPngBytes = await generateBytes(
-        highlightLastMove: true,
-        senteName: initialSente,
-        goteName: initialGote,
-      );
-
-      if (!mounted) return;
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DiagramPreviewPage(
-            initialPngBytes: initialPngBytes,
-            moveNumber: kifTree!.currentNode.moveNumber,
-            initialSenteName: initialSente,
-            initialGoteName: initialGote,
-            onUpdateDiagram: ({
-              required bool highlightLastMove,
-              required String senteName,
-              required String goteName,
-            }) async {
-              return await generateBytes(
-                highlightLastMove: highlightLastMove,
-                senteName: senteName,
-                goteName: goteName,
-              );
-            },
-          ),
-        ),
-      );
-    } catch (e) {
-      debugPrint("画像生成失敗: $e");
-      if (mounted) {
-        ShowErrorSnackbar.show(context, "画像の生成に失敗しました");
-      }
-    }
   }
 }

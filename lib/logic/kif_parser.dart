@@ -78,7 +78,6 @@ class KifParser {
     final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
 
     int parsedMoveCount = 0;
-    int parsedInfoCount = 0;
 
     for (var line in lines) {
       final trimmedLine = line.trim();
@@ -174,7 +173,6 @@ class KifParser {
         final value = infoMatch.group(2)!.trim();
         if (!key.startsWith('手数')) {
           tree.info[key] = value;
-          parsedInfoCount++;
         }
       }
     }
