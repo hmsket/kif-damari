@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:math';
+import 'package:flutter/gestures.dart'; // kTouchSlop
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart'; // BoundedFrictionSimulation（慣性スクロール用）
 import 'package:flutter/scheduler.dart'; // Ticker
