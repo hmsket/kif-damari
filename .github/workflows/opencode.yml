@@ -3,91 +3,81 @@ name: opencode
 # Issue / PR に /opencode または /oc とコメントすると、OpenCode が
 # GitHub Actions の中で修正してブランチ + PR を作る。
 #
-#
-# GitHub Actions の共有IPは Zen 無料枠が枯れているため、ジョブの途中で
-# Tailscale に参加し、本人の Android スマホを出口ノード (exit node) にして
-# 通信をスマホ側の回線 (モバイル回線 / 接続中Wi-Fi) から出す。
-# Zen から見える送信元IPが Actions のものではなくなるのが狙い。
-#
-# 事前に必要なもの (ユーザーが登録):
-# Secrets:
-# TAILSCALE_OAUTH_CLIENT_ID Tailscale OAuth クライアントID
-# TAILSCALE_OAUTH_SECRET Tailscale OAuth シークレット
-# TAILSCALE_EXIT_NODE スマホの Tailscale IP (100.x.x.x)
-# スマホ側: Tailscale アプリで Run as exit node を有効化し、
-# 管理画面で Use as exit node を承認しておく。
-# Tailscale ポリシー: tag:github-actions の tagOwners 定義。
-# 出口が使えない場合は grant (tag:github-actions ->
-# autogroup:internet) の追加が必要になることがある。
+# 【スマホ出口ノード版】モデル呼び出しの前に Tailscale へ参加し、
+# 本人の Android スマホを出口ノードにして通信をスマホ回線から出す
+# (Actions の共有IPは Zen 無料枠が枯れているため)。
+# 必要な Secrets: TAILSCALE_OAUTH_CLIENT_ID / TAILSCALE_OAUTH_SECRET /
+# TAILSCALE_EXIT_NODE (スマホの Tailscale IP 100.x.x.x)。
+# スマホ側で Run as exit node の有効化と管理画面での承認が前提。
 #
 # モデルは無料枠のみ・学習に使われないモデルのみで2段フォールバック:
-# 1段目: opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)
-# 2段目: opencode/deepseek-v4.1-flash-free (DeepSeek V4.1 Flash Free)
+#   1段目: opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)
+#   2段目: opencode/deepseek-v4.1-flash-free (DeepSeek V4.1 Flash Free)
 # 無料枠が上限 (429) のとき OpenCode は長時間リトライし続けるため、
 # 各段に制限時間 (25分) を付けて見切り、次段へ切り替える。
 # 公開リポジトリなので、起動できるのはリポジトリ所有者 (hmsket) のコメントだけに制限する。
 
 on:
-issue_comment:
-types: [created]
-pull_request_review_comment:
-types: [created]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
 
 jobs:
-opencode:
-if: >-
-github.event.comment.user.login == 'hmsket' &&
-(contains(github.event.comment.body, '/oc') ||
-contains(github.event.comment.body, '/opencode'))
-runs-on: ubuntu-latest
-timeout-minutes: 60
-permissions:
-contents: write
-pull-requests: write
-issues: write
-steps:
-- name: Checkout
-uses: actions/checkout@v6
-with:
-fetch-depth: 1
-persist-credentials: false
+  opencode:
+    if: >-
+      github.event.comment.user.login == 'hmsket' &&
+      (contains(github.event.comment.body, '/oc') ||
+       contains(github.event.comment.body, '/opencode'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
 
-- name: Configure git
-run: |
-git config --global user.name "opencode-agent[bot]"
-git config --global user.email "opencode-agent@users.noreply.github.com"
+      - name: Configure git
+        run: |
+          git config --global user.name "opencode-agent[bot]"
+          git config --global user.email "opencode-agent@users.noreply.github.com"
 
-- name: Connect Tailscale (exit node = my phone)
-timeout-minutes: 3
-uses: tailscale/github-action@v3
-with:
-oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID}}
-oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET}}
-args: "--exit-node=${{ secrets.TAILSCALE_EXIT_NODE}}"
-tags: tag:github-actions
+      - name: Connect Tailscale (exit node = my phone)
+        timeout-minutes: 3
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          args: "--exit-node=${{ secrets.TAILSCALE_EXIT_NODE }}"
+          tags: tag:github-actions
 
-- name: Verify egress IP (should NOT be a GitHub/Azure IP)
-run: |
-tailscale status | grep -i 'exit node' || true
-echo "Egress IP: $(curl -s https://ifconfig.me)"
+      - name: Verify egress IP (should NOT be a GitHub/Azure IP)
+        run: |
+          tailscale status | grep -i 'exit node' || true
+          echo "Egress IP: $(curl -s https://ifconfig.me)"
 
-- name: Run OpenCode (primary - GLM-5.3-Flash Free)
-id: oc_primary
-timeout-minutes: 25
-continue-on-error: true
-uses: anomalyco/opencode/github@latest
-env:
-GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}
-with:
-model: opencode/glm-5.3-flash-free
-use_github_token: true
+      - name: Run OpenCode (primary - GLM-5.3-Flash Free)
+        id: oc_primary
+        timeout-minutes: 25
+        continue-on-error: true
+        uses: anomalyco/opencode/github@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/glm-5.3-flash-free
+          use_github_token: true
 
-- name: Run OpenCode (fallback - DeepSeek V4.1 Flash Free)
-if: steps.oc_primary.outcome == 'failure'
-timeout-minutes: 25
-uses: anomalyco/opencode/github@latest
-env:
-GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}
-with:
-model: opencode/deepseek-v4.1-flash-free
-use_github_token: true
+      - name: Run OpenCode (fallback - DeepSeek V4.1 Flash Free)
+        if: steps.oc_primary.outcome == 'failure'
+        timeout-minutes: 25
+        uses: anomalyco/opencode/github@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/deepseek-v4.1-flash-free
+          use_github_token: true
