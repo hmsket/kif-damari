@@ -58,8 +58,8 @@ class TreeScrollSpeedSetting extends StatelessWidget {
                     Slider(
                       value: currentSliderValue,
                       min: 0.5,
-                      max: 3.0,
-                      divisions: 5,
+                      max: 5.0,
+                      divisions: 9,
                       label: currentSliderValue.toStringAsFixed(1),
                       onChanged: (newValue) async {
                         await settings.set('treeScrollSpeed', newValue);
