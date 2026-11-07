@@ -13,6 +13,7 @@ name: opencode
 # モデルは無料枠のみ・学習に使われないモデルのみで2段フォールバック:
 #   1段目: opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)
 #   2段目: opencode/deepseek-v4.1-flash-free (DeepSeek V4.1 Flash Free)
+# 指示は AGENTS.md に集約 (SDK取得・検証コマンド禁止, 検証はCI)。
 # 無料枠が上限 (429) のとき OpenCode は長時間リトライし続けるため、
 # 各段に制限時間 (25分) を付けて見切り、次段へ切り替える。
 # 公開リポジトリなので、起動できるのはリポジトリ所有者 (hmsket) のコメントだけに制限する。
@@ -30,7 +31,7 @@ jobs:
       (contains(github.event.comment.body, '/oc') ||
        contains(github.event.comment.body, '/opencode'))
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: write
       pull-requests: write
@@ -46,6 +47,12 @@ jobs:
         run: |
           git config --global user.name "opencode-agent[bot]"
           git config --global user.email "opencode-agent@users.noreply.github.com"
+
+      - name: Setup Flutter (for the agent's local checks)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          cache: true
 
       - name: Connect Tailscale (exit node = my phone)
         timeout-minutes: 3
@@ -63,7 +70,7 @@ jobs:
 
       - name: Run OpenCode (primary - GLM-5.3-Flash Free)
         id: oc_primary
-        timeout-minutes: 25
+        timeout-minutes: 40
         continue-on-error: true
         uses: anomalyco/opencode/github@latest
         env:
@@ -74,7 +81,7 @@ jobs:
 
       - name: Run OpenCode (fallback - DeepSeek V4.1 Flash Free)
         if: steps.oc_primary.outcome == 'failure'
-        timeout-minutes: 25
+        timeout-minutes: 40
         uses: anomalyco/opencode/github@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
