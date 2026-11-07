@@ -107,8 +107,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
 
     // 設定された自動フォーマットテンプレートの取得
-    final String titleTemplate = settings.get<String>('kifTitle') ?? '{先手} vs {後手}';
-    final String detailTemplate = settings.get<String>('kifDetail') ?? '{棋戦} / {戦型} / {対局日}';
+    final String titleTemplate = settings.get<String>('kifTitle');
+    final String detailTemplate = settings.get<String>('kifDetail');
 
     // 新規作成時の初期値マッピング（ファイル読み込み前のためプレースホルダー値を設定）
     final Map<String, String> defaultHeaderValues = {
