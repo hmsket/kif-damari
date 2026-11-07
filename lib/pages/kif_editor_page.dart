@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:charset_converter/charset_converter.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
@@ -22,7 +20,6 @@ import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class KifEditorPage extends StatefulWidget {
   final KifEntity kifEntity;
@@ -1324,7 +1321,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   String _generateTitleText() {
     final settings = AppSettings();
-    final String titleTemplate = settings.get<String>('kifTitle') ?? '{先手} vs {後手}';
+    final String titleTemplate = settings.get<String>('kifTitle');
     return _applyTemplate(titleTemplate, _generateValueMap());
   }
 
@@ -1332,7 +1329,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     if (kifTree == null) return widget.kifEntity.detail ?? '';
 
     final settings = AppSettings();
-    final String detailTemplate = settings.get<String>('kifDetail') ?? '{棋戦} / {戦型} / {対局日}';
+    final String detailTemplate = settings.get<String>('kifDetail');
     return _applyTemplate(detailTemplate, _generateValueMap());
   }
 
