@@ -10,6 +10,7 @@ class AppSettings {
     'fontSize': 14.0,
     'kifLimit': defaultKifLimit,
     'thumbnailSize': 120,
+    'treeScrollSpeed': 2.0,
     'defaultPlayerName': 'プレイヤー',
     'kifTitle': '{先手} vs {後手}',
     'kifDetail': '{棋戦} / {戦型} / {対局日}',

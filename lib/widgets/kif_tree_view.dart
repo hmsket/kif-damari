@@ -5,6 +5,7 @@ import 'package:flutter/physics.dart'; // BoundedFrictionSimulation（慣性ス�
 import 'package:flutter/scheduler.dart'; // Ticker
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/game_node.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
 
 class KifTreeView extends StatefulWidget {
   final GameNode rootNode;
@@ -32,12 +33,15 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
   static const double nodeHeight = 50.0;  // ノード（ボタン）の高さ
 
   // 💡 スクロール挙動の調整用定数
-  static const double panSpeedMultiplier = 1.5;  // ドラッグ移動の倍率
+  // ドラッグ移動の倍率は設定「treeScrollSpeed」から読み込む（既定値 2.0）
   static const double flickFriction = 0.08;      // 慣性スクロールの摩擦係数（小さいほど遠くまで滑る）
   static const double flickMaxVelocity = 2500.0; // 慣性スクロール速度の上限 (px/s)
   static const double flickMinVelocity = 50.0;   // 慣性スクロールを開始する最低速度 (px/s)
   static const int velocitySampleWindowMs = 100; // 速度算出に使うサンプル時間幅 (ms)
   static const double treeBoundaryMargin = 100.0; // パン可能な範囲のマージン
+
+  final AppSettings _settings = AppSettings();
+  double _panSpeedMultiplier = 2.0; // ドラッグ移動・慣性初速に掛ける倍率（設定由来）
 
   late GameNode rootNode;
   late TransformationController _transformationController;
@@ -60,10 +64,20 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     super.initState();
     _transformationController = TransformationController();
     _buildTreeLayout();
-    
+
+    // 💡 スクロール速度の設定値を読み込み、変更をリアルタイムで反映する
+    _panSpeedMultiplier = _settings.get<double>('treeScrollSpeed');
+    _settings.listenable.addListener(_onSettingsChanged);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToCurrentNode();
     });
+  }
+
+  void _onSettingsChanged() {
+    final double newValue = _settings.get<double>('treeScrollSpeed');
+    if (newValue == _panSpeedMultiplier) return;
+    _panSpeedMultiplier = newValue;
   }
 
   @override
@@ -82,6 +96,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    _settings.listenable.removeListener(_onSettingsChanged);
     _cancelInertia();
     _transformationController.dispose();
     super.dispose();
@@ -123,7 +138,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
 
   // 💡 ドラッグ（パン）と慣性スクロールの自前処理
   // InteractiveViewer標準のパンは panEnabled: false で無効化し、
-  // ここで「panSpeedMultiplier 倍の移動」と「指を離した後の慣性」を実現する。
+  // ここで「設定倍率（_panSpeedMultiplier）倍の移動」と「指を離した後の慣性」を実現する。
 
   void _onPointerDown(PointerDownEvent event) {
     // 指が触れたら慣性は中止する
@@ -156,7 +171,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
       }
     }
 
-    _applyPan(event.delta * panSpeedMultiplier);
+    _applyPan(event.delta * _panSpeedMultiplier);
     _recordPointerSample(event.timeStamp, event.localPosition);
   }
 
@@ -164,7 +179,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     if (event.pointer != _trackedPointerId) return;
     _trackedPointerId = null;
 
-    final Offset velocity = _estimatePointerVelocity() * panSpeedMultiplier;
+    final Offset velocity = _estimatePointerVelocity() * _panSpeedMultiplier;
     if (velocity.distance < flickMinVelocity) return;
     _startInertia(velocity);
   }
@@ -397,7 +412,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     }
 
     // 💡 標準のパン（panEnabled: false で無効化）の代わりに、上側の Listener で
-    // ドラッグ移動（panSpeedMultiplier 倍）と慣性スクロールを自前処理する。
+    // ドラッグ移動（設定のスクロール速度倍）と慣性スクロールを自前処理する。
     final Widget tree = InteractiveViewer(
       transformationController: _transformationController, // コントローラーを紐付け
       boundaryMargin: const EdgeInsets.all(treeBoundaryMargin), 
@@ -550,7 +565,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     );
 
     // 💡 InteractiveViewer自身のパンは無効なので、指の動きを直接受け取って
-    // パン（panSpeedMultiplier 倍）と慣性スクロールを処理する。
+    // パン（設定のスクロール速度倍）と慣性スクロールを処理する。
     // ノードのタップ選択には影響しない（Listenerはジェスチャ競合に参加しない）。
     return Listener(
       onPointerDown: _onPointerDown,

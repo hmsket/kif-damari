@@ -3,6 +3,7 @@ import 'package:kifdamari/settings/font_size_setting.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/settings/kif_template_setting.dart';
 import 'package:kifdamari/settings/thumbnail_size_setting.dart';
+import 'package:kifdamari/settings/tree_scroll_speed_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 
 class SettingPage extends StatelessWidget {
@@ -43,6 +44,8 @@ class SettingPage extends StatelessWidget {
               _buildSectionTitle('棋譜再生画面'),
 
               FontSizeSetting(settings: settings),
+
+              TreeScrollSpeedSetting(settings: settings),
 
             ],
           );
