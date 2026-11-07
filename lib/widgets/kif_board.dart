@@ -8,6 +8,10 @@ class KifBoard extends StatelessWidget {
   final int? selectedY;
   final List<List<int>>? validMoves;
 
+  /// ドラッグ中の駒の位置（筋・段）。指定されたマスの駒は盤面に描画しない。
+  final int? draggingX;
+  final int? draggingY;
+
   const KifBoard({
     super.key,
     required this.state,
@@ -15,6 +19,8 @@ class KifBoard extends StatelessWidget {
     this.selectedX,
     this.selectedY,
     this.validMoves,
+    this.draggingX,
+    this.draggingY,
   });
 
   @override
@@ -35,6 +41,14 @@ class KifBoard extends StatelessWidget {
           for (int x = 0; x < 9; x++) {
             final String? pieceName = state.grid[y][x];
             if (pieceName != null) {
+              final int? draggingX = this.draggingX;
+              final int? draggingY = this.draggingY;
+              final bool isDraggingPiece = draggingX != null &&
+                  draggingY != null &&
+                  x == 9 - draggingX &&
+                  y == draggingY - 1;
+              if (isDraggingPiece) continue;
+
               final displayX = isReversed ? (8 - x) : x;
               final displayY = isReversed ? (8 - y) : y;
 
