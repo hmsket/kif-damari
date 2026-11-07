@@ -52,13 +52,20 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isSidebarOpen = false;
   Offset _lastTapGlobalPosition = Offset.zero;
 
-  // 盤上の駒のドラッグ中の状態（持ち駒はドラッグ対象外）
+  // 盤上の駒・持ち駒のドラッグ中の状態
   bool _isDraggingPiece = false;
   int? _dragFile;
   int? _dragRank;
   String? _dragPieceCode;
   Offset _dragGlobalPosition = Offset.zero;
   Offset _dragLocalPosition = Offset.zero;
+
+  // 持ち駒のドラッグ中の状態
+  bool _dragIsFromHand = false;
+  String? _dragHandPieceType;
+  final GlobalKey _boardKey = GlobalKey();
+  final GlobalKey _dragOverlayKey = GlobalKey();
+  BoxConstraints? _boardConstraints;
 
   // 最後にファイルに書き込んだ、または読み込んだ時の状態比較用文字列
   String _lastSavedContent = '';
@@ -312,6 +319,22 @@ class _KifEditorPageState extends State<KifEditorPage> {
     return (file, rank);
   }
 
+  /// グローバル座標を盤面の（筋, 段）に変換する。盤の外の場合は null を返す。
+  (int, int)? _boardCoordsFromGlobal(Offset globalPosition) {
+    final RenderBox? box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    final BoxConstraints? constraints = _boardConstraints;
+    if (box == null || constraints == null || !box.attached) return null;
+
+    return _boardCoordsFromLocal(box.globalToLocal(globalPosition), constraints);
+  }
+
+  /// グローバル座標を指定したウィジェットのローカル座標に変換する。
+  Offset? _localPositionFromGlobal(Offset globalPosition, GlobalKey key) {
+    final RenderBox? box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    return box.globalToLocal(globalPosition);
+  }
+
   void _onBoardTap(TapUpDetails details, BoxConstraints constraints) {
     if (kifTree == null) return;
 
@@ -325,6 +348,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _onBoardPanStart(DragStartDetails details, BoxConstraints constraints) {
     if (kifTree == null) return;
+    if (_dragIsFromHand) return;
 
     final coord = _boardCoordsFromLocal(details.localPosition, constraints);
     if (coord == null) return;
@@ -351,6 +375,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _onBoardPanUpdate(DragUpdateDetails details) {
     if (!_isDraggingPiece) return;
+    if (_dragIsFromHand) return;
 
     setState(() {
       _dragGlobalPosition = details.globalPosition;
@@ -360,6 +385,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _onBoardPanEnd(BoxConstraints constraints) {
     if (!_isDraggingPiece) return;
+    if (_dragIsFromHand) return;
 
     final int? fromFile = _dragFile;
     final int? fromRank = _dragRank;
@@ -389,12 +415,86 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _onBoardPanCancel() {
     if (!_isDraggingPiece) return;
+    if (_dragIsFromHand) return;
 
     setState(() {
       _isDraggingPiece = false;
       _dragFile = null;
       _dragRank = null;
       _dragPieceCode = null;
+      _selectedFile = null;
+      _selectedRank = null;
+    });
+  }
+
+  /// 持ち駒のドラッグ開始（駒台）。有効な駒のみ（タップ選択と同じ条件）。
+  void _onHandPanStart(DragStartDetails details, String pieceType, String assetCode, bool isOwnTurn) {
+    if (kifTree == null || !isOwnTurn) return;
+
+    setState(() {
+      _isDraggingPiece = true;
+      _dragIsFromHand = true;
+      _dragHandPieceType = pieceType;
+      _dragFile = null;
+      _dragRank = null;
+      _dragPieceCode = assetCode;
+      _dragGlobalPosition = details.globalPosition;
+      _selectedHandPiece = pieceType;
+      _selectedFile = null;
+      _selectedRank = null;
+    });
+  }
+
+  void _onHandPanUpdate(DragUpdateDetails details) {
+    if (!_isDraggingPiece || !_dragIsFromHand) return;
+
+    setState(() {
+      _dragGlobalPosition = details.globalPosition;
+    });
+  }
+
+  /// 持ち駒のドラッグ終了。盤上の打てるマスなら _dropPiece で打ち、それ以外はキャンセル。
+  void _onHandPanEnd() {
+    if (!_isDraggingPiece || !_dragIsFromHand) return;
+
+    final String? pieceType = _dragHandPieceType;
+    final Offset dropGlobal = _dragGlobalPosition;
+
+    setState(() {
+      _isDraggingPiece = false;
+      _dragIsFromHand = false;
+      _dragFile = null;
+      _dragRank = null;
+      _dragPieceCode = null;
+      _dragHandPieceType = null;
+      _selectedHandPiece = null;
+      _selectedFile = null;
+      _selectedRank = null;
+    });
+
+    if (pieceType == null || kifTree == null) return;
+
+    final coord = _boardCoordsFromGlobal(dropGlobal);
+    if (coord == null) return;
+
+    final validDrops = _getValidDropMoves(pieceType);
+    final bool canDrop = validDrops.any((m) => m[0] == coord.$1 && m[1] == coord.$2);
+    if (!canDrop) return;
+
+    _dropPiece(pieceType: pieceType, toFile: coord.$1, toRank: coord.$2);
+  }
+
+  void _onHandPanCancel() {
+    if (!_isDraggingPiece || !_dragIsFromHand) return;
+
+    setState(() {
+      _isDraggingPiece = false;
+      _dragIsFromHand = false;
+      _dragFile = null;
+      _dragRank = null;
+      _dragPieceCode = null;
+      _dragHandPieceType = null;
+      _selectedHandPiece = null;
       _selectedFile = null;
       _selectedRank = null;
     });
@@ -955,6 +1055,20 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
+    // ドラッグ中の駒の画像（盤上の駒・持ち駒の両方）。指位置に追従して描画する。
+    final bool isDragging = _isDraggingPiece && _dragPieceCode != null;
+    String dragAsset = _dragPieceCode ?? '';
+    if (!_dragIsFromHand && _isReversed) {
+      if (dragAsset.startsWith('b')) {
+        dragAsset = dragAsset.replaceFirst('b', 'w');
+      } else if (dragAsset.startsWith('w')) {
+        dragAsset = dragAsset.replaceFirst('w', 'b');
+      }
+    }
+    final double dragCellSize = (_boardConstraints?.maxWidth ?? 0) / 9;
+    final Offset? dragOverlayLocal =
+        isDragging ? _localPositionFromGlobal(_dragGlobalPosition, _dragOverlayKey) : null;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
@@ -1028,6 +1142,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         ),
         body: SafeArea(
           child: Stack(
+            key: _dragOverlayKey,
             children: [
               Column(
                 children: [
@@ -1042,60 +1157,28 @@ class _KifEditorPageState extends State<KifEditorPage> {
                       aspectRatio: 0.93,
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final bool isDragging = _isDraggingPiece && _dragPieceCode != null;
-                          String dragAsset = _dragPieceCode ?? '';
-                          if (_isReversed) {
-                            if (dragAsset.startsWith('b')) {
-                              dragAsset = dragAsset.replaceFirst('b', 'w');
-                            } else if (dragAsset.startsWith('w')) {
-                              dragAsset = dragAsset.replaceFirst('w', 'b');
-                            }
-                          }
-                          final double cellSize = constraints.maxWidth / 9;
+                          _boardConstraints = constraints;
 
-                          return Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              GestureDetector(
-                                onTapUp: (details) => _onBoardTap(details, constraints),
-                                onPanStart: (details) => _onBoardPanStart(details, constraints),
-                                onPanUpdate: _onBoardPanUpdate,
-                                onPanEnd: (_) => _onBoardPanEnd(constraints),
-                                onPanCancel: _onBoardPanCancel,
-                                child: KifBoard(
-                                  state: kifTree!.currentNode.state,
-                                  isReversed: _isReversed,
-                                  selectedX: _selectedFile,
-                                  selectedY: _selectedRank,
-                                  draggingX: _dragFile,
-                                  draggingY: _dragRank,
-                                  validMoves: (_selectedFile != null && _selectedRank != null)
-                                      ? _getValidMoves(_selectedFile!, _selectedRank!)
-                                      : (_selectedHandPiece != null)
-                                          ? _getValidDropMoves(_selectedHandPiece!)
-                                          : null,
-                                ),
-                              ),
-                              if (isDragging)
-                                Positioned(
-                                  left: _dragLocalPosition.dx - cellSize / 2,
-                                  top: _dragLocalPosition.dy - cellSize / 2,
-                                  width: cellSize,
-                                  height: cellSize,
-                                  child: IgnorePointer(
-                                    child: Opacity(
-                                      opacity: 0.7,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(2.0),
-                                        child: Image.asset(
-                                          'assets/images/pieces/$dragAsset.png',
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                          return GestureDetector(
+                            key: _boardKey,
+                            onTapUp: (details) => _onBoardTap(details, constraints),
+                            onPanStart: (details) => _onBoardPanStart(details, constraints),
+                            onPanUpdate: _onBoardPanUpdate,
+                            onPanEnd: (_) => _onBoardPanEnd(constraints),
+                            onPanCancel: _onBoardPanCancel,
+                            child: KifBoard(
+                              state: kifTree!.currentNode.state,
+                              isReversed: _isReversed,
+                              selectedX: _selectedFile,
+                              selectedY: _selectedRank,
+                              draggingX: _dragFile,
+                              draggingY: _dragRank,
+                              validMoves: (_selectedFile != null && _selectedRank != null)
+                                  ? _getValidMoves(_selectedFile!, _selectedRank!)
+                                  : (_selectedHandPiece != null)
+                                      ? _getValidDropMoves(_selectedHandPiece!)
+                                      : null,
+                            ),
                           );
                         },
                       ),
@@ -1185,6 +1268,25 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   ),
                 ),
               ),
+              if (isDragging && dragOverlayLocal != null)
+                Positioned(
+                  left: dragOverlayLocal.dx - dragCellSize / 2,
+                  top: dragOverlayLocal.dy - dragCellSize / 2,
+                  width: dragCellSize,
+                  height: dragCellSize,
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: 0.7,
+                      child: Padding(
+                        padding: const EdgeInsets.all(2.0),
+                        child: Image.asset(
+                          'assets/images/pieces/$dragAsset.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -1254,6 +1356,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
     }
 
+    final Player currentPlayer = kifTree!.currentNode.state.nextPlayer;
+    final bool isOwnTurn = (currentPlayer == Player.sente && isSente) ||
+        (currentPlayer == Player.gote && !isSente);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: slots.map((entry) {
@@ -1276,17 +1382,18 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   setState(() {
                     if (isSelected) {
                       _selectedHandPiece = null;
-                    } else {
-                      final currentPlayer = kifTree!.currentNode.state.nextPlayer;
-                      if ((currentPlayer == Player.sente && isSente) ||
-                          (currentPlayer == Player.gote && !isSente)) {
-                        _selectedHandPiece = entry.key;
-                        _selectedFile = null;
-                        _selectedRank = null;
-                      }
+                    } else if (isOwnTurn) {
+                      _selectedHandPiece = entry.key;
+                      _selectedFile = null;
+                      _selectedRank = null;
                     }
                   });
                 },
+                onPanStart: (details) =>
+                    _onHandPanStart(details, entry.key, '$assetPrefix${entry.key}', isOwnTurn),
+                onPanUpdate: _onHandPanUpdate,
+                onPanEnd: (_) => _onHandPanEnd(),
+                onPanCancel: _onHandPanCancel,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Stack(
