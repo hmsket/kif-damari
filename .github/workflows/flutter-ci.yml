@@ -1,7 +1,9 @@
 name: flutter-ci
 
 # PR / main への push / 手動実行で、解析・テスト・APK ビルドを行う。
-# APK は Actions の Artifacts (kifdamari-apk-arm64) からダウンロードできる。
+# APK は Actions の Artifacts (kifdamari-apk-arm64) からもダウンロードできるが、
+# 通常は固定リンクの dev リリース (末尾の Publish ステップ) を使うのが楽:
+#   https://github.com/hmsket/kif-damari/releases/download/dev/kifdamari.apk
 #
 # 署名について:
 #   Secrets に KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD が
@@ -18,7 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # dev リリースへ APK を公開するために必要
 
 jobs:
   build:
@@ -82,3 +84,14 @@ jobs:
           name: kifdamari-apk-arm64
           path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           if-no-files-found: error
+      - name: Publish APK to rolling dev release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk kifdamari.apk
+          if ! gh release view dev > /dev/null 2>&1; then
+            gh release create dev --prerelease --title "dev (検証用・最新ビルド)" --notes "CI が自動で更新する検証用リリースです。" || true
+          fi
+          gh release upload dev kifdamari.apk --clobber
+          gh release edit dev --notes "最新の成功ビルド: ${{ github.event_name }} / ${{ github.sha }} / run ${{ github.run_number }}"
+          echo "Published: https://github.com/hmsket/kif-damari/releases/download/dev/kifdamari.apk"
