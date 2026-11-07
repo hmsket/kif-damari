@@ -41,6 +41,8 @@ class KifBoard extends StatelessWidget {
           for (int x = 0; x < 9; x++) {
             final String? pieceName = state.grid[y][x];
             if (pieceName != null) {
+              final int? draggingX = this.draggingX;
+              final int? draggingY = this.draggingY;
               final bool isDraggingPiece = draggingX != null &&
                   draggingY != null &&
                   x == 9 - draggingX &&
