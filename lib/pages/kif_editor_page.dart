@@ -52,6 +52,14 @@ class _KifEditorPageState extends State<KifEditorPage> {
   bool _isSidebarOpen = false;
   Offset _lastTapGlobalPosition = Offset.zero;
 
+  // 盤上の駒のドラッグ中の状態（持ち駒はドラッグ対象外）
+  bool _isDraggingPiece = false;
+  int? _dragFile;
+  int? _dragRank;
+  String? _dragPieceCode;
+  Offset _dragGlobalPosition = Offset.zero;
+  Offset _dragLocalPosition = Offset.zero;
+
   // 最後にファイルに書き込んだ、または読み込んだ時の状態比較用文字列
   String _lastSavedContent = '';
   // 現在編集中の状態が保存された状態と一致しているか
@@ -280,31 +288,116 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
-  void _onBoardTap(TapUpDetails details, BoxConstraints constraints) {
-    if (kifTree == null) return;
-
-    _lastTapGlobalPosition = details.globalPosition;
-
+  /// 盤面上のローカル座標を（筋, 段）に変換する。盤の外の場合は null を返す。
+  (int, int)? _boardCoordsFromLocal(Offset localPosition, BoxConstraints constraints) {
     final double boardWidth = constraints.maxWidth;
     final double boardHeight = constraints.maxHeight;
 
     final double cellWidth = boardWidth / 9;
     final double cellHeight = boardHeight / 9;
 
-    double localX = details.localPosition.dx;
-    double localY = details.localPosition.dy;
+    double localX = localPosition.dx;
+    double localY = localPosition.dy;
 
     if (_isReversed) {
       localX = boardWidth - localX;
       localY = boardHeight - localY;
     }
 
-    int file = 9 - (localX / cellWidth).floor();
-    int rank = (localY / cellHeight).floor() + 1;
+    final int file = 9 - (localX / cellWidth).floor();
+    final int rank = (localY / cellHeight).floor() + 1;
 
-    if (file < 1 || file > 9 || rank < 1 || rank > 9) return;
+    if (file < 1 || file > 9 || rank < 1 || rank > 9) return null;
 
-    _handleSquareClick(file, rank);
+    return (file, rank);
+  }
+
+  void _onBoardTap(TapUpDetails details, BoxConstraints constraints) {
+    if (kifTree == null) return;
+
+    _lastTapGlobalPosition = details.globalPosition;
+
+    final coord = _boardCoordsFromLocal(details.localPosition, constraints);
+    if (coord == null) return;
+
+    _handleSquareClick(coord.$1, coord.$2);
+  }
+
+  void _onBoardPanStart(DragStartDetails details, BoxConstraints constraints) {
+    if (kifTree == null) return;
+
+    final coord = _boardCoordsFromLocal(details.localPosition, constraints);
+    if (coord == null) return;
+
+    final int file = coord.$1;
+    final int rank = coord.$2;
+
+    final currentState = kifTree!.currentNode.state;
+    final String? piece = currentState.grid[rank - 1][9 - file];
+    if (piece == null || !_isOwnPiece(piece, currentState.nextPlayer)) return;
+
+    setState(() {
+      _isDraggingPiece = true;
+      _dragFile = file;
+      _dragRank = rank;
+      _dragPieceCode = piece;
+      _dragGlobalPosition = details.globalPosition;
+      _dragLocalPosition = details.localPosition;
+      _selectedHandPiece = null;
+      _selectedFile = file;
+      _selectedRank = rank;
+    });
+  }
+
+  void _onBoardPanUpdate(DragUpdateDetails details) {
+    if (!_isDraggingPiece) return;
+
+    setState(() {
+      _dragGlobalPosition = details.globalPosition;
+      _dragLocalPosition = details.localPosition;
+    });
+  }
+
+  void _onBoardPanEnd(BoxConstraints constraints) {
+    if (!_isDraggingPiece) return;
+
+    final int? fromFile = _dragFile;
+    final int? fromRank = _dragRank;
+
+    setState(() {
+      _isDraggingPiece = false;
+      _dragFile = null;
+      _dragRank = null;
+      _dragPieceCode = null;
+      _selectedFile = null;
+      _selectedRank = null;
+    });
+
+    if (fromFile == null || fromRank == null) return;
+
+    final coord = _boardCoordsFromLocal(_dragLocalPosition, constraints);
+    if (coord == null || (coord.$1 == fromFile && coord.$2 == fromRank)) return;
+
+    final validMoves = _getValidMoves(fromFile, fromRank);
+    final bool canMove = validMoves.any((m) => m[0] == coord.$1 && m[1] == coord.$2);
+    if (!canMove) return;
+
+    _lastTapGlobalPosition = _dragGlobalPosition;
+
+    _movePiece(fromFile: fromFile, fromRank: fromRank, toFile: coord.$1, toRank: coord.$2);
+  }
+
+  void _onBoardPanCancel() {
+    if (!_isDraggingPiece) return;
+
+    setState(() {
+      _isDraggingPiece = false;
+      _dragFile = null;
+      _dragRank = null;
+      _dragPieceCode = null;
+      _selectedFile = null;
+      _selectedRank = null;
+    });
   }
 
   void _handleSquareClick(int file, int rank) {
@@ -949,19 +1042,60 @@ class _KifEditorPageState extends State<KifEditorPage> {
                       aspectRatio: 0.93,
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          return GestureDetector(
-                            onTapUp: (details) => _onBoardTap(details, constraints),
-                            child: KifBoard(
-                              state: kifTree!.currentNode.state,
-                              isReversed: _isReversed,
-                              selectedX: _selectedFile,
-                              selectedY: _selectedRank,
-                              validMoves: (_selectedFile != null && _selectedRank != null)
-                                  ? _getValidMoves(_selectedFile!, _selectedRank!)
-                                  : (_selectedHandPiece != null)
-                                      ? _getValidDropMoves(_selectedHandPiece!)
-                                      : null,
-                            ),
+                          final bool isDragging = _isDraggingPiece && _dragPieceCode != null;
+                          String dragAsset = _dragPieceCode ?? '';
+                          if (_isReversed) {
+                            if (dragAsset.startsWith('b')) {
+                              dragAsset = dragAsset.replaceFirst('b', 'w');
+                            } else if (dragAsset.startsWith('w')) {
+                              dragAsset = dragAsset.replaceFirst('w', 'b');
+                            }
+                          }
+                          final double cellSize = constraints.maxWidth / 9;
+
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              GestureDetector(
+                                onTapUp: (details) => _onBoardTap(details, constraints),
+                                onPanStart: (details) => _onBoardPanStart(details, constraints),
+                                onPanUpdate: _onBoardPanUpdate,
+                                onPanEnd: (_) => _onBoardPanEnd(constraints),
+                                onPanCancel: _onBoardPanCancel,
+                                child: KifBoard(
+                                  state: kifTree!.currentNode.state,
+                                  isReversed: _isReversed,
+                                  selectedX: _selectedFile,
+                                  selectedY: _selectedRank,
+                                  draggingX: _dragFile,
+                                  draggingY: _dragRank,
+                                  validMoves: (_selectedFile != null && _selectedRank != null)
+                                      ? _getValidMoves(_selectedFile!, _selectedRank!)
+                                      : (_selectedHandPiece != null)
+                                          ? _getValidDropMoves(_selectedHandPiece!)
+                                          : null,
+                                ),
+                              ),
+                              if (isDragging)
+                                Positioned(
+                                  left: _dragLocalPosition.dx - cellSize / 2,
+                                  top: _dragLocalPosition.dy - cellSize / 2,
+                                  width: cellSize,
+                                  height: cellSize,
+                                  child: IgnorePointer(
+                                    child: Opacity(
+                                      opacity: 0.7,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(2.0),
+                                        child: Image.asset(
+                                          'assets/images/pieces/$dragAsset.png',
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           );
                         },
                       ),
