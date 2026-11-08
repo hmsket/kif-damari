@@ -37,10 +37,7 @@ class KifViewerPage extends StatefulWidget {
 class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateMixin {
   KifTree? kifTree;
   bool _isLoading = true;
-  bool _isSeeking = false;
   bool _isReversed = false;
-  double _dragStartX = 0.0;
-  int _dragStartMoveNumber = 0;
   String? _rawKifContent;
 
   // 💡 ダイヤル操作用の変数
@@ -242,158 +239,134 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     return Scaffold(
       body: Stack(
         children: [
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onLongPressStart: (details) {
-              HapticFeedback.mediumImpact();
-              setState(() {
-                _isSeeking = true;
-                _dragStartX = details.localPosition.dx;
-                _dragStartMoveNumber = kifTree!.currentNode.moveNumber;
-              });
-            },
-            onLongPressMoveUpdate: (details) {
-              if (!_isSeeking) return;
-              double deltaX = details.localPosition.dx - _dragStartX;
-              int sensitivity = 3;
-              int moveOffset = (deltaX / sensitivity).toInt();
+          SafeArea(
+            child: Column(
+              children: [
+                _buildPlayerAndKomaDai(
+                  playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
+                  isSente: _isReversed,
+                  isUpper: true,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: AspectRatio(
+                    aspectRatio: 0.93,
+                    child: Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        GestureDetector(
+                          onTapUp: (details) {
+                            final box = context.findRenderObject() as RenderBox?;
+                            if (box == null) return;
+                            final halfWidth = box.size.width / 2;
 
-              setState(() {
-                kifTree!.jumpTo(_dragStartMoveNumber + moveOffset);
-              });
-            },
-            onLongPressEnd: (_) => setState(() => _isSeeking = false),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  _buildPlayerAndKomaDai(
-                    playerName: _isReversed ? (kifTree!.info['先手'] ?? '先手') : (kifTree!.info['後手'] ?? '後手'),
-                    isSente: _isReversed,
-                    isUpper: true,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: AspectRatio(
-                      aspectRatio: 0.93,
-                      child: Stack(
-                        alignment: Alignment.bottomCenter,
-                        children: [
-                          GestureDetector(
-                            onTapUp: (details) {
-                              if (_isSeeking) return;
-                              final box = context.findRenderObject() as RenderBox?;
-                              if (box == null) return;
-                              final halfWidth = box.size.width / 2;
-
-                              setState(() {
-                                if (details.localPosition.dx > halfWidth) {
-                                  kifTree!.stepNext();
-                                } else {
-                                  kifTree!.stepBack();
-                                }
-                              });
-                            },
-                            child: KifBoard(
-                              state: kifTree!.currentNode.state,
-                              isReversed: _isReversed,
-                            ),
+                            setState(() {
+                              if (details.localPosition.dx > halfWidth) {
+                                kifTree!.stepNext();
+                              } else {
+                                kifTree!.stepBack();
+                              }
+                            });
+                          },
+                          child: KifBoard(
+                            state: kifTree!.currentNode.state,
+                            isReversed: _isReversed,
                           ),
-                          if (_isSeeking) _buildFloatingSeekBar(),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  _buildPlayerAndKomaDai(
-                    playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
-                    isSente: !_isReversed,
-                    isUpper: false,
-                  ),
-                  // コメント欄＆ダイヤルオーバーレイ領域
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                      child: Stack(
-                        children: [
-                          // 通常時のコメント欄
-                          Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            padding: const EdgeInsets.all(12.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onLongPress: () {},
-                              child: Scrollbar(
+                ),
+                _buildPlayerAndKomaDai(
+                  playerName: _isReversed ? (kifTree!.info['後手'] ?? '後手') : (kifTree!.info['先手'] ?? '先手'),
+                  isSente: !_isReversed,
+                  isUpper: false,
+                ),
+                // コメント欄＆ダイヤルオーバーレイ領域
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                    child: Stack(
+                      children: [
+                        // 通常時のコメント欄
+                        Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          padding: const EdgeInsets.all(12.0),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onLongPress: () {},
+                            child: Scrollbar(
+                              controller: _commentScrollController,
+                              thumbVisibility: true,
+                              child: SingleChildScrollView(
                                 controller: _commentScrollController,
-                                thumbVisibility: true,
-                                child: SingleChildScrollView(
-                                  controller: _commentScrollController,
-                                  child: SelectableLinkify(
-                                    text: "${kifTree!.currentNode.joinedComment}",
-                                    style: TextStyle(
-                                      fontSize: settings.get<double>('fontSize'),
-                                    ),
-                                    strutStyle: StrutStyle(
-                                      fontSize: settings.get<double>('fontSize'),
-                                      height: 1.5,
-                                      forceStrutHeight: true,
-                                    ),
-                                    linkStyle: const TextStyle(
-                                      color: Colors.blue,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                    contextMenuBuilder: (context, editableTextState) {
-                                      return AdaptiveTextSelectionToolbar.editableText(
-                                        editableTextState: editableTextState,
-                                      );
-                                    },
-                                    onOpen: (link) async {
-                                      final url = Uri.parse(link.url);
-                                      if (await canLaunchUrl(url)) {
-                                        await launchUrl(
-                                          url,
-                                          mode: LaunchMode.externalApplication,
-                                        );
-                                      } else {
-                                        ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
-                                      }
-                                    },
+                                child: SelectableLinkify(
+                                  text: "${kifTree!.currentNode.joinedComment}",
+                                  style: TextStyle(
+                                    fontSize: settings.get<double>('fontSize'),
                                   ),
+                                  strutStyle: StrutStyle(
+                                    fontSize: settings.get<double>('fontSize'),
+                                    height: 1.5,
+                                    forceStrutHeight: true,
+                                  ),
+                                  linkStyle: const TextStyle(
+                                    color: Colors.blue,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                  contextMenuBuilder: (context, editableTextState) {
+                                    return AdaptiveTextSelectionToolbar.editableText(
+                                      editableTextState: editableTextState,
+                                    );
+                                  },
+                                  onOpen: (link) async {
+                                    final url = Uri.parse(link.url);
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(
+                                        url,
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                    } else {
+                                      ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                                    }
+                                  },
                                 ),
                               ),
                             ),
                           ),
-                          // 💡 ドラッグ時にコメント欄の上に浮かび上がる文字なしシンプル大型ダイヤル
-                          if (_isOverlayDialActive)
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.95),
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.12),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: _buildLargeOverlayDial(),
-                                ),
+                        ),
+                        // 💡 ドラッグ時にコメント欄の上に浮かび上がる文字なしシンプル大型ダイヤル
+                        if (_isOverlayDialActive)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.12),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: _buildLargeOverlayDial(),
                               ),
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   ),
-                  _buildControlPanel(),
-                ],
-              ),
+                ),
+                _buildControlPanel(),
+              ],
             ),
           ),
           if (_isSidebarOpen)
@@ -534,51 +507,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.grey[400],
-      ),
-    );
-  }
-
-  Widget _buildFloatingSeekBar() {
-    final int total = kifTree!.totalMoveCount;
-    final int current = kifTree!.currentNode.moveNumber;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      width: MediaQuery.of(context).size.width * 0.85,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            spreadRadius: 2,
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          Text(
-            "$current",
-            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: Slider(
-              value: current.toDouble().clamp(0, total.toDouble()),
-              min: 0,
-              max: total.toDouble(),
-              activeColor: Colors.orange[700],
-              inactiveColor: Colors.black12,
-              onChanged: (_) {},
-            ),
-          ),
-          Text(
-            "$total",
-            style: const TextStyle(color: Colors.black54, fontSize: 12),
-          ),
-        ],
       ),
     );
   }
