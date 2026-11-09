@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:charset_converter/charset_converter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,7 +49,12 @@ class _KifEditorPageState extends State<KifEditorPage> {
   int? _selectedRank;
   String? _selectedHandPiece;
 
-  double _dragDistance = 0.0;
+  // ダイヤル操作用の変数
+  double _dialRotation = 0.0;
+  double _dialAccumulator = 0.0;
+  bool _isOverlayDialActive = false; // コメント欄オーバーレイ表示フラグ
+  final GlobalKey _overlayDialKey = GlobalKey();
+
   bool _isSidebarOpen = false;
   Offset _lastTapGlobalPosition = Offset.zero;
 
@@ -737,6 +743,59 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
+  // ダイヤルの回転操作（ドラッグ計算）ロジック
+  void _processDialPanUpdate(DragUpdateDetails details) {
+    final renderBox = _overlayDialKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final center = renderBox.size.center(Offset.zero);
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+
+    final x = localPos.dx - center.dx;
+    final y = localPos.dy - center.dy;
+    final dx = details.delta.dx;
+    final dy = details.delta.dy;
+
+    final dist = math.sqrt(x * x + y * y);
+    final effectiveDist = math.max(dist, 10.0);
+
+    final rotationDelta = (-y * dx + x * dy) / (effectiveDist * 35.0);
+
+    setState(() {
+      _dialRotation += rotationDelta;
+      _dialAccumulator += rotationDelta;
+    });
+
+    const double threshold = 0.22;
+
+    while (_dialAccumulator >= threshold) {
+      if (kifTree != null && kifTree!.currentNode.nextNodes.isNotEmpty) {
+        setState(() {
+          kifTree!.stepNext();
+          _selectedFile = null;
+          _selectedRank = null;
+          _selectedHandPiece = null;
+          _syncCommentFromCurrentNode();
+        });
+        HapticFeedback.selectionClick();
+      }
+      _dialAccumulator -= threshold;
+    }
+
+    while (_dialAccumulator <= -threshold) {
+      if (kifTree != null && kifTree!.currentNode.parent != null) {
+        setState(() {
+          kifTree!.stepBack();
+          _selectedFile = null;
+          _selectedRank = null;
+          _selectedHandPiece = null;
+          _syncCommentFromCurrentNode();
+        });
+        HapticFeedback.selectionClick();
+      }
+      _dialAccumulator += threshold;
+    }
+  }
+
   Widget _buildControlPanel() {
     return Container(
       color: const Color(0XFFF1F1F5),
@@ -782,105 +841,101 @@ class _KifEditorPageState extends State<KifEditorPage> {
             flex: 3,
             child: Container(
               constraints: const BoxConstraints(maxWidth: 90),
-              child: GestureDetector(
-                onVerticalDragUpdate: (details) {
-                  _dragDistance += details.delta.dy;
-                  const double threshold = 10.0;
-                  if (_dragDistance <= -threshold) {
-                    setState(() {
-                      kifTree!.stepNext();
-                      _dragDistance = 0;
-                      _selectedFile = null;
-                      _selectedRank = null;
-                      _selectedHandPiece = null;
-                      _syncCommentFromCurrentNode();
-                    });
-                  } else if (_dragDistance >= threshold) {
-                    setState(() {
-                      kifTree!.stepBack();
-                      _dragDistance = 0;
-                      _selectedFile = null;
-                      _selectedRank = null;
-                      _selectedHandPiece = null;
-                      _syncCommentFromCurrentNode();
-                    });
-                  }
-                },
-                onVerticalDragEnd: (_) => _dragDistance = 0,
-                child: Builder(
-                  builder: (context) {
-                    final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                if (!_isOverlayDialActive) {
+                  setState(() {
+                    _isSidebarOpen = true;
+                  });
+                }
+              },
+              onPanStart: (_) {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _isOverlayDialActive = true;
+                });
+              },
+              onPanUpdate: _processDialPanUpdate,
+              onPanEnd: (_) {
+                setState(() {
+                  _isOverlayDialActive = false;
+                  _dialAccumulator = 0.0;
+                });
+              },
+              onPanCancel: () {
+                setState(() {
+                  _isOverlayDialActive = false;
+                  _dialAccumulator = 0.0;
+                });
+              },
+              child: Builder(
+                builder: (context) {
+                  final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
 
-                    final rawLabel = kifTree!.currentNode.moveLabel;
-                    final parentState = kifTree!.currentNode.parent?.state;
-                    final displayLabel = rawLabel != null && rawLabel.isNotEmpty
-                        ? KifParser.convertToJapanese(
-                            rawLabel,
-                            lastToX: parentState?.lastMoveToX,
-                            lastToY: parentState?.lastMoveToY,
-                          )
-                        : '開始局面';
+                  final rawLabel = kifTree!.currentNode.moveLabel;
+                  final parentState = kifTree!.currentNode.parent?.state;
+                  final displayLabel = rawLabel != null && rawLabel.isNotEmpty
+                      ? KifParser.convertToJapanese(
+                          rawLabel,
+                          lastToX: parentState?.lastMoveToX,
+                          lastToY: parentState?.lastMoveToY,
+                        )
+                      : '開始局面';
 
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isSidebarOpen = true;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: hasBranch ? Colors.orange[100] : Colors.white,
-                          border: Border.all(
-                            color: hasBranch ? Colors.orange[700]! : Colors.black45,
-                            width: hasBranch ? 2.0 : 1.5,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Stack(
-                            alignment: Alignment.center,
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: hasBranch ? Colors.orange[100] : Colors.white,
+                      border: Border.all(
+                        color: hasBranch ? Colors.orange[700]! : Colors.black45,
+                        width: hasBranch ? 2.0 : 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${kifTree!.currentNode.moveNumber}手目',
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.normal,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    displayLabel,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.black,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (hasBranch)
-                                const Positioned(
-                                  top: -2,
-                                  right: 0,
-                                  child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                              Text(
+                                '${kifTree!.currentNode.moveNumber}手目',
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.normal,
+                                  color: Colors.black,
                                 ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                displayLabel,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.black,
+                                  height: 1.1,
+                                ),
+                              ),
                             ],
                           ),
-                        ),
+                          if (hasBranch)
+                            const Positioned(
+                              top: -2,
+                              right: 0,
+                              child: Icon(Icons.alt_route, size: 12, color: Colors.orange),
+                            ),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
+            ),
             ),
           ),
           Expanded(
@@ -1030,6 +1085,70 @@ class _KifEditorPageState extends State<KifEditorPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // 文字なし仕様の大型ダイヤルウィジェット
+  Widget _buildLargeOverlayDial() {
+    final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
+
+    return Container(
+      key: _overlayDialKey,
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hasBranch ? Colors.orange[50] : Colors.blue[50],
+        border: Border.all(
+          color: hasBranch ? Colors.orange[600]! : Colors.blue[400]!,
+          width: 2.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Transform.rotate(
+        angle: _dialRotation,
+        child: SizedBox.expand(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // 回転ポインター（ツマミ）
+              Positioned(
+                left: 53,
+                top: 8,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: hasBranch ? Colors.orange[700] : Colors.blue[600],
+                  ),
+                ),
+              ),
+              // 周囲の目盛りドット
+              Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
+              Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
+              Positioned(left: 102.5, top: 57.5, child: _buildDialDot()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialDot() {
+    return Container(
+      width: 5,
+      height: 5,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey[400],
       ),
     );
   }
@@ -1190,7 +1309,32 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     isUpper: false,
                   ),
                   Expanded(
-                    child: _buildCommentField(),
+                    child: Stack(
+                      children: [
+                        _buildCommentField(),
+                        // ドラッグ時にコメント欄の上に浮かび上がる文字なしシンプル大型ダイヤル
+                        if (_isOverlayDialActive)
+                          Positioned.fill(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.12),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: _buildLargeOverlayDial(),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   _buildControlPanel(),
                 ],
