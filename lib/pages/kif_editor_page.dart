@@ -1134,7 +1134,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
               // 周囲の目盛りドット
               Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
               Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
-              Positioned(left: 112.5, top: 57.5, child: _buildDialDot()),
+              Positioned(left: 102.5, top: 57.5, child: _buildDialDot()),
             ],
           ),
         ),
