@@ -155,6 +155,16 @@ jobs:
           ref: ${{ needs.opencode.outputs.branch }}
           token: ${{ secrets.OPENCODE_PAT }}
 
+      # PR ブランチには scripts/ci_build.sh がまだ無い場合があるため、
+      # 実行前に main から取得する (main 側に v5 が入っていることが前提)。
+      - name: Fetch CI script from main
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+        run: |
+          mkdir -p scripts
+          gh api "repos/$GITHUB_REPOSITORY/contents/scripts/ci_build.sh?ref=main" --jq '.content' | base64 --decode > scripts/ci_build.sh
+          test -s scripts/ci_build.sh
+
       - name: Run CI build (same script as flutter-ci)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
