@@ -1120,6 +1120,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
             children: [
               // 回転ポインター（ツマミ）
               Positioned(
+                left: 53,
                 top: 8,
                 child: Container(
                   width: 14,
@@ -1131,9 +1132,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
                 ),
               ),
               // 周囲の目盛りドット
-              Positioned(bottom: 8, child: _buildDialDot()),
-              Positioned(left: 8, child: _buildDialDot()),
-              Positioned(right: 8, child: _buildDialDot()),
+              Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
+              Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
+              Positioned(left: 112.5, top: 57.5, child: _buildDialDot()),
             ],
           ),
         ),
