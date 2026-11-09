@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:kifdamari/database/entity/tab_entity.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/constants.dart';
+import 'package:kifdamari/widgets/kif_colors.dart';
 
 class KifFormContent extends StatefulWidget {
   final KifEntity? initialKif;
@@ -44,20 +47,7 @@ class _KifFormContentState extends State<KifFormContent> {
   late int _selectedColor;
   String? _kfilePath;
 
-  static const List<Map<String, dynamic>> _colorData = [
-    {'value': 0xFFFFFFFF, 'label': 'white', 'textColor': Colors.black87},
-    {'value': 0xFFF7D6D3, 'label': 'red', 'textColor': Colors.black87},
-    {'value': 0xFFFFE6C7, 'label': 'orange', 'textColor': Colors.black87},
-    {'value': 0xFFFFF6CC, 'label': 'yellow', 'textColor': Colors.black87},
-    {'value': 0xFFE6F5D6, 'label': 'green', 'textColor': Colors.black87},
-    {'value': 0xFFDFF5EE, 'label': 'teal', 'textColor': Colors.black87},
-    {'value': 0xFFE3F1F8, 'label': 'blue', 'textColor': Colors.black87},
-    {'value': 0xFFE0E9FB, 'label': 'dark_blue', 'textColor': Colors.black87},
-    {'value': 0xFFE9DDF8, 'label': 'violet', 'textColor': Colors.black87},
-    {'value': 0xFFF9DDEA, 'label': 'pink', 'textColor': Colors.black87},
-    {'value': 0xFFEEE4D6, 'label': 'brown', 'textColor': Colors.black87},
-    {'value': 0xFFEFF1F4, 'label': 'gray', 'textColor': Colors.black87},
-  ];
+  static const List<Map<String, dynamic>> _colorData = KifColors.palette;
 
   @override
   void initState() {
@@ -70,9 +60,9 @@ class _KifFormContentState extends State<KifFormContent> {
         ? widget.initialTabId
         : (widget.tabs.isNotEmpty ? widget.tabs.first.id! : 0);
 
-    final initialColor = widget.initialKif?.color ?? 0xFFFFFFFF;
+    final initialColor = widget.initialKif?.color ?? KifColors.resolveDefaultColor(AppSettings());
     final colorExists = _colorData.any((c) => c['value'] == initialColor);
-    _selectedColor = colorExists ? initialColor : 0xFFFFFFFF;
+    _selectedColor = colorExists ? initialColor : colorWhite;
 
     _kfilePath = widget.initialKif?.kifPath;
 

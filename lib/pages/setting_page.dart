@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kifdamari/settings/default_color_setting.dart';
 import 'package:kifdamari/settings/font_size_setting.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/settings/kif_template_setting.dart';
@@ -32,6 +33,8 @@ class SettingPage extends StatelessWidget {
               KifRewardSetting(settings: settings),
 
               ThumbnailSizeSetting(settings: settings),
+
+              DefaultColorSetting(settings: settings),
 
               const SizedBox(height: 12),
 

@@ -7,6 +7,7 @@ import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/constants.dart';
 import 'package:kifdamari/widgets/home_drawer.dart';
+import 'package:kifdamari/widgets/kif_colors.dart';
 import 'package:kifdamari/widgets/mode_badge.dart';
 import 'package:kifdamari/database/dao/tab_dao.dart';
 import 'package:kifdamari/database/entity/tab_entity.dart';
@@ -130,7 +131,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       detail: initialDetail,
       kifOrder: maxKifId + 1,
       kifPath: '',
-      color: colorWhite,
+      color: KifColors.resolveDefaultColor(settings),
     );
 
     final insertedId = await dao.insertKif(kif);
