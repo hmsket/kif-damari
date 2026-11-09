@@ -40,6 +40,7 @@ jobs:
     outputs:
       pushed: ${{ steps.detect_push.outputs.pushed }}
       branch: ${{ steps.detect_push.outputs.branch }}
+      new_pr: ${{ steps.detect_push.outputs.new_pr }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -131,6 +132,11 @@ jobs:
           if [ -n "$target" ]; then
             echo "pushed=true" >> "$GITHUB_OUTPUT"
             echo "branch=${target#refs/heads/}" >> "$GITHUB_OUTPUT"
+            if grep -q "^$target " /tmp/refs_before.txt; then
+              echo "new_pr=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "new_pr=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "pushed=false" >> "$GITHUB_OUTPUT"
           fi
@@ -141,9 +147,13 @@ jobs:
   # APK を dev リリースへ公開するまでを行う。
   ci-build:
     needs: opencode
+    # エージェントが新規ブランチ+PRを作った場合は flutter-ci (pull_request) が
+    # 担当するため、ここでは「既存PRブランチへの追加push」のときだけビルドする。
+    # 新規PRの場合は ci-build はスキップされる (flutter-ci 側の承認が必要な点は従来通り)。
     if: >-
       always() && needs.opencode.result == 'success' &&
-      needs.opencode.outputs.pushed == 'true'
+      needs.opencode.outputs.pushed == 'true' &&
+      needs.opencode.outputs.new_pr != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
