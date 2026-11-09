@@ -1,17 +1,11 @@
 name: flutter-ci
 
 # PR / main への push / 手動実行で、解析・テスト・APK ビルドを行う。
-# APK は Actions の Artifacts (kifdamari-apk-arm64) からもダウンロードできるが、
-# 通常は固定リンクの dev リリース (末尾の Publish ステップ) を使うのが楽:
+# ビルド本体は scripts/ci_build.sh (opencode.yml の ci-build ジョブと共有)。
+# APK は固定リンクの dev リリースから取得するのが通常:
 #   https://github.com/hmsket/kif-damari/releases/download/dev/kifdamari.apk
-#
-# 署名について:
-#   Secrets に KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD が
-#   設定されていれば、そのキーストアで release 署名する（毎回同じ署名になるので
-#   上書きインストールで更新できる）。
-#   未設定の場合はランナー上で作られる一時的な debug キーで署名されるため、
-#   その APK は前回のインストールを上書きできない（初回検証用と割り切ること）。
-#   設定手順は docs/remote_dev_setup.md を参照。
+# 署名: Secrets に KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD が
+#   設定されていればそのキーストアで署名し、上書きインストールで更新できる。
 
 on:
   pull_request:
@@ -41,57 +35,18 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-      - name: Test (only if test/ exists)
-        run: |
-          if [ -d test ]; then
-            flutter test
-          else
-            echo "test/ directory not found - skipping tests."
-          fi
-
-      - name: Prepare release signing (optional)
+      - name: Run CI build (shared script)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-            cat > android/key.properties <<EOF
-          storePassword=$STORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=upload-keystore.jks
-          EOF
-            echo "Release signing configured from secrets."
-          else
-            echo "::warning::KEYSTORE_BASE64 is not set. The APK will be signed with an ephemeral debug key and cannot update previous installs."
-          fi
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci_build.sh
 
-      - name: Build release APK (split per ABI)
-        run: flutter build apk --release --split-per-abi
-
-      - name: Upload arm64 APK
+      - name: Upload arm64 APK (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: kifdamari-apk-arm64
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          path: build/ci-artifact/kifdamari-apk-arm64.apk
           if-no-files-found: error
-      - name: Publish APK to rolling dev release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk kifdamari.apk
-          if ! gh release view dev > /dev/null 2>&1; then
-            gh release create dev --prerelease --title "dev (検証用・最新ビルド)" --notes "CI が自動で更新する検証用リリースです。" || true
-          fi
-          gh release upload dev kifdamari.apk --clobber
-          gh release edit dev --notes "最新の成功ビルド: ${{ github.event_name }} / ${{ github.sha }} / run ${{ github.run_number }}"
-          echo "Published: https://github.com/hmsket/kif-damari/releases/download/dev/kifdamari.apk"

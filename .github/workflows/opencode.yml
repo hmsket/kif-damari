@@ -15,7 +15,12 @@ name: opencode
 #   2段目: opencode/deepseek-v4.1-flash-free (DeepSeek V4.1 Flash Free)
 # 指示は AGENTS.md に集約 (SDK取得・検証コマンド禁止, 検証はCI)。
 # 認証情報は保持する (persist-credentials 既定true): エージェントの git push に必要。
-# PR作成には専用PAT (OPENCODE_PAT) を使い、後段CIが自動開始されるようにする。
+# PR作成には専用PAT (OPENCODE_PAT) を使う。ただしエージェントの push は
+# GITHUB_TOKEN 相手でも PAT 相手でも後段ワークフローを自動開始しない
+# (GitHub の連鎖防止仕様) ため、このワークフロー自身が push を検知して
+# 同じ run の中で flutter-ci 相当 (scripts/ci_build.sh) を直接実行し、
+# APK を dev リリースへ公開する (ci-build ジョブ)。push では起動しない
+# flutter-ci.yml 本体は、通常の PR / main への push 用にそのまま残す。
 # 無料枠が上限 (429) のとき OpenCode は長時間リトライし続けるため、
 # 各段に制限時間 (25分) を付けて見切り、次段へ切り替える。
 # 公開リポジトリなので、起動できるのはリポジトリ所有者 (hmsket) のコメントだけに制限する。
@@ -32,6 +37,9 @@ jobs:
       github.event.comment.user.login == 'hmsket' &&
       (contains(github.event.comment.body, '/oc') ||
        contains(github.event.comment.body, '/opencode'))
+    outputs:
+      pushed: ${{ steps.detect_push.outputs.pushed }}
+      branch: ${{ steps.detect_push.outputs.branch }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -70,6 +78,16 @@ jobs:
           tailscale status | grep -i 'exit node' || true
           echo "Egress IP: $(curl -s https://ifconfig.me)"
 
+      # push 検知用スナップショット (opencode アクションは内部で push するため、
+      # 前後比較で「この run で push が起きたか」と対象ブランチを判定する)
+      - name: Snapshot refs (before)
+        id: refs_before
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads" --jq '.[] | "\(.ref) \(.object.sha)"' | sort > /tmp/refs_before.txt
+          wc -l /tmp/refs_before.txt
+
       - name: Run OpenCode (primary - GLM-5.3-Flash Free)
         id: oc_primary
         timeout-minutes: 40
@@ -90,3 +108,58 @@ jobs:
         with:
           model: opencode/deepseek-v4.1-flash-free
           use_github_token: true
+
+      # push 検知 (ci-build ジョブへの出力)。対象は opencode/ で始まるブランチのみ。
+      - name: Detect agent push
+        id: detect_push
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads" --jq '.[] | "\(.ref) \(.object.sha)"' | sort > /tmp/refs_after.txt
+          changed=$(join -j 1 <(awk '{print $1, $2}' /tmp/refs_before.txt) <(awk '{print $1, $2}' /tmp/refs_after.txt) -o 0,1.2,2.2 2>/dev/null | awk '$2 != $3 {print $1}' || true)
+          for ref in $(awk '{print $1}' /tmp/refs_after.txt); do
+            if ! grep -q "^$ref " /tmp/refs_before.txt; then changed="$changed $ref"; fi
+          done
+          echo "changed branches: $changed"
+          target=""
+          for ref in $changed; do
+            case "$ref" in
+              refs/heads/opencode/*) target="$ref" ;;
+            esac
+          done
+          if [ -n "$target" ]; then
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+            echo "branch=${target#refs/heads/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # エージェントが push したブランチでは flutter-ci が自動開始されない
+  # (GitHub の連鎖防止) ため、push を検知したらこの run の中で CI を回す。
+  # 共有スクリプト scripts/ci_build.sh は flutter-ci.yml と同一内容で、
+  # APK を dev リリースへ公開するまでを行う。
+  ci-build:
+    needs: opencode
+    if: >-
+      always() && needs.opencode.result == 'success' &&
+      needs.opencode.outputs.pushed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout pushed branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.opencode.outputs.branch }}
+          token: ${{ secrets.OPENCODE_PAT }}
+
+      - name: Run CI build (same script as flutter-ci)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+        run: bash scripts/ci_build.sh
