@@ -35,8 +35,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
       onConfigure: _onConfigure,
     );
   }
@@ -69,7 +70,49 @@ class DatabaseHelper {
       )
     ''');
 
+    await _createPositionTables(db);
+
     await _insertDefaultTabs(db);
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createPositionTables(db);
+    }
+  }
+
+  Future _createPositionTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS position (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        position_key TEXT NOT NULL UNIQUE,
+        is_root INTEGER NOT NULL DEFAULT 0,
+        comment TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS transition (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_position_id INTEGER NOT NULL,
+        to_position_id INTEGER NOT NULL,
+        move_label TEXT NOT NULL,
+        UNIQUE (from_position_id, move_label),
+        FOREIGN KEY (from_position_id) REFERENCES position (id) ON DELETE CASCADE,
+        FOREIGN KEY (to_position_id) REFERENCES position (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS position_appearance (
+        position_id INTEGER NOT NULL,
+        kif_id INTEGER NOT NULL,
+        move_number INTEGER NOT NULL,
+        PRIMARY KEY (position_id, kif_id, move_number),
+        FOREIGN KEY (position_id) REFERENCES position (id) ON DELETE CASCADE,
+        FOREIGN KEY (kif_id) REFERENCES kif (id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   Future<void> _insertDefaultTabs(Database db) async {

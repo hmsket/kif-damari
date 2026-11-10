@@ -8,6 +8,7 @@ import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/dialogs/discard_changes_dialog.dart';
+import 'package:kifdamari/logic/integrated_tree_service.dart';
 import 'package:kifdamari/logic/shogi_rule_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
@@ -161,6 +162,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
           content = await CharsetConverter.decode("Shift_JIS", bytes);
         }
         final tree = KifParser.decode(content);
+        await IntegratedTreeService.registerKifTree(tree, kifId: _currentEntity.id);
 
         if (widget.initialBranchPath != null && widget.initialBranchPath!.isNotEmpty) {
           GameNode temp = tree.root;
@@ -227,6 +229,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
 
       final tree = KifParser.decode(content);
+      await IntegratedTreeService.registerKifTree(tree, kifId: _currentEntity.id);
 
       if (!mounted) return;
 
@@ -277,6 +280,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     try {
       final tree = KifParser.decode(text);
+      await IntegratedTreeService.registerKifTree(tree, kifId: _currentEntity.id);
 
       if (!mounted) return;
 
@@ -1719,6 +1723,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   Future<void> _saveKifData() async {
+    if (kifTree == null) return;
+
+    await IntegratedTreeService.registerKifTree(kifTree!, kifId: _currentEntity.id);
+
     final kifData = await _prepareKifData();
     if (kifData == null) return;
 
