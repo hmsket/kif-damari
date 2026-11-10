@@ -282,6 +282,83 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
   // 現在局面のコメント編集が可能か（DB上も管理されている局面のみ）
   bool get _isCommentEditable => _currentPositionId != null;
 
+  // ─── 統合ツリーの削除（仕様 F.3 / Q22） ───
+
+  // ツリー表示の×ボタンで「その局面だけ」を削除する。
+  // 親との枝（エッジ）を消すだけ。その先の局面・個別棋譜には触らず、
+  // コメントも一緒に消える。墓標は残さない（再取り込みで復活してよい）。
+  void _removeTreeNode(GameNode node) async {
+    final parent = node.parent;
+    final t = tree;
+    if (parent == null || t == null) return; // 開始局面（根）は削除しない
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('局面の削除'),
+        content: Text('${node.moveNumber}手目の局面を削除しますか？\n（この局面に付いたコメントも消えます）'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    final fromId = parent.positionKey == null
+        ? null
+        : t.positionIdByKey[parent.positionKey!];
+    final toId = node.positionKey == null
+        ? null
+        : t.positionIdByKey[node.positionKey!];
+    if (fromId == null || toId == null) {
+      ShowErrorSnackbar.show(context, '局面の削除に失敗しました');
+      return;
+    }
+
+    final ok = await IntegratedTreeService.removePositionEdge(
+      fromPositionId: fromId,
+      toPositionId: toId,
+    );
+    if (!ok || !mounted) {
+      if (mounted) ShowErrorSnackbar.show(context, '局面の削除に失敗しました');
+      return;
+    }
+
+    setState(() {
+      parent.nextNodes.remove(node);
+
+      if (parent.selectedBranchIndex >= parent.nextNodes.length) {
+        parent.selectedBranchIndex = (parent.nextNodes.length - 1).clamp(0, 999);
+      }
+
+      // 現在地が削除した局面（またはその子孫）なら、その親局面へ戻す
+      GameNode? temp = current;
+      while (temp != null) {
+        if (identical(node, temp)) {
+          current = parent;
+          break;
+        }
+        temp = temp.parent;
+      }
+
+      // 同じ局面（手順前後で他の経路から辿れるコピー）からもコメントを消す
+      final nodeKey = node.positionKey;
+      if (nodeKey != null) {
+        _applyCommentToNodes(nodeKey, const <String>[]);
+      }
+
+      _clearSelectionState();
+    });
+  }
+
   // ─── 出現一覧の行タップ：その棋譜のその手数へジャンプする ───
 
   void _handleAppearanceTap(PositionAppearanceEntity appearance) {
@@ -1126,6 +1203,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                         currentNode: current!,
                         showBranchIcon: false, // 統合ツリー表示では分岐アイコンを付けない
                         onNodeSelected: _selectNode,
+                        onNodeDeleted: _removeTreeNode, // ×ボタンでその局面だけを削除（④）
                       ),
                     ),
                   ],

@@ -42,6 +42,19 @@ class TransitionDao {
     return TransitionEntity.fromMap(rows.first);
   }
 
+  Future<int> deleteByFromTo(
+    int fromPositionId,
+    int toPositionId, {
+    DatabaseExecutor? executor,
+  }) async {
+    final db = executor ?? await _db;
+    return await db.delete(
+      'transition',
+      where: 'from_position_id = ? AND to_position_id = ?',
+      whereArgs: [fromPositionId, toPositionId],
+    );
+  }
+
   Future<int> insert(TransitionEntity transition, {DatabaseExecutor? executor}) async {
     final db = executor ?? await _db;
     return await db.insert(

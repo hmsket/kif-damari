@@ -481,6 +481,31 @@ class IntegratedTreeService {
     }
   }
 
+  /// 統合ツリーから「その局面だけ」を削除する（仕様 F.3 / Q22）。
+  /// 親局面からその局面への枝（エッジ）を消し、その局面に付いたコメントも消す。
+  /// 局面そのもの・その先の局面・個別棋譜には触らない。削除の墓標も残さない
+  /// （局面を通る棋譜が取り込み／保存し直されれば、登録ルールで復活する）。
+  static Future<bool> removePositionEdge({
+    required int fromPositionId,
+    required int toPositionId,
+  }) async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      await db.transaction((txn) async {
+        await TransitionDao().deleteByFromTo(
+          fromPositionId,
+          toPositionId,
+          executor: txn,
+        );
+        await PositionDao().updateComment(toPositionId, '', executor: txn);
+      });
+      return true;
+    } catch (e) {
+      debugPrint('統合ツリーからの局面削除に失敗しました: $e');
+      return false;
+    }
+  }
+
   /// 現在局面のコメントを1行文字列として保存する（局面コメントは棋譜に共通）
   static Future<bool> savePositionComment(int positionId, String comment) async {
     try {
