@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
+import 'package:kifdamari/logic/integrated_tree_service.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
@@ -98,6 +99,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
         }
 
         final tree = KifParser.decode(content);
+        await IntegratedTreeService.registerKifTree(tree, kifId: _currentKifEntity.id);
 
         setState(() {
           kifTree = tree;

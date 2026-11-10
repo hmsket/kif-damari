@@ -13,6 +13,8 @@ class GameNode {
 
   int selectedBranchIndex = 0;
 
+  String? positionKey;
+
   GameNode({
     required this.moveNumber,
     this.moveLabel,
