@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:collection';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -7,6 +8,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:charset_converter/charset_converter.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
+import 'package:kifdamari/database/dao/position_appearance_dao.dart';
+import 'package:kifdamari/database/dao/position_dao.dart';
+import 'package:kifdamari/database/entity/position_appearance_entity.dart';
+import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/logic/saf_helper.dart';
@@ -28,8 +33,9 @@ import 'package:kifdamari/models/game_node.dart';
 
 class KifViewerPage extends StatefulWidget {
   final KifEntity kifEntity;
+  final int initialMoveNumber;
 
-  const KifViewerPage({super.key, required this.kifEntity});
+  const KifViewerPage({super.key, required this.kifEntity, this.initialMoveNumber = 0});
 
   @override
   State<KifViewerPage> createState() => _KifViewerPageState();
@@ -50,6 +56,13 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
   late KifEntity _currentKifEntity;
 
   bool _isSidebarOpen = false;
+
+  bool _isLeftSidebarOpen = false;
+
+  // 出現情報（現在局面の positionKey に紐づく出現一覧と、その棋譜の実体）
+  String? _loadedPositionKey;
+  List<PositionAppearanceEntity> _appearances = const [];
+  Map<int, KifEntity> _kifById = const {};
 
   final ScrollController _commentScrollController = ScrollController();
 
@@ -100,6 +113,10 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
         final tree = KifParser.decode(content);
         await IntegratedTreeService.registerKifTree(tree, kifId: _currentKifEntity.id);
+
+        if (widget.initialMoveNumber > 0) {
+          tree.jumpTo(widget.initialMoveNumber);
+        }
 
         setState(() {
           kifTree = tree;
@@ -226,6 +243,156 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     }
   }
 
+  // 現在局面の positionKey が変わっていたら、出現情報を再読み込みする
+  void _refreshPositionInfoIfNeeded() {
+    final key = kifTree?.currentNode.positionKey;
+    if (key == null || key == _loadedPositionKey) return;
+    _loadedPositionKey = key;
+    _appearances = const [];
+    _kifById = const {};
+    _loadPositionInfo(key);
+  }
+
+  Future<void> _loadPositionInfo(String key) async {
+    try {
+      final position = await PositionDao().getByKey(key);
+      if (position == null) {
+        if (!mounted || _loadedPositionKey != key) return;
+        setState(() {
+          _appearances = const [];
+          _kifById = const {};
+        });
+        return;
+      }
+      final appearances = await PositionAppearanceDao().getByPositionId(position.id!);
+      final kifs = await KifDao().getByIds(appearances.map((a) => a.kifId).toList());
+      if (!mounted || _loadedPositionKey != key) return;
+      setState(() {
+        _appearances = appearances;
+        _kifById = {for (final k in kifs) k.id!: k};
+      });
+    } catch (e) {
+      debugPrint('出現情報の取得に失敗しました: $e');
+      if (mounted && _loadedPositionKey == key) {
+        setState(() {
+          _appearances = const [];
+          _kifById = const {};
+        });
+      }
+    }
+  }
+
+  // 現在の局面が「他の棋譜にも出現する」かどうか
+  bool get _hasOtherKifAppearance =>
+      _appearances.any((a) => a.kifId != _currentKifEntity.id);
+
+  void _openLeftSidebar() {
+    setState(() {
+      _isLeftSidebarOpen = true;
+      _isSidebarOpen = false;
+    });
+  }
+
+  void _openRightSidebar() {
+    setState(() {
+      _isSidebarOpen = true;
+      _isLeftSidebarOpen = false;
+    });
+  }
+
+  // 同じ positionKey を持つノードすべてにコメントを反映する
+  void _applyCommentToNodes(String positionKey, List<String> comments) {
+    final queue = Queue<GameNode>();
+    queue.add(kifTree!.root);
+    while (queue.isNotEmpty) {
+      final node = queue.removeFirst();
+      queue.addAll(node.nextNodes);
+      if (node.positionKey == positionKey) {
+        node.comments
+          ..clear()
+          ..addAll(comments);
+      }
+    }
+  }
+
+  void _showCommentEditDialog() async {
+    final node = kifTree!.currentNode;
+    final positionKey = node.positionKey;
+    final result = await showCommentEditDialog(context, node.joinedComment);
+    if (result == null || !mounted) return;
+
+    setState(() {
+      if (positionKey != null) {
+        _applyCommentToNodes(positionKey, result);
+      } else {
+        node.comments
+          ..clear()
+          ..addAll(result);
+      }
+    });
+
+    if (positionKey == null) return;
+    try {
+      final position = await PositionDao().getByKey(positionKey);
+      if (position != null) {
+        await PositionDao().updateComment(position.id!, result.join('\n'));
+      }
+    } catch (e) {
+      debugPrint('コメントの保存に失敗しました: $e');
+      if (mounted) ShowErrorSnackbar.show(context, 'コメントの保存に失敗しました');
+    }
+  }
+
+  // 出現一覧の行タップ：その棋譜のその手数へジャンプする
+  void _handleAppearanceTap(PositionAppearanceEntity appearance) async {
+    final kif = _kifById[appearance.kifId];
+    if (kif == null) return;
+
+    if (appearance.kifId == _currentKifEntity.id) {
+      // 自分の棋譜内なら、その局面のノードを探して直接選択する
+      GameNode? target;
+      final queue = Queue<GameNode>();
+      queue.add(kifTree!.root);
+      while (queue.isNotEmpty) {
+        final node = queue.removeFirst();
+        queue.addAll(node.nextNodes);
+        if (node.positionKey == kifTree!.currentNode.positionKey &&
+            node.moveNumber == appearance.moveNumber) {
+          target = node;
+          break;
+        }
+      }
+      setState(() {
+        _isLeftSidebarOpen = false;
+        if (target != null) {
+          kifTree!.currentNode = target;
+          GameNode? temp = target;
+          while (temp != null && temp.parent != null) {
+            final parent = temp.parent!;
+            parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
+            temp = parent;
+          }
+        } else {
+          kifTree!.jumpTo(appearance.moveNumber);
+        }
+      });
+      return;
+    }
+
+    setState(() {
+      _isLeftSidebarOpen = false;
+    });
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => KifViewerPage(
+          kifEntity: kif,
+          initialMoveNumber: appearance.moveNumber,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = AppSettings();
@@ -237,6 +404,8 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     }
 
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
+
+    _refreshPositionInfoIfNeeded();
 
     return Scaffold(
       body: Stack(
@@ -291,7 +460,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                     child: Stack(
                       children: [
-                        // 通常時のコメント欄
+                        // 通常時のコメント欄（タップでこの局面のコメント編集ダイアログを開く）
                         Container(
                           width: double.infinity,
                           height: double.infinity,
@@ -302,13 +471,13 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                           ),
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
-                            onLongPress: () {},
+                            onTap: _showCommentEditDialog,
                             child: Scrollbar(
                               controller: _commentScrollController,
                               thumbVisibility: true,
                               child: SingleChildScrollView(
                                 controller: _commentScrollController,
-                                child: SelectableLinkify(
+                                child: Linkify(
                                   text: "${kifTree!.currentNode.joinedComment}",
                                   style: TextStyle(
                                     fontSize: settings.get<double>('fontSize'),
@@ -322,11 +491,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                                     color: Colors.blue,
                                     decoration: TextDecoration.none,
                                   ),
-                                  contextMenuBuilder: (context, editableTextState) {
-                                    return AdaptiveTextSelectionToolbar.editableText(
-                                      editableTextState: editableTextState,
-                                    );
-                                  },
                                   onOpen: (link) async {
                                     final url = Uri.parse(link.url);
                                     if (await canLaunchUrl(url)) {
@@ -369,6 +533,109 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                 ),
                 _buildControlPanel(),
               ],
+            ),
+          ),
+          // 画面左端からの右スワイプで左サイドバーを開く
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 24,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: (details) {
+                if ((details.primaryVelocity ?? 0) > 100) {
+                  _openLeftSidebar();
+                }
+              },
+            ),
+          ),
+          if (_isLeftSidebarOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isLeftSidebarOpen = false;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  color: Colors.black.withOpacity(0.4),
+                ),
+              ),
+            ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            left: _isLeftSidebarOpen ? 0 : -sidebarWidth,
+            top: 0,
+            bottom: 0,
+            width: sidebarWidth,
+            child: Material(
+              elevation: 16,
+              color: Colors.white,
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '出現する棋譜',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              setState(() {
+                                _isLeftSidebarOpen = false;
+                              });
+                            },
+                          )
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: _appearances.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'この局面を含む棋譜はありません',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _appearances.length,
+                              itemBuilder: (context, index) {
+                                final appearance = _appearances[index];
+                                final kif = _kifById[appearance.kifId];
+                                final bool isCurrent = appearance.kifId == _currentKifEntity.id &&
+                                    appearance.moveNumber == kifTree!.currentNode.moveNumber;
+
+                                return ListTile(
+                                  dense: true,
+                                  selected: isCurrent,
+                                  selectedTileColor: Colors.orange[50],
+                                  title: Text(
+                                    (kif?.title.isNotEmpty ?? false) ? kif!.title : '（タイトルなし）',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    '${appearance.moveNumber}手目',
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                  onTap: () => _handleAppearanceTap(appearance),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           if (_isSidebarOpen)
@@ -519,6 +786,42 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
+          // 0. 他棋譜ピル（現在の局面が他の棋譜にも出現する場合のみ表示）
+          Expanded(
+            flex: 1,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: _hasOtherKifAppearance
+                  ? GestureDetector(
+                      onTap: _openLeftSidebar,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.black45, width: 1.5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final char in '他棋譜'.split(''))
+                              Text(
+                                char,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                  height: 1.1,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : const SizedBox(width: 24, height: 40),
+            ),
+          ),
+
           // 1. 最初の手へ移動ボタン
           Expanded(
             flex: 2,
@@ -555,9 +858,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
                   if (!_isOverlayDialActive) {
-                    setState(() {
-                      _isSidebarOpen = true;
-                    });
+                    _openRightSidebar();
                   }
                 },
                 onPanStart: (_) {
@@ -756,11 +1057,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.account_tree, size: 20),
                     child: const Text('棋譜ツリーを表示'),
-                    onPressed: () {
-                      setState(() {
-                        _isSidebarOpen = true;
-                      });
-                    },
+                    onPressed: _openRightSidebar,
                   ),
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.cached, size: 20),
