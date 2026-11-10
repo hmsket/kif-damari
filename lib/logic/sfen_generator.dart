@@ -107,7 +107,7 @@ class SfenGenerator {
           i++;
         }
 
-        final type = _sfenToPiece[sfenPiece];
+        final type = _sfenToPiece[sfenPiece.toUpperCase()];
         if (type == null) {
           throw ArgumentError('不明な駒が盤面キーに含まれています: $key');
         }
