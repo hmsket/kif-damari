@@ -38,6 +38,131 @@ class SfenGenerator {
     'fu': 'P',
   };
 
+  static const Map<String, String> _sfenToPiece = {
+    'P': 'fu',
+    'L': 'ya',
+    'N': 'ke',
+    'S': 'gi',
+    'G': 'ki',
+    'B': 'ka',
+    'R': 'hi',
+    'K': 'gy',
+    '+P': 'to',
+    '+L': 'ny',
+    '+N': 'nk',
+    '+S': 'ng',
+    '+B': 'um',
+    '+R': 'ry',
+  };
+
+  static const Map<String, String> _sfenToHand = {
+    'R': 'hi',
+    'B': 'ka',
+    'G': 'ki',
+    'S': 'gi',
+    'N': 'ke',
+    'L': 'ya',
+    'P': 'fu',
+  };
+
+  /// 盤面キー（position_key）から BoardState を復元する。
+  /// 復元した盤面は generateKey を通すと元のキーに一致する。
+  static BoardState stateFromKey(String key) {
+    final parts = key.split(' ');
+    if (parts.length < 3) {
+      throw ArgumentError('盤面キーの形式が不正です: $key');
+    }
+
+    final boardPart = parts[0];
+    final turn = parts[1];
+    final handPart = parts[2];
+
+    final rows = boardPart.split('/');
+    if (rows.length != 9) {
+      throw ArgumentError('盤面キーの盤部分が不正です: $key');
+    }
+
+    final grid = List.generate(9, (_) => List<String?>.filled(9, null));
+    for (int y = 0; y < 9; y++) {
+      final row = rows[y];
+      int x = 0;
+      int i = 0;
+      while (i < row.length) {
+        final ch = row[i];
+        if (ch.codeUnitAt(0) >= 0x30 && ch.codeUnitAt(0) <= 0x39) {
+          x += ch.codeUnitAt(0) - 0x30;
+          i++;
+          continue;
+        }
+
+        String sfenPiece;
+        if (ch == '+') {
+          if (i + 1 >= row.length) {
+            throw ArgumentError('盤面キーの盤部分が不正です: $key');
+          }
+          sfenPiece = '+${row[i + 1]}';
+          i += 2;
+        } else {
+          sfenPiece = ch;
+          i++;
+        }
+
+        final type = _sfenToPiece[sfenPiece];
+        if (type == null) {
+          throw ArgumentError('不明な駒が盤面キーに含まれています: $key');
+        }
+
+        final letter = row[i - 1];
+        final prefix = _isUpperCasePiece(letter) ? 'b' : 'w';
+        if (x > 8) {
+          throw ArgumentError('盤面キーの盤部分が不正です: $key');
+        }
+        grid[y][x] = prefix + type;
+        x++;
+      }
+      if (x != 9) {
+        throw ArgumentError('盤面キーの盤部分が不正です: $key');
+      }
+    }
+
+    final senteHand = <String, int>{};
+    final goteHand = <String, int>{};
+    if (handPart != '-') {
+      String digits = '';
+      for (int i = 0; i < handPart.length; i++) {
+        final ch = handPart[i];
+        if (ch.codeUnitAt(0) >= 0x30 && ch.codeUnitAt(0) <= 0x39) {
+          digits += ch;
+          continue;
+        }
+        final type = _sfenToHand[ch.toUpperCase()];
+        if (type == null) {
+          throw ArgumentError('持ち駒部分が不正です: $key');
+        }
+        final count = digits.isEmpty ? 1 : int.parse(digits);
+        if (_isUpperCasePiece(ch)) {
+          senteHand[type] = count;
+        } else {
+          goteHand[type] = count;
+        }
+        digits = '';
+      }
+    }
+
+    return BoardState(
+      grid: grid,
+      senteHand: senteHand,
+      goteHand: goteHand,
+      nextPlayer: turn == 'b' ? Player.sente : Player.gote,
+    );
+  }
+
+  /// 大文字（成駒の '+' は除く）かどうかで手番の所属を判定する
+  static bool _isUpperCasePiece(String ch) {
+    final code = ch.codeUnitAt(0);
+    return code >= 0x41 && code <= 0x5A;
+  }
+
   static String generateKey(BoardState state) {
     final board = StringBuffer();
     for (int y = 0; y < 9; y++) {

@@ -19,6 +19,19 @@ class PositionAppearanceDao {
     return rows.map((map) => PositionAppearanceEntity.fromMap(map)).toList();
   }
 
+  /// 指定した局面に出現する棋譜の id 一覧（重複なし）
+  Future<List<int>> getKifIdsForPosition(int positionId, {DatabaseExecutor? executor}) async {
+    final db = executor ?? await _db;
+    final rows = await db.query(
+      'position_appearance',
+      where: 'position_id = ?',
+      whereArgs: [positionId],
+      columns: ['kif_id'],
+      groupBy: 'kif_id',
+    );
+    return rows.map((map) => map['kif_id'] as int).toList();
+  }
+
   Future<void> replaceForKif(
     int kifId,
     List<PositionAppearanceEntity> appearances, {

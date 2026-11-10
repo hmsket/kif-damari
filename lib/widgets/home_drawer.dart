@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/pages/setting_page.dart';
+import 'package:kifdamari/pages/integrated_tree_root_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/widgets/constants.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -51,6 +52,23 @@ class HomeDrawer extends StatelessWidget {
               ],
             ),
           ),
+          // 局面管理（③統合ツリーの入口）
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.account_tree),
+            title: const Text('統合ツリー'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const IntegratedTreeRootPage(),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1),
           const Padding(
             padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
             child: Text(

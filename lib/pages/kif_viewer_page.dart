@@ -20,6 +20,7 @@ import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/appearance_sidebar.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
@@ -403,9 +404,9 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       );
     }
 
-    final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
-
     _refreshPositionInfoIfNeeded();
+
+    final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
     return Scaffold(
       body: Stack(
@@ -550,93 +551,20 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
               },
             ),
           ),
-          if (_isLeftSidebarOpen)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isLeftSidebarOpen = false;
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  color: Colors.black.withOpacity(0.4),
-                ),
-              ),
-            ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            left: _isLeftSidebarOpen ? 0 : -sidebarWidth,
-            top: 0,
-            bottom: 0,
-            width: sidebarWidth,
-            child: Material(
-              elevation: 16,
-              color: Colors.white,
-              child: SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '出現する棋譜',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.brown[800]),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () {
-                              setState(() {
-                                _isLeftSidebarOpen = false;
-                              });
-                            },
-                          )
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: _appearances.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'この局面を含む棋譜はありません',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: _appearances.length,
-                              itemBuilder: (context, index) {
-                                final appearance = _appearances[index];
-                                final kif = _kifById[appearance.kifId];
-                                final bool isCurrent = appearance.kifId == _currentKifEntity.id &&
-                                    appearance.moveNumber == kifTree!.currentNode.moveNumber;
-
-                                return ListTile(
-                                  dense: true,
-                                  selected: isCurrent,
-                                  selectedTileColor: Colors.orange[50],
-                                  title: Text(
-                                    (kif?.title.isNotEmpty ?? false) ? kif!.title : '（タイトルなし）',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    '${appearance.moveNumber}手目',
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                  onTap: () => _handleAppearanceTap(appearance),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // 出現する棋譜の左サイドバー（②の「出現一覧」を共用ウィジェットで再利用）
+          AppearanceSidebar(
+            open: _isLeftSidebarOpen,
+            appearances: _appearances,
+            kifById: _kifById,
+            isCurrent: (appearance) =>
+                appearance.kifId == _currentKifEntity.id &&
+                appearance.moveNumber == kifTree!.currentNode.moveNumber,
+            onTap: _handleAppearanceTap,
+            onClose: () {
+              setState(() {
+                _isLeftSidebarOpen = false;
+              });
+            },
           ),
           if (_isSidebarOpen)
             Positioned.fill(
