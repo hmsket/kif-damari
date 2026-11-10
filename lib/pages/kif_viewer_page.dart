@@ -406,6 +406,8 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
     _refreshPositionInfoIfNeeded();
 
+    final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
+
     return Scaffold(
       body: Stack(
         children: [

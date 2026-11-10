@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kifdamari/database/entity/position_entity.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
 import 'package:kifdamari/logic/sfen_generator.dart';
+import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/pages/integrated_tree_page.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 
