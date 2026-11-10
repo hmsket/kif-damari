@@ -14,12 +14,16 @@ class KifTreeView extends StatefulWidget {
   final Function(GameNode) onNodeSelected;
   final Function(GameNode)? onNodeDeleted; // 💡 削除用コールバック（nullの場合は閲覧モードとして動作）
 
+  // 分岐アイコン（ノード左上）を表示するか。統合ツリー表示では false にする（吹き出しは表示する）
+  final bool showBranchIcon;
+
   const KifTreeView({
     super.key,
     required this.rootNode,
     required this.currentNode,
     required this.onNodeSelected,
     this.onNodeDeleted, // 💡 編集画面でのみ渡す
+    this.showBranchIcon = true,
   });
 
   @override
@@ -526,7 +530,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                             ],
                           ),
                           // 💡 分岐アイコン（×ボタンと重ならないよう左上に配置）
-                          if (hasBranch && !isCurrent)
+                          if (hasBranch && !isCurrent && widget.showBranchIcon)
                             const Positioned(
                               top: 2,
                               left: 2,

@@ -23,6 +23,23 @@ class PositionDao {
     return result;
   }
 
+  Future<List<PositionEntity>> getByIds(List<int> ids, {DatabaseExecutor? executor}) async {
+    if (ids.isEmpty) return [];
+    final db = executor ?? await _db;
+    final uniqueIds = ids.toSet().toList();
+    final result = <PositionEntity>[];
+    for (int i = 0; i < uniqueIds.length; i += _chunkSize) {
+      final chunk = uniqueIds.skip(i).take(_chunkSize).toList();
+      final rows = await db.query(
+        'position',
+        where: 'id IN (${List.filled(chunk.length, '?').join(',')})',
+        whereArgs: chunk,
+      );
+      result.addAll(rows.map((map) => PositionEntity.fromMap(map)));
+    }
+    return result;
+  }
+
   Future<PositionEntity?> getByKey(String key, {DatabaseExecutor? executor}) async {
     final db = executor ?? await _db;
     final rows = await db.query(
