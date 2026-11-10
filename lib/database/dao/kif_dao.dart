@@ -16,6 +16,23 @@ class KifDao {
     return result.map((map) => KifEntity.fromMap(map)).toList();
   }
 
+  Future<List<KifEntity>> getByIds(List<int> ids) async {
+    final uniqueIds = ids.toSet().toList();
+    if (uniqueIds.isEmpty) return [];
+    final db = await _db;
+    final result = <KifEntity>[];
+    for (int i = 0; i < uniqueIds.length; i += 100) {
+      final chunk = uniqueIds.skip(i).take(100).toList();
+      final rows = await db.query(
+        'kif',
+        where: 'id IN (${List.filled(chunk.length, '?').join(',')})',
+        whereArgs: chunk,
+      );
+      result.addAll(rows.map((map) => KifEntity.fromMap(map)));
+    }
+    return result;
+  }
+
   Future<int> insertKif(KifEntity kif) async {
     final db = await _db;
     int insertedId = 0;

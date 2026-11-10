@@ -536,6 +536,17 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                                 color: Colors.orange,
                               ),
                             ),
+                          // 💡 コメント付き局面ノードの印（青い吹き出し・右上に配置）
+                          if (node.comments.isNotEmpty)
+                            const Positioned(
+                              top: 2,
+                              right: 2,
+                              child: Icon(
+                                Icons.chat_bubble,
+                                size: 10,
+                                color: Colors.blue,
+                              ),
+                            ),
                           // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
                           if (!isRoot && widget.onNodeDeleted != null)
                             Positioned(
