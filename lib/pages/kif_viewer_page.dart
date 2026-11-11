@@ -11,7 +11,6 @@ import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/dao/position_appearance_dao.dart';
 import 'package:kifdamari/database/dao/position_dao.dart';
 import 'package:kifdamari/database/entity/position_appearance_entity.dart';
-import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/logic/saf_helper.dart';
@@ -301,49 +300,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     });
   }
 
-  // 同じ positionKey を持つノードすべてにコメントを反映する
-  void _applyCommentToNodes(String positionKey, List<String> comments) {
-    final queue = Queue<GameNode>();
-    queue.add(kifTree!.root);
-    while (queue.isNotEmpty) {
-      final node = queue.removeFirst();
-      queue.addAll(node.nextNodes);
-      if (node.positionKey == positionKey) {
-        node.comments
-          ..clear()
-          ..addAll(comments);
-      }
-    }
-  }
-
-  void _showCommentEditDialog() async {
-    final node = kifTree!.currentNode;
-    final positionKey = node.positionKey;
-    final result = await showCommentEditDialog(context, node.joinedComment);
-    if (result == null || !mounted) return;
-
-    setState(() {
-      if (positionKey != null) {
-        _applyCommentToNodes(positionKey, result);
-      } else {
-        node.comments
-          ..clear()
-          ..addAll(result);
-      }
-    });
-
-    if (positionKey == null) return;
-    try {
-      final position = await PositionDao().getByKey(positionKey);
-      if (position != null) {
-        await PositionDao().updateComment(position.id!, result.join('\n'));
-      }
-    } catch (e) {
-      debugPrint('コメントの保存に失敗しました: $e');
-      if (mounted) ShowErrorSnackbar.show(context, 'コメントの保存に失敗しました');
-    }
-  }
-
   // 出現一覧の行タップ：その棋譜のその手数へジャンプする
   void _handleAppearanceTap(PositionAppearanceEntity appearance) async {
     final kif = _kifById[appearance.kifId];
@@ -461,7 +417,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                     child: Stack(
                       children: [
-                        // 通常時のコメント欄（タップでこの局面のコメント編集ダイアログを開く）
+                        // 通常時のコメント欄（表示専用・編集は棋譜編集画面で行う）
                         Container(
                           width: double.infinity,
                           height: double.infinity,
@@ -470,40 +426,36 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                             color: Colors.white.withOpacity(0.8),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: _showCommentEditDialog,
-                            child: Scrollbar(
+                          child: Scrollbar(
+                            controller: _commentScrollController,
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
                               controller: _commentScrollController,
-                              thumbVisibility: true,
-                              child: SingleChildScrollView(
-                                controller: _commentScrollController,
-                                child: Linkify(
-                                  text: "${kifTree!.currentNode.joinedComment}",
-                                  style: TextStyle(
-                                    fontSize: settings.get<double>('fontSize'),
-                                  ),
-                                  strutStyle: StrutStyle(
-                                    fontSize: settings.get<double>('fontSize'),
-                                    height: 1.5,
-                                    forceStrutHeight: true,
-                                  ),
-                                  linkStyle: const TextStyle(
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                  onOpen: (link) async {
-                                    final url = Uri.parse(link.url);
-                                    if (await canLaunchUrl(url)) {
-                                      await launchUrl(
-                                        url,
-                                        mode: LaunchMode.externalApplication,
-                                      );
-                                    } else {
-                                      ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
-                                    }
-                                  },
+                              child: Linkify(
+                                text: "${kifTree!.currentNode.joinedComment}",
+                                style: TextStyle(
+                                  fontSize: settings.get<double>('fontSize'),
                                 ),
+                                strutStyle: StrutStyle(
+                                  fontSize: settings.get<double>('fontSize'),
+                                  height: 1.5,
+                                  forceStrutHeight: true,
+                                ),
+                                linkStyle: const TextStyle(
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.none,
+                                ),
+                                onOpen: (link) async {
+                                  final url = Uri.parse(link.url);
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(
+                                      url,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  } else {
+                                    ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                                  }
+                                },
                               ),
                             ),
                           ),
