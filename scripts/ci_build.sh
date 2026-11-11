@@ -12,9 +12,27 @@ set -euo pipefail
 
 export JAVA_HOME="${JAVA_HOME:-/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64}"
 
-if ! command -v flutter >/dev/null 2>&1; then
-  echo "flutter not found; setting up Flutter (stable)..."
-  git clone --depth 1 -b stable https://github.com/flutter/flutter.git "$HOME/flutter-sdk"
+# Flutter を実績のあるバージョン 3.47.9 に固定する。
+# 新しい Flutter stable は Gradle の最小要件を引き上げており
+# (3.47.9 以降は Gradle 9.3.1 必須)、本リポジトリの Gradle 8.14 では
+# APK ビルドが失敗するため。ワークフローで 3.47.9 が入っていればそれを
+# そのまま使い、無い/違う場合はタグ 3.47.9 の SDK を clone して優先する。
+FLUTTER_VERSION="3.47.9"
+
+flutter_pinned_version() {
+  "$1" --version 2>/dev/null | sed -n 's/^Flutter \([0-9][0-9.]*\).*/\1/p' | head -n 1
+}
+
+if [ "$(flutter_pinned_version flutter)" = "$FLUTTER_VERSION" ]; then
+  echo "Using preinstalled Flutter $FLUTTER_VERSION."
+elif [ -x "$HOME/flutter-sdk/bin/flutter" ] && \
+     [ "$(flutter_pinned_version "$HOME/flutter-sdk/bin/flutter")" = "$FLUTTER_VERSION" ]; then
+  echo "Using cached Flutter $FLUTTER_VERSION from \$HOME/flutter-sdk."
+  export PATH="$HOME/flutter-sdk/bin:$PATH"
+else
+  echo "Setting up Flutter $FLUTTER_VERSION (pinned)..."
+  rm -rf "$HOME/flutter-sdk"
+  git clone --depth 1 -b "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$HOME/flutter-sdk"
   export PATH="$HOME/flutter-sdk/bin:$PATH"
 fi
 flutter --version
