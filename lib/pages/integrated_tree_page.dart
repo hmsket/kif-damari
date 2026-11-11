@@ -812,7 +812,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
 
     if (!mounted) return;
     setState(() {
-      parentNode.nextNodes.add(child);
+      parentNode.addChild(child);
       parentNode.selectedBranchIndex = parentNode.nextNodes.length - 1;
       if (child.positionKey != null) {
         t.positionIdByKey[child.positionKey!] = childPositionId;
