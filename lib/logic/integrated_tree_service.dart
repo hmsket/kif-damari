@@ -368,7 +368,7 @@ class IntegratedTreeService {
             );
             child.positionKey = toKey;
             _applyCommentsToNode(child, commentsById[edge.toPositionId] ?? '');
-            node.nextNodes.add(child);
+            node.addChild(child);
             nextFrontier.add(child);
             nodeCount++;
           }
@@ -537,6 +537,7 @@ class IntegratedTreeService {
       moveNumber: parentNode.moveNumber + 1,
       state: nextState,
       moveLabel: moveLabel,
+      parent: parentNode,
     );
     child.positionKey = childKey;
     _applyCommentsToNode(child, comment);
