@@ -51,6 +51,9 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
   bool _isRightSidebarOpen = false;
   bool _isLeftSidebarOpen = false;
 
+  // 統合ツリーの削除モード（false=参照モード：×ボタン非表示、true=削除モード：×ボタン表示）
+  bool _isTreeDeleteMode = false;
+
   // ダイヤル操作用の変数
   double _dialRotation = 0.0;
   double _dialAccumulator = 0.0;
@@ -1185,6 +1188,32 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                               color: Colors.brown[800],
                             ),
                           ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _isTreeDeleteMode = !_isTreeDeleteMode;
+                              });
+                            },
+                            icon: Icon(
+                              _isTreeDeleteMode
+                                  ? Icons.visibility
+                                  : Icons.delete_outline,
+                              size: 18,
+                              color: _isTreeDeleteMode
+                                  ? Colors.red[600]
+                                  : Colors.brown[800],
+                            ),
+                            label: Text(
+                              _isTreeDeleteMode ? '参照モードへ' : '削除モード',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _isTreeDeleteMode
+                                    ? Colors.red[600]
+                                    : Colors.brown[800],
+                              ),
+                            ),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.close),
                             onPressed: () {
@@ -1204,7 +1233,9 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                         showBranchIcon: false, // 統合ツリー表示では分岐アイコンを付けない
                         flatNodeCards: true, // 統合ツリー表示のノードは影なし・背景白
                         onNodeSelected: _selectNode,
-                        onNodeDeleted: _removeTreeNode, // ×ボタンでその局面だけを削除（④）
+                        // 削除モードの間だけ × ボタンを表示（参照モードでは null で非表示）
+                        onNodeDeleted:
+                            _isTreeDeleteMode ? _removeTreeNode : null,
                       ),
                     ),
                   ],
