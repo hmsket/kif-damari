@@ -85,7 +85,8 @@ class _IntegratedTreeRootPageState extends State<IntegratedTreeRootPage> {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      elevation: 2,
+      elevation: 0,
+      color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),

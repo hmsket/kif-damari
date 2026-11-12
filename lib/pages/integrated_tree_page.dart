@@ -1202,6 +1202,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                         rootNode: tree!.root,
                         currentNode: current!,
                         showBranchIcon: false, // 統合ツリー表示では分岐アイコンを付けない
+                        flatNodeCards: true, // 統合ツリー表示のノードは影なし・背景白
                         onNodeSelected: _selectNode,
                         onNodeDeleted: _removeTreeNode, // ×ボタンでその局面だけを削除（④）
                       ),

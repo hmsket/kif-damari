@@ -17,6 +17,10 @@ class KifTreeView extends StatefulWidget {
   // 分岐アイコン（ノード左上）を表示するか。統合ツリー表示では false にする（吹き出しは表示する）
   final bool showBranchIcon;
 
+  // ノードカードを影なし・背景白にするか。統合ツリー表示では true にする
+  // （現在ノードのオレンジ枠など、影・背景以外の区別表現は維持する）
+  final bool flatNodeCards;
+
   const KifTreeView({
     super.key,
     required this.rootNode,
@@ -24,6 +28,7 @@ class KifTreeView extends StatefulWidget {
     required this.onNodeSelected,
     this.onNodeDeleted, // 💡 編集画面でのみ渡す
     this.showBranchIcon = true,
+    this.flatNodeCards = false,
   });
 
   @override
@@ -478,27 +483,31 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
-                        color: isCurrent ? Colors.orange[300] : Colors.white,
+                        color: isCurrent && !widget.flatNodeCards
+                            ? Colors.orange[300]
+                            : Colors.white,
                         border: Border.all(
                           color: isCurrent ? Colors.orange[800]! : Colors.grey[400]!,
                           width: isCurrent ? 2.5 : 1.5,
                         ),
                         borderRadius: BorderRadius.circular(8),
-                        boxShadow: isCurrent
-                            ? [
-                                BoxShadow(
-                                  color: Colors.orange.withOpacity(0.4),
-                                  blurRadius: 6,
-                                  spreadRadius: 1,
-                                )
-                              ]
-                            : [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                )
-                              ],
+                        boxShadow: widget.flatNodeCards
+                            ? null
+                            : isCurrent
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.orange.withOpacity(0.4),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    )
+                                  ]
+                                : [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 2,
+                                      offset: const Offset(0, 1),
+                                    )
+                                  ],
                       ),
                       child: Stack(
                         clipBehavior: Clip.none,
