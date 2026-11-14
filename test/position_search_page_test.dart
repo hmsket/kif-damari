@@ -7,6 +7,27 @@ import 'package:kifdamari/widgets/home_drawer.dart';
 Finder pieceOnBoard(int gridX, int gridY, String pieceName) =>
     find.byKey(ValueKey('piece_${gridX}${gridY}$pieceName'));
 
+/// パレットで駒を選択する
+Future<void> selectPiece(WidgetTester tester, String pieceKey) async {
+  await tester.tap(find.byKey(ValueKey(pieceKey)));
+  await tester.pumpAndSettle();
+}
+
+/// 盤のマスをタップする
+Future<void> tapSquare(WidgetTester tester, int gridX, int gridY) async {
+  await tester.tap(find.byKey(ValueKey('square_${gridX}_$gridY')));
+  await tester.pumpAndSettle();
+}
+
+/// 指定した表面サイズで検索画面を表示する
+Future<void> pumpAtSize(WidgetTester tester, Size size) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('ドロワーの「局面検索」から検索画面を開ける', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: HomeDrawer()));
@@ -17,55 +38,85 @@ void main() {
     expect(find.byType(SingleChildScrollView), findsNothing);
   });
 
-  testWidgets('マスをタップして駒ピッカーから先手の歩を配置できる', (tester) async {
+  testWidgets('パレットで先手の歩を選んでマスをタップすると配置できる', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('square_4_8')));
-    await tester.pumpAndSettle();
-
-    final tile = find.byKey(const ValueKey('piece_tile_b_fu'));
-    await tester.ensureVisible(tile);
-    await tester.pumpAndSettle();
-    await tester.tap(tile);
-    await tester.pumpAndSettle();
+    await selectPiece(tester, 'piece_tile_b_fu');
+    await tapSquare(tester, 4, 8);
 
     expect(pieceOnBoard(4, 8, 'bfu'), findsOneWidget);
   });
 
-  testWidgets('駒のあるマスで「駒を消す」ができ、全消しボタンで盤が空になる', (tester) async {
+  testWidgets('選択は保持され、同じ駒を連続で置ける', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
     await tester.pumpAndSettle();
 
-    // 先手の飛を配置
-    await tester.tap(find.byKey(const ValueKey('square_1_8')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const ValueKey('piece_tile_b_hi')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('piece_tile_b_hi')));
-    await tester.pumpAndSettle();
-    expect(pieceOnBoard(1, 8, 'bhi'), findsOneWidget);
+    await selectPiece(tester, 'piece_tile_b_fu');
+    await tapSquare(tester, 4, 8);
+    await tapSquare(tester, 3, 8);
 
-    // 同じマスをタップすると「駒を消す」が出る
-    await tester.tap(find.byKey(const ValueKey('square_1_8')));
+    expect(pieceOnBoard(4, 8, 'bfu'), findsOneWidget);
+    expect(pieceOnBoard(3, 8, 'bfu'), findsOneWidget);
+  });
+
+  testWidgets('置き済みのマスを別の駒でタップすると上書きされる', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('駒を消す'));
+
+    await selectPiece(tester, 'piece_tile_b_fu');
+    await tapSquare(tester, 4, 8);
+    expect(pieceOnBoard(4, 8, 'bfu'), findsOneWidget);
+
+    await selectPiece(tester, 'piece_tile_b_hi');
+    await tapSquare(tester, 4, 8);
+
+    expect(pieceOnBoard(4, 8, 'bfu'), findsNothing);
+    expect(pieceOnBoard(4, 8, 'bhi'), findsOneWidget);
+  });
+
+  testWidgets('消しゴム選択中はマスタップで駒を消せて、全消しボタンで盤が空になる', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
     await tester.pumpAndSettle();
-    expect(pieceOnBoard(1, 8, 'bhi'), findsNothing);
+
+    // 先手の歩を配置
+    await selectPiece(tester, 'piece_tile_b_fu');
+    await tapSquare(tester, 4, 8);
+    expect(pieceOnBoard(4, 8, 'bfu'), findsOneWidget);
+
+    // 消しゴムを選んで同じマスをタップすると消える
+    await tester.tap(find.byKey(const ValueKey('palette_eraser')));
+    await tester.pumpAndSettle();
+    await tapSquare(tester, 4, 8);
+    expect(pieceOnBoard(4, 8, 'bfu'), findsNothing);
 
     // 後手の玉を配置して全消し
-    await tester.tap(find.byKey(const ValueKey('square_4_0')));
+    await tester.tap(find.text('後手'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const ValueKey('piece_tile_w_gy')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('piece_tile_w_gy')));
-    await tester.pumpAndSettle();
+    await selectPiece(tester, 'piece_tile_w_gy');
+    await tapSquare(tester, 4, 0);
     expect(pieceOnBoard(4, 0, 'wgy'), findsOneWidget);
 
     await tester.tap(find.text('全消し'));
     await tester.pumpAndSettle();
     expect(pieceOnBoard(4, 0, 'wgy'), findsNothing);
-    expect(pieceOnBoard(1, 8, 'bhi'), findsNothing);
+  });
+
+  testWidgets('先手/後手の切替で選択中の駒種が保持され、相手側の同種駒に切り替わる', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
+    await tester.pumpAndSettle();
+
+    await selectPiece(tester, 'piece_tile_b_fu');
+    await tester.tap(find.text('後手'));
+    await tester.pumpAndSettle();
+
+    // パレットが後手の駒に変わる
+    expect(find.byKey(const ValueKey('piece_tile_b_fu')), findsNothing);
+    expect(find.byKey(const ValueKey('piece_tile_w_fu')), findsOneWidget);
+
+    // 選択は後手の歩に引き継がれている（再選択なしで置ける）
+    await tapSquare(tester, 4, 0);
+    expect(pieceOnBoard(4, 0, 'wfu'), findsOneWidget);
   });
 
   testWidgets('モードを「場所はどこでも」に切り替えられる', (tester) async {
@@ -93,14 +144,9 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
     await tester.pumpAndSettle();
 
-    // 先手の歩を配置してから検索する
-    await tester.tap(find.byKey(const ValueKey('square_4_8')));
-    await tester.pumpAndSettle();
-    final tile = find.byKey(const ValueKey('piece_tile_b_fu'));
-    await tester.ensureVisible(tile);
-    await tester.pumpAndSettle();
-    await tester.tap(tile);
-    await tester.pumpAndSettle();
+    // 先手の歩をスタンプしてから検索する
+    await selectPiece(tester, 'piece_tile_b_fu');
+    await tapSquare(tester, 4, 8);
 
     await tester.tap(find.text('検索'));
     await tester.pumpAndSettle();
@@ -122,5 +168,35 @@ void main() {
 
     expect(find.text('見つかりませんでした'), findsOneWidget);
     expect(find.textContaining('回転'), findsOneWidget);
+  });
+
+  group('どんな画面サイズでも縦スクロールなしで表示できる', () {
+    const Map<String, Size> surfaceSizes = {
+      '320x568': Size(320, 568),
+      '360x640': Size(360, 640),
+      '375x667': Size(375, 667),
+      '390x844': Size(390, 844),
+    };
+
+    surfaceSizes.forEach((label, size) {
+      testWidgets('$label で overflow エラーが出ず、検索ボタンまで表示される', (tester) async {
+        await pumpAtSize(tester, size);
+
+        expect(tester.takeException(), isNull);
+
+        final searchButton = find.text('検索');
+        expect(searchButton, findsOneWidget);
+        final rect = tester.getRect(searchButton);
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(size.height));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(size.width));
+
+        // 検索ボタンが実際に押せる
+        await tester.tap(searchButton);
+        await tester.pumpAndSettle();
+        expect(find.text('検索結果'), findsOneWidget);
+      });
+    });
   });
 }
