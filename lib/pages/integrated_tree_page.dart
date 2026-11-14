@@ -30,7 +30,15 @@ import 'package:url_launcher/url_launcher.dart';
 class IntegratedTreePage extends StatefulWidget {
   final PositionEntity rootPosition;
 
-  const IntegratedTreePage({super.key, required this.rootPosition});
+  /// 開き初めに現在地とする局面の positionKey（局面検索の結果画面から開くときに使う）。
+  /// 指定した局面がツリー内に見つからない場合は根の局面で開く。
+  final String? initialPositionKey;
+
+  const IntegratedTreePage({
+    super.key,
+    required this.rootPosition,
+    this.initialPositionKey,
+  });
 
   @override
   State<IntegratedTreePage> createState() => _IntegratedTreePageState();
@@ -94,11 +102,39 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
   Future<void> _initTree() async {
     final built = await IntegratedTreeService.buildTreeFromRoot(widget.rootPosition);
     if (!mounted) return;
+
+    // 指定局面があればそこを現在地にする（根から現在地までの分岐選択も整える）
+    GameNode? initial = built?.root;
+    final initialKey = widget.initialPositionKey;
+    if (built != null && initialKey != null) {
+      final found = _findNodeByKey(built.root, initialKey);
+      if (found != null) {
+        initial = found;
+        GameNode? temp = found;
+        while (temp.parent != null) {
+          final parent = temp.parent!;
+          parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
+          temp = parent;
+        }
+      }
+    }
+
     setState(() {
       tree = built;
-      current = built?.root;
+      current = initial;
       _isLoading = false;
     });
+  }
+
+  /// ツリー内から positionKey が一致する最初のノードを探す（幅優先）
+  static GameNode? _findNodeByKey(GameNode root, String positionKey) {
+    final queue = <GameNode>[root];
+    while (queue.isNotEmpty) {
+      final node = queue.removeFirst();
+      if (node.positionKey == positionKey) return node;
+      queue.addAll(node.nextNodes);
+    }
+    return null;
   }
 
   bool get _hasLoadError => !_isLoading && tree == null;

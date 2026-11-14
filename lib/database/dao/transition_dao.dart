@@ -26,6 +26,20 @@ class TransitionDao {
     return result;
   }
 
+  /// 指定した局面へ入ってくる枝（from → その局面）の一覧
+  Future<List<TransitionEntity>> getByToPositionId(
+    int positionId, {
+    DatabaseExecutor? executor,
+  }) async {
+    final db = executor ?? await _db;
+    final rows = await db.query(
+      'transition',
+      where: 'to_position_id = ?',
+      whereArgs: [positionId],
+    );
+    return rows.map((map) => TransitionEntity.fromMap(map)).toList();
+  }
+
   Future<TransitionEntity?> getByFromAndMoveLabel(
     int fromPositionId,
     String moveLabel, {

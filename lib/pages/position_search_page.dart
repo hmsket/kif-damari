@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kifdamari/logic/position_search_service.dart';
 import 'package:kifdamari/logic/position_searcher.dart';
 import 'package:kifdamari/models/board_state.dart';
+import 'package:kifdamari/pages/position_search_result_page.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 
 /// 局面検索画面（Issue #37）。
@@ -198,20 +199,25 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
   Future<void> _search() async {
     setState(() => _isSearching = true);
     final hits = await PositionSearchService.search(_pattern, _mode);
+    final rows = await PositionSearchService.loadResultRows(hits);
     if (!mounted) return;
     setState(() => _isSearching = false);
 
-    // 結果一覧画面は②（Issue #38）の範囲。ここでは仮の確認画面へ遷移する。
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => _SearchResultPlaceholderPage(
-          hits: hits,
+        builder: (context) => PositionSearchResultPage(
+          pattern: _copiedPattern(),
           mode: _mode,
+          rows: rows,
         ),
       ),
     );
   }
+
+  /// 結果画面に渡すパターンのコピー（遷移後に検索画面で編集しても影響しないようにする）
+  List<List<String?>> _copiedPattern() =>
+      _pattern.map((row) => List<String?>.of(row)).toList();
 }
 
 /// 駒ピッカー（シート状の一覧）。先手・後手の全種の駒から選ぶ。
@@ -323,52 +329,3 @@ class _PieceTile extends StatelessWidget {
   }
 }
 
-/// 結果一覧画面（②）までの仮の確認画面。
-class _SearchResultPlaceholderPage extends StatelessWidget {
-  final List<PositionSearchHit> hits;
-  final PositionSearchMode mode;
-
-  const _SearchResultPlaceholderPage({
-    required this.hits,
-    required this.mode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text('検索結果（仮）'),
-      ),
-      body: hits.isEmpty
-          ? const Center(child: Text('一致する局面は見つかりませんでした'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: hits.length,
-              itemBuilder: (context, index) {
-                final hit = hits[index];
-                final squares =
-                    hit.matchedSquares.map((s) => '${s[0]}${s[1]}').join(' ');
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'position_key: ${hit.positionKey}',
-                          style: const TextStyle(
-                              fontFamily: 'monospace', fontSize: 12),
-                        ),
-                        const SizedBox(height: 4),
-                        Text('マッチしたマス: $squares'),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-    );
-  }
-}
