@@ -37,7 +37,10 @@ class PositionSearcher {
     final hits = <PositionSearchHit>[];
     if (!_hasPiece(pattern)) return hits;
 
-    final rotated = mode == PositionSearchMode.anywhere ? _rotate180(_swapColors(pattern)) : null;
+    // パターンの駒を筋の昇順（grid の x 降順、同 x なら y 昇順）に並べたセル列。
+    // matchedSquares はこの順序に対応して返す。回転マッチも同じ順序を保つ。
+    final cells = _orderedCells(pattern);
+    final rotatedCells = mode == PositionSearchMode.anywhere ? _rotateCells(cells) : null;
 
     for (final key in positionKeys) {
       final grid = _boardGridFromKey(key);
@@ -45,9 +48,9 @@ class PositionSearcher {
 
       List<List<int>>? squares;
       if (mode == PositionSearchMode.exact) {
-        squares = _matchExact(grid, pattern);
+        squares = _matchExact(grid, cells);
       } else {
-        squares = _matchRelative(grid, pattern) ?? _matchRelative(grid, rotated!);
+        squares = _matchRelative(grid, cells) ?? _matchRelative(grid, rotatedCells!);
       }
       if (squares != null) {
         hits.add(PositionSearchHit(positionKey: key, matchedSquares: squares));
@@ -75,19 +78,45 @@ class PositionSearcher {
     }
   }
 
-  /// 場所も一致: パターンの駒があるマスだけを比較する。
-  static List<List<int>>? _matchExact(
-    List<List<String?>> grid,
-    List<List<String?>> pattern,
-  ) {
-    final squares = <List<int>>[];
+  /// パターンの駒セルを筋の昇順（x 降順、同 x なら y 昇順）に並べた列を作る。
+  static List<(int, int, String)> _orderedCells(List<List<String?>> pattern) {
+    final cells = <(int, int, String)>[];
     for (int y = 0; y < 9; y++) {
       for (int x = 0; x < 9; x++) {
         final piece = pattern[y][x];
-        if (piece == null) continue;
-        if (grid[y][x] != piece) return null;
-        squares.add(_square(x, y));
+        if (piece != null) cells.add((x, y, piece));
       }
+    }
+    cells.sort((a, b) {
+      final byX = b.$1.compareTo(a.$1);
+      if (byX != 0) return byX;
+      return a.$2.compareTo(b.$2);
+    });
+    return cells;
+  }
+
+  /// セル列を 180°回転＋先後入替する（＝後手向きに見た同じ配置）。
+  /// セルの順序は変えず、座標変換と駒の先後入替だけを行う。
+  static List<(int, int, String)> _rotateCells(List<(int, int, String)> cells) {
+    return [
+      for (final (x, y, piece) in cells)
+        (
+          8 - x,
+          8 - y,
+          piece.startsWith('b') ? 'w${piece.substring(1)}' : 'b${piece.substring(1)}',
+        ),
+    ];
+  }
+
+  /// 場所も一致: パターンの駒があるマスだけを比較する。
+  static List<List<int>>? _matchExact(
+    List<List<String?>> grid,
+    List<(int, int, String)> cells,
+  ) {
+    final squares = <List<int>>[];
+    for (final (x, y, piece) in cells) {
+      if (grid[y][x] != piece) return null;
+      squares.add(_square(x, y));
     }
     return squares;
   }
@@ -95,20 +124,14 @@ class PositionSearcher {
   /// 場所はどこでも: パターンを平行移動して全部が盤内に収まる置き方を全通り試す。
   static List<List<int>>? _matchRelative(
     List<List<String?>> grid,
-    List<List<String?>> pattern,
+    List<(int, int, String)> cells,
   ) {
-    final cells = <(int, int, String)>[];
     int minY = 9, maxY = -1, minX = 9, maxX = -1;
-    for (int y = 0; y < 9; y++) {
-      for (int x = 0; x < 9; x++) {
-        final piece = pattern[y][x];
-        if (piece == null) continue;
-        cells.add((x, y, piece));
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
+    for (final (x, y, _) in cells) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
     }
     if (cells.isEmpty) return null;
 
@@ -129,27 +152,6 @@ class PositionSearcher {
       }
     }
     return null;
-  }
-
-  /// 180°回転＋先後入替（＝後手向きに見た同じ配置）
-  static List<List<String?>> _rotate180(List<List<String?>> pattern) {
-    final rotated = List.generate(9, (_) => List<String?>.filled(9, null));
-    for (int y = 0; y < 9; y++) {
-      for (int x = 0; x < 9; x++) {
-        rotated[8 - y][8 - x] = pattern[y][x];
-      }
-    }
-    return rotated;
-  }
-
-  static List<List<String?>> _swapColors(List<List<String?>> pattern) {
-    return [
-      for (final row in pattern)
-        [
-          for (final cell in row)
-            if (cell == null) null else (cell.startsWith('b') ? 'w${cell.substring(1)}' : 'b${cell.substring(1)}'),
-        ],
-    ];
   }
 
   /// grid 座標 → [筋, 段]（1〜9）

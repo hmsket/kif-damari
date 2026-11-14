@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kifdamari/logic/position_searcher.dart';
 import 'package:kifdamari/pages/position_search_page.dart';
 import 'package:kifdamari/widgets/home_drawer.dart';
 
@@ -74,7 +75,7 @@ void main() {
     await tester.tap(find.text('場所はどこでも'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(SegmentedButton), findsOneWidget);
+    expect(find.byType(SegmentedButton<PositionSearchMode>), findsOneWidget);
   });
 
   testWidgets('検索ボタンで仮の結果確認画面へ遷移する', (tester) async {
