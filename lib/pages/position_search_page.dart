@@ -14,6 +14,24 @@ class PositionSearchPage extends StatefulWidget {
   State<PositionSearchPage> createState() => _PositionSearchPageState();
 }
 
+/// ピッカーで選べる駒（盤に置ける全種）
+const List<(String, String)> _kPieceTypes = [
+  ('fu', '歩'),
+  ('ya', '香'),
+  ('ke', '桂'),
+  ('gi', '銀'),
+  ('ki', '金'),
+  ('ka', '角'),
+  ('hi', '飛'),
+  ('gy', '玉'),
+  ('to', 'と'),
+  ('ny', '成香'),
+  ('nk', '成桂'),
+  ('ng', '成銀'),
+  ('um', '馬'),
+  ('ry', '龍'),
+];
+
 class _PositionSearchPageState extends State<PositionSearchPage> {
   /// 検索パターンの盤（grid[y][x]）。駒コードは 'bfu' 'wgy' など。空マスは null。
   final List<List<String?>> _pattern =
@@ -21,24 +39,6 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
 
   PositionSearchMode _mode = PositionSearchMode.exact;
   bool _isSearching = false;
-
-  /// ピッカーで選べる駒（盤に置ける全種）
-  static const List<(String, String)> _pieceTypes = [
-    ('fu', '歩'),
-    ('ya', '香'),
-    ('ke', '桂'),
-    ('gi', '銀'),
-    ('ki', '金'),
-    ('ka', '角'),
-    ('hi', '飛'),
-    ('gy', '玉'),
-    ('to', 'と'),
-    ('ny', '成香'),
-    ('nk', '成桂'),
-    ('ng', '成銀'),
-    ('um', '馬'),
-    ('ry', '龍'),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +273,7 @@ class _PiecePickerSheet extends StatelessWidget {
           mainAxisSpacing: 4,
           crossAxisSpacing: 4,
           children: [
-            for (final (type, name) in _pieceTypes)
+            for (final (type, name) in _kPieceTypes)
               _PieceTile(
                 key: ValueKey('piece_tile_${prefix}_$type'),
                 prefix: prefix,
