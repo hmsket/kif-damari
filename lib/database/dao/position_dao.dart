@@ -86,4 +86,11 @@ class PositionDao {
     );
     return rows.map((map) => PositionEntity.fromMap(map)).toList();
   }
+
+  /// 登録済みの全局面の position_key 一覧を返す（局面検索の走査用）
+  Future<List<String>> getAllKeys({DatabaseExecutor? executor}) async {
+    final db = executor ?? await _db;
+    final rows = await db.query('position', columns: ['position_key']);
+    return rows.map((row) => row['position_key'] as String).toList();
+  }
 }
