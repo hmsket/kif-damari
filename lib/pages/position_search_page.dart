@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:kifdamari/logic/position_search_service.dart';
 import 'package:kifdamari/logic/position_searcher.dart';
@@ -5,9 +7,10 @@ import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/pages/position_search_result_page.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 
-/// 局面検索画面（Issue #37）。
+/// 局面検索画面（Issue #37 / #41）。
 /// 空盤から駒を配置してパターンを組み、盤面のみで全局面を照合する。
 /// 手番・持駒は不問。SFEN 入力は付けない。
+/// 駒の配置は「パレットで駒を選んでマスにスタンプする」方式（Issue #41）。
 class PositionSearchPage extends StatefulWidget {
   const PositionSearchPage({super.key});
 
@@ -15,7 +18,7 @@ class PositionSearchPage extends StatefulWidget {
   State<PositionSearchPage> createState() => _PositionSearchPageState();
 }
 
-/// ピッカーで選べる駒（盤に置ける全種）
+/// パレットで選べる駒種（成り駒込みの全14種）
 const List<(String, String)> _kPieceTypes = [
   ('fu', '歩'),
   ('ya', '香'),
@@ -33,6 +36,19 @@ const List<(String, String)> _kPieceTypes = [
   ('ry', '龍'),
 ];
 
+/// 盤画像のアスペクト比（幅 / 高さ）
+const double _kBoardAspectRatio = 878 / 960;
+
+/// パレットの1段に並べる駒の数
+const int _kPiecesPerRow = 7;
+
+/// パレット上部（先後切替 + 消しゴム）の高さ。
+/// SegmentedButton のタップターゲット（48）に合わせて固定する。
+const double _kPaletteBarHeight = 48;
+
+/// パレットの駒1段分の高さ
+const double _kPaletteRowHeight = 56;
+
 class _PositionSearchPageState extends State<PositionSearchPage> {
   /// 検索パターンの盤（grid[y][x]）。駒コードは 'bfu' 'wgy' など。空マスは null。
   final List<List<String?>> _pattern =
@@ -40,6 +56,15 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
 
   PositionSearchMode _mode = PositionSearchMode.exact;
   bool _isSearching = false;
+
+  /// スタンプする駒（'bfu' など）。未選択は null。
+  String? _selectedPiece;
+
+  /// 消しゴム選択中かどうか
+  bool _isEraser = false;
+
+  /// パレットに表示する側。'b' = 先手, 'w' = 後手。
+  String _side = 'b';
 
   @override
   Widget build(BuildContext context) {
@@ -49,20 +74,12 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
         title: const Text('局面検索'),
       ),
       body: SafeArea(
-        // スクロール無しで1画面に収める（盤＋モード切替＋操作部）
+        // どんな画面サイズでも縦スクロールなしで1画面に収める（Issue #41）。
+        // アプリバー / モード切替 / パレット / 下段バーは固定高、
+        // 盤は残りの高さに合わせて縮む。
         child: Column(
           children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 878 / 960,
-                    child: _buildPatternBoard(),
-                  ),
-                ),
-              ),
-            ),
+            // モード切替（固定高）
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: SegmentedButton<PositionSearchMode>(
@@ -84,6 +101,30 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
                 },
               ),
             ),
+            // 盤（残りの高さに収まる最大サイズで表示）
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final double width = math.min(
+                        constraints.maxWidth,
+                        constraints.maxHeight * _kBoardAspectRatio,
+                      );
+                      return SizedBox(
+                        width: width,
+                        height: width / _kBoardAspectRatio,
+                        child: _buildPatternBoard(),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            // 駒パレット（固定高）
+            _buildPalette(),
+            // 下段バー（固定高）
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               child: Row(
@@ -119,6 +160,66 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
     );
   }
 
+  /// 駒パレット。上部に先後切替トグルと消しゴム、
+  /// 下に成り駒込みの全14種を2段で常駐させる。
+  Widget _buildPalette() {
+    final List<Widget> rows = [];
+    for (var i = 0; i < _kPieceTypes.length; i += _kPiecesPerRow) {
+      rows.add(
+        SizedBox(
+          height: _kPaletteRowHeight,
+          child: Row(
+            children: [
+              for (final (type, name) in _kPieceTypes.skip(i).take(_kPiecesPerRow))
+                Expanded(
+                  child: _PaletteTile(
+                    key: ValueKey('piece_tile_${_side}_$type'),
+                    prefix: _side,
+                    type: type,
+                    name: name,
+                    selected: _selectedPiece == '$_side$type',
+                    onTap: () => _selectPiece('$_side$type'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: _kPaletteBarHeight,
+            child: Row(
+              children: [
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'b', label: Text('先手')),
+                    ButtonSegment(value: 'w', label: Text('後手')),
+                  ],
+                  selected: {_side},
+                  onSelectionChanged: (selection) =>
+                      _switchSide(selection.first),
+                ),
+                const Spacer(),
+                _EraserButton(
+                  key: const ValueKey('palette_eraser'),
+                  selected: _isEraser,
+                  onTap: () => setState(() => _isEraser = !_isEraser),
+                ),
+              ],
+            ),
+          ),
+          ...rows,
+        ],
+      ),
+    );
+  }
+
   /// パターン盤。KifBoard の描画＋同じジオメトリのタップ受付レイヤー。
   Widget _buildPatternBoard() {
     return Stack(
@@ -147,7 +248,7 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
                         child: GestureDetector(
                           key: ValueKey('square_${x}_$y'),
                           behavior: HitTestBehavior.opaque,
-                          onTap: () => _openPiecePicker(x, y),
+                          onTap: () => _placePiece(x, y),
                         ),
                       ),
                 ],
@@ -168,22 +269,39 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
     );
   }
 
-  Future<void> _openPiecePicker(int x, int y) async {
-    final current = _pattern[y][x];
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => _PiecePickerSheet(
-        currentPiece: current,
-      ),
-    );
-    if (selected == null || !mounted) return;
-
+  /// パレットで駒を選ぶ。消しゴムは解除される。
+  void _selectPiece(String piece) {
     setState(() {
-      _pattern[y][x] = selected == '' ? null : selected;
+      _selectedPiece = piece;
+      _isEraser = false;
     });
+  }
+
+  /// 先手 / 後手を切り替える。
+  /// 駒を選択中なら、選択は保持したまま相手側の同種駒に切り替える。
+  void _switchSide(String side) {
+    if (side == _side) return;
+    setState(() {
+      _side = side;
+      final piece = _selectedPiece;
+      if (piece != null) {
+        _selectedPiece = side + piece.substring(1);
+      }
+    });
+  }
+
+  /// マスをタップしたときの処理（スタンプ方式）。
+  /// 消しゴム選択中ならそのマスの駒を消す。
+  /// 駒選択中ならその駒を置く（置き済みのマスは上書き）。
+  /// 選択は保持されるので、同じ駒を連続で置ける。
+  void _placePiece(int x, int y) {
+    if (_isEraser) {
+      setState(() => _pattern[y][x] = null);
+      return;
+    }
+    final piece = _selectedPiece;
+    if (piece == null) return;
+    setState(() => _pattern[y][x] = piece);
   }
 
   void _clearPattern() {
@@ -220,112 +338,95 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
       _pattern.map((row) => List<String?>.of(row)).toList();
 }
 
-/// 駒ピッカー（シート状の一覧）。先手・後手の全種の駒から選ぶ。
-/// 駒のあるマスでは「駒を消す」も選べる。
-class _PiecePickerSheet extends StatelessWidget {
-  final String? currentPiece;
-
-  const _PiecePickerSheet({required this.currentPiece});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'マスに置く駒を選んでください',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (currentPiece != null)
-                  TextButton.icon(
-                    onPressed: () => Navigator.pop(context, ''),
-                    icon: const Icon(Icons.backspace_outlined, size: 18),
-                    label: const Text('駒を消す'),
-                  ),
-              ],
-            ),
-            _buildSection(context, '先手', 'b'),
-            _buildSection(context, '後手', 'w'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSection(BuildContext context, String label, String prefix) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 4),
-          child: Text(
-            label,
-            style: TextStyle(color: Colors.grey[700], fontSize: 12),
-          ),
-        ),
-        GridView.count(
-          crossAxisCount: 7,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 140 / 148,
-          mainAxisSpacing: 4,
-          crossAxisSpacing: 4,
-          children: [
-            for (final (type, name) in _kPieceTypes)
-              _PieceTile(
-                key: ValueKey('piece_tile_${prefix}_$type'),
-                prefix: prefix,
-                type: type,
-                name: name,
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _PieceTile extends StatelessWidget {
+/// パレットの駒マス。選択中はハイライト表示する。
+class _PaletteTile extends StatelessWidget {
   final String prefix;
   final String type;
   final String name;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _PieceTile({
+  const _PaletteTile({
     super.key,
     required this.prefix,
     required this.type,
     required this.name,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: () => Navigator.pop(context, '$prefix$type'),
-      child: Column(
-        children: [
-          // 実物の縦横比（140x148）を保って表示する
-          Expanded(
-            child: AspectRatio(
-              aspectRatio: 140 / 148,
-              child: Image.asset(
-                'assets/images/pieces/$prefix$type.png',
-                fit: BoxFit.contain,
-              ),
-            ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1),
+      child: Material(
+        color: selected ? Colors.orange.withOpacity(0.15) : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: BorderSide(
+            color: selected ? Colors.orange : Colors.transparent,
+            width: 2,
           ),
-          Text(name, style: const TextStyle(fontSize: 10)),
-        ],
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            children: [
+              // 実物の縦横比（140x148）を保って表示する
+              Expanded(
+                child: AspectRatio(
+                  aspectRatio: 140 / 148,
+                  child: Image.asset(
+                    'assets/images/pieces/$prefix$type.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Text(name, style: const TextStyle(fontSize: 10)),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
+/// 消しゴムボタン。選択中はハイライト表示する。
+class _EraserButton extends StatelessWidget {
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _EraserButton({
+    super.key,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? Colors.orange.withOpacity(0.15) : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(
+          color: selected ? Colors.orange : Colors.grey.shade400,
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.backspace_outlined, size: 18),
+              SizedBox(width: 4),
+              Text('消しゴム', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
