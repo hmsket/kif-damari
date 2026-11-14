@@ -97,8 +97,15 @@ void main() {
       final top1 = tester.getTopLeft(find.text('出現する棋譜 1件')).dy;
       expect(top3, lessThan(top1));
 
-      // 行のミニ盤にその局面の駒が表示される
-      expect(find.byKey(const ValueKey('piece_44bka')), findsOneWidget);
+      // 行のミニ盤にその局面の駒が表示される。
+      // 同じ駒キーはパターン概要の小盤にも出るので、行リスト内に絞って検査する。
+      expect(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.byKey(const ValueKey('piece_44bka')),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('マッチしたマスがハイライトされる', (tester) async {
