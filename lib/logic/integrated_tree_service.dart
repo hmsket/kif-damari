@@ -300,6 +300,40 @@ class IntegratedTreeService {
     return '$total枚落ち';
   }
 
+  /// 指定した局面が属する統合ツリーの根を探す（局面検索の結果画面から統合ツリーを開くため）。
+  /// transition を根方向へ辿り、is_root の局面に着いたらそれを返す。
+  /// 局面が登録されていない・どの根にも辿り着かない場合は null。
+  static Future<PositionEntity?> findRootOf(String positionKey) async {
+    try {
+      final positionDao = PositionDao();
+      final transitionDao = TransitionDao();
+
+      var current = await positionDao.getByKey(positionKey);
+      if (current == null || current.id == null) return null;
+
+      final visitedIds = <int>{current.id!};
+      PositionEntity node = current;
+      while (!node.isRoot) {
+        final incomingEdges = await transitionDao.getByToPositionId(node.id!);
+        PositionEntity? parent;
+        for (final edge in incomingEdges) {
+          if (visitedIds.contains(edge.fromPositionId)) continue;
+          final candidates = await positionDao.getByIds([edge.fromPositionId]);
+          if (candidates.isEmpty) continue;
+          parent = candidates.first;
+          break;
+        }
+        if (parent == null || parent.id == null) return null;
+        visitedIds.add(parent.id!);
+        node = parent;
+      }
+      return node;
+    } catch (e) {
+      debugPrint('局面の根の取得に失敗しました: $e');
+      return null;
+    }
+  }
+
   /// 指定した根から統合ツリーをメモリ上に展開する。
   /// 合流はツリーの複製として展開し、祖先に戻るエッジ（＝循環）のみスキップする。
   static Future<IntegratedTree?> buildTreeFromRoot(PositionEntity root) async {

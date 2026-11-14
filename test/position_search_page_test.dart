@@ -78,15 +78,49 @@ void main() {
     expect(find.byType(SegmentedButton<PositionSearchMode>), findsOneWidget);
   });
 
-  testWidgets('検索ボタンで仮の結果確認画面へ遷移する', (tester) async {
+  testWidgets('検索ボタンで結果一覧画面へ遷移する（0件）', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('検索'));
     await tester.pumpAndSettle();
 
-    // 結果一覧画面は②の範囲なので、ここでは仮画面が開くことだけ確認する
-    expect(find.text('検索結果（仮）'), findsOneWidget);
-    expect(find.text('一致する局面は見つかりませんでした'), findsOneWidget);
+    expect(find.text('検索結果'), findsOneWidget);
+    expect(find.text('見つかりませんでした'), findsOneWidget);
+  });
+
+  testWidgets('結果一覧画面の0件表示でもパターンの概要（小盤＋モード説明）が出る', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
+    await tester.pumpAndSettle();
+
+    // 先手の歩を配置してから検索する
+    await tester.tap(find.byKey(const ValueKey('square_4_8')));
+    await tester.pumpAndSettle();
+    final tile = find.byKey(const ValueKey('piece_tile_b_fu'));
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('検索'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('見つかりませんでした'), findsOneWidget);
+    // パターンの概要の小盤に置いた駒が表示される
+    expect(find.byKey(const ValueKey('piece_48bfu')), findsOneWidget);
+    expect(find.textContaining('場所も一致'), findsOneWidget);
+  });
+
+  testWidgets('「場所はどこでも」で検索すると回転も対象である旨が概要に出る', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: PositionSearchPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('場所はどこでも'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('検索'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('見つかりませんでした'), findsOneWidget);
+    expect(find.textContaining('回転'), findsOneWidget);
   });
 }
