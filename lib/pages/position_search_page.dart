@@ -173,7 +173,7 @@ class _PositionSearchPageState extends State<PositionSearchPage> {
               for (final (type, name) in _kPieceTypes.skip(i).take(_kPiecesPerRow))
                 Expanded(
                   child: _PaletteTile(
-                    key: ValueKey('piece_tile_$_side$type'),
+                    key: ValueKey('piece_tile_${_side}_$type'),
                     prefix: _side,
                     type: type,
                     name: name,
