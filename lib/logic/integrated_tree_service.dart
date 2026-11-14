@@ -312,8 +312,9 @@ class IntegratedTreeService {
       if (current == null || current.id == null) return null;
 
       final visitedIds = <int>{current.id!};
-      while (!current.isRoot) {
-        final incomingEdges = await transitionDao.getByToPositionId(current.id!);
+      PositionEntity node = current;
+      while (!node.isRoot) {
+        final incomingEdges = await transitionDao.getByToPositionId(node.id!);
         PositionEntity? parent;
         for (final edge in incomingEdges) {
           if (visitedIds.contains(edge.fromPositionId)) continue;
@@ -324,9 +325,9 @@ class IntegratedTreeService {
         }
         if (parent == null || parent.id == null) return null;
         visitedIds.add(parent.id!);
-        current = parent;
+        node = parent;
       }
-      return current;
+      return node;
     } catch (e) {
       debugPrint('局面の根の取得に失敗しました: $e');
       return null;

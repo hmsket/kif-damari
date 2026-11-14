@@ -110,7 +110,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       final found = _findNodeByKey(built.root, initialKey);
       if (found != null) {
         initial = found;
-        GameNode? temp = found;
+        GameNode temp = found;
         while (temp.parent != null) {
           final parent = temp.parent!;
           parent.selectedBranchIndex = parent.nextNodes.indexOf(temp);
@@ -130,7 +130,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
   static GameNode? _findNodeByKey(GameNode root, String positionKey) {
     final queue = <GameNode>[root];
     while (queue.isNotEmpty) {
-      final node = queue.removeFirst();
+      final node = queue.removeAt(0);
       if (node.positionKey == positionKey) return node;
       queue.addAll(node.nextNodes);
     }

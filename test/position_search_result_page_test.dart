@@ -5,7 +5,6 @@ import 'package:kifdamari/logic/position_searcher.dart';
 import 'package:kifdamari/logic/sfen_generator.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/pages/position_search_result_page.dart';
-import 'package:kifdamari/widgets/kif_board.dart';
 
 /// (筋, 段, 駒コード) から盤面キーを作るテスト用ヘルパー。
 String keyFromPlacements(List<(int, int, String)> placements) {
