@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/pages/setting_page.dart';
 import 'package:kifdamari/pages/integrated_tree_root_page.dart';
+import 'package:kifdamari/pages/position_search_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/widgets/constants.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -64,6 +65,21 @@ class HomeDrawer extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const IntegratedTreeRootPage(),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          // 局面検索（①検索ロジックとパターン編集画面）
+          ListTile(
+            leading: const Icon(Icons.search),
+            title: const Text('局面検索'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PositionSearchPage(),
                 ),
               );
             },
