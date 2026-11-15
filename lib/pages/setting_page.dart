@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kifdamari/settings/default_color_setting.dart';
 import 'package:kifdamari/settings/default_save_location_setting.dart';
 import 'package:kifdamari/settings/font_size_setting.dart';
+import 'package:kifdamari/settings/home_view_mode_setting.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/settings/kif_template_setting.dart';
 import 'package:kifdamari/settings/thumbnail_size_setting.dart';
@@ -36,6 +37,8 @@ class SettingPage extends StatelessWidget {
               ThumbnailSizeSetting(settings: settings),
 
               DefaultColorSetting(settings: settings),
+
+              HomeViewModeSetting(settings: settings),
 
               const SizedBox(height: 12),
 

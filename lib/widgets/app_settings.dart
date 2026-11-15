@@ -17,6 +17,7 @@ class AppSettings {
     'kifTitle': '{先手} vs {後手}',
     'kifDetail': '{棋戦} / {戦型} / {対局日}',
     'defaultSaveTreeUri': '',
+    'homeViewMode': 'grid',
   };
 
   ValueListenable<Box<dynamic>> get listenable => _box.listenable();
