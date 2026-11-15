@@ -465,7 +465,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                           Positioned.fill(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.95),
+                                color: Colors.white.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: [
                                   BoxShadow(
