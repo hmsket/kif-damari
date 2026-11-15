@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:reorderable_grid/reorderable_grid.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/delete_kif_dialog.dart';
@@ -174,7 +175,7 @@ class KifListWidgetState extends State<KifListWidget> {
   Widget _buildSortList(List<KifEntity> kifs) {
     return ReorderableListView.builder(
       itemCount: kifs.length,
-      buildDefaultDragHandles: true,
+      buildDefaultDragHandles: false,
       proxyDecorator: (child, index, animation) {
         return Material(
           elevation: 80,
@@ -193,12 +194,16 @@ class KifListWidgetState extends State<KifListWidget> {
       },
       itemBuilder: (context, index) {
         final kif = kifs[index];
-        return KifListItem(
+        // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
+        return ReorderableDelayedDragStartListener(
           key: ValueKey('sort_${kif.id}'),
-          kif: kif,
-          mode: widget.mode,
-          onRefresh: _loadKifu,
           index: index,
+          child: KifListItem(
+            kif: kif,
+            mode: widget.mode,
+            onRefresh: _loadKifu,
+            index: index,
+          ),
         );
       },
     );
@@ -275,7 +280,7 @@ class KifListWidgetState extends State<KifListWidget> {
 
   /// 並べ替えモード（グリッド表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortGrid(List<KifEntity> kifs) {
-    return GridView.builder(
+    return ReorderableGridView.builder(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 200,
@@ -284,50 +289,28 @@ class KifListWidgetState extends State<KifListWidget> {
         childAspectRatio: 0.95,
       ),
       itemCount: kifs.length,
+      proxyDecorator: (child, index, animation) {
+        return Material(
+          elevation: 6,
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: child,
+        );
+      },
+      onReorder: (oldIndex, newIndex) {
+        setState(() {
+          final item = kifs.removeAt(oldIndex);
+          kifs.insert(newIndex, item);
+          _tempKifs = List.from(kifs);
+        });
+      },
       itemBuilder: (context, index) {
         final kif = kifs[index];
-        return DragTarget<int>(
+        return KifGridItem(
           key: ValueKey('sort_grid_${kif.id}'),
-          onWillAcceptWithDetails: (details) => details.data != index,
-          onAcceptWithDetails: (details) {
-            setState(() {
-              final item = kifs.removeAt(details.data!);
-              kifs.insert(index, item);
-              _tempKifs = List.from(kifs);
-            });
-          },
-          builder: (context, candidateData, rejectedData) {
-            return LongPressDraggable<int>(
-              data: index,
-              feedback: Material(
-                elevation: 6,
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 140,
-                  height: 150,
-                  child: KifGridItem(
-                    kif: kif,
-                    mode: widget.mode,
-                    onRefresh: _loadKifu,
-                  ),
-                ),
-              ),
-              childWhenDragging: Opacity(
-                opacity: 0.4,
-                child: KifGridItem(
-                  kif: kif,
-                  mode: widget.mode,
-                  onRefresh: _loadKifu,
-                ),
-              ),
-              child: KifGridItem(
-                kif: kif,
-                mode: widget.mode,
-                onRefresh: _loadKifu,
-              ),
-            );
-          },
+          kif: kif,
+          mode: widget.mode,
+          onRefresh: _loadKifu,
         );
       },
     );
