@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kifdamari/settings/default_color_setting.dart';
+import 'package:kifdamari/settings/default_save_location_setting.dart';
 import 'package:kifdamari/settings/font_size_setting.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/settings/kif_template_setting.dart';
@@ -41,6 +42,12 @@ class SettingPage extends StatelessWidget {
               _buildSectionTitle('棋譜追加'),
 
               KifTemplateSetting(settings: settings),
+
+              const SizedBox(height: 12),
+
+              _buildSectionTitle('棋譜の保存'),
+
+              DefaultSaveLocationSetting(settings: settings),
 
               const SizedBox(height: 12),
 

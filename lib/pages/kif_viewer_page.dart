@@ -162,6 +162,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
           kifPath: _currentKifEntity.kifPath,
           imgPath: savedPath,
           color: _currentKifEntity.color,
+          pendingTreeUri: _currentKifEntity.pendingTreeUri,
         );
 
         await KifDao().updateKif(updatedKif);

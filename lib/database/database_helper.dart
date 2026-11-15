@@ -35,7 +35,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: _onConfigure,
@@ -66,6 +66,7 @@ class DatabaseHelper {
         kif_path TEXT,
         img_path TEXT,
         color INTEGER,
+        pending_tree_uri TEXT,
         FOREIGN KEY (tab_id) REFERENCES tab (id) ON DELETE CASCADE
       )
     ''');
@@ -78,6 +79,9 @@ class DatabaseHelper {
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createPositionTables(db);
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE kif ADD COLUMN pending_tree_uri TEXT');
     }
   }
 

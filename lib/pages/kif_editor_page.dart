@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -9,6 +10,8 @@ import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/dialogs/discard_changes_dialog.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
+import 'package:kifdamari/logic/kif_save_planner.dart';
+import 'package:kifdamari/logic/pending_kif_sender.dart';
 import 'package:kifdamari/logic/shogi_rule_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
@@ -250,6 +253,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
           kifPath: targetPath,
           imgPath: _currentEntity.imgPath,
           color: _currentEntity.color,
+          pendingTreeUri: null,
         );
 
         _lastSavedContent = _getExportContent();
@@ -1748,31 +1752,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     setState(() => _isLoading = true);
 
     try {
-      String targetPath = _currentEntity.kifPath ?? "";
-      bool isNewFile = targetPath.isEmpty || 
-          (!targetPath.startsWith('content://') && !await File(targetPath).exists());
-
-      if (isNewFile) {
-        final Directory appDocDir = await getApplicationDocumentsDirectory();
-        final Directory saveDir = Directory(p.join(appDocDir.path, 'Kifdamari'));
-        if (!await saveDir.exists()) {
-          await saveDir.create(recursive: true);
-        }
-        targetPath = p.join(saveDir.path, kifData.fileName);
-      }
-
-      if (targetPath.startsWith('content://')) {
-        final success = await SafHelper.writeFileBytes(
-          targetPath,
-          Uint8List.fromList(kifData.bytes),
-        );
-        if (!success) {
-          throw Exception("Google Drive 上書き保存に失敗しました");
-        }
-      } else {
-        final file = File(targetPath);
-        await file.writeAsBytes(kifData.bytes, flush: true);
-      }
+      final saveResult = await _writeKifFile(kifData);
 
       final titleText = _generateTitleText();
       final detailText = _generateDetailText();
@@ -1784,9 +1764,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
         title: titleText,
         detail: detailText,
         kifOrder: _currentEntity.kifOrder,
-        kifPath: targetPath,
+        kifPath: saveResult.kifPath,
         imgPath: _currentEntity.imgPath,
         color: _currentEntity.color,
+        pendingTreeUri: saveResult.pendingTreeUri,
       );
       await KifDao().updateKif(updatedKif);
 
@@ -1798,8 +1779,18 @@ class _KifEditorPageState extends State<KifEditorPage> {
       });
 
       if (mounted) {
-        ShowSuccessSnackbar.show(context, '棋譜を保存しました');
+        if (updatedKif.isPendingSend) {
+          ShowSuccessSnackbar.show(
+            context,
+            'オフラインのため送信待ちです。オンライン時に自動で保存先へ送ります',
+          );
+        } else {
+          ShowSuccessSnackbar.show(context, '棋譜を保存しました');
+        }
       }
+
+      // 保存操作のタイミングでも送信待ち棋譜の自動送信を試みる
+      unawaited(_flushPendingKifs());
     } catch (e) {
       debugPrint("保存エラー: $e");
       if (mounted) {
@@ -1807,6 +1798,127 @@ class _KifEditorPageState extends State<KifEditorPage> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// 保存データの書き込み先を決めて書き込む。
+  ///
+  /// デフォルト保存先が設定されていて新規作成の場合はそのフォルダへ保存し、
+  /// オフライン等で書き込めない場合はアプリ内部フォルダに「送信待ち」として
+  /// 退避保存する（kifPath は退避ファイル、pendingTreeUri に保存先を記録）。
+  Future<({String kifPath, String? pendingTreeUri})> _writeKifFile(
+    ({String fileName, List<int> bytes}) kifData,
+  ) async {
+    final settings = AppSettings();
+    final plan = await KifSavePlanner.plan(
+      currentPath: _currentEntity.kifPath ?? '',
+      pendingTreeUri: _currentEntity.pendingTreeUri,
+      defaultTreeUri: settings.get<String>('defaultSaveTreeUri'),
+      fileExists: (path) async => await File(path).exists(),
+    );
+
+    switch (plan.mode) {
+      case KifSaveMode.overwriteRemote:
+        final success = await SafHelper.writeFileBytes(
+          plan.targetPath!,
+          Uint8List.fromList(kifData.bytes),
+        );
+        if (!success) {
+          throw Exception("保存先ファイルへの上書き保存に失敗しました");
+        }
+        return (kifPath: plan.targetPath!, pendingTreeUri: null);
+
+      case KifSaveMode.overwriteLocal:
+      case KifSaveMode.newInternal:
+        final targetPath = plan.mode == KifSaveMode.overwriteLocal
+            ? plan.targetPath!
+            : await _newInternalKifPath(kifData.fileName);
+        final file = File(targetPath);
+        await file.writeAsBytes(kifData.bytes, flush: true);
+        return (kifPath: targetPath, pendingTreeUri: null);
+
+      case KifSaveMode.newRemote:
+        final docUri = await SafHelper.createFileInTree(
+          plan.treeUri!,
+          kifData.fileName,
+          Uint8List.fromList(kifData.bytes),
+        );
+        if (docUri != null && docUri.isNotEmpty) {
+          return (kifPath: docUri, pendingTreeUri: null);
+        }
+        // オフライン等で保存先に書き込めないため、送信待ちとして退避する
+        final pendingPath = await _writePendingKifFile(kifData, existingPath: null);
+        return (kifPath: pendingPath, pendingTreeUri: plan.treeUri);
+
+      case KifSaveMode.pendingUpdate:
+        // 退避ファイルを最新の内容で更新してから、保存先への送信を試みる
+        final pendingPath = await _writePendingKifFile(kifData, existingPath: plan.targetPath);
+        final docUri = await SafHelper.createFileInTree(
+          plan.treeUri!,
+          p.basename(pendingPath),
+          Uint8List.fromList(kifData.bytes),
+        );
+        if (docUri != null && docUri.isNotEmpty) {
+          await _deleteFileQuietly(pendingPath);
+          return (kifPath: docUri, pendingTreeUri: null);
+        }
+        return (kifPath: pendingPath, pendingTreeUri: plan.treeUri);
+    }
+  }
+
+  /// アプリ内部フォルダ（Documents/Kifdamari）への新規保存パスを返す。
+  Future<String> _newInternalKifPath(String fileName) async {
+    final Directory appDocDir = await getApplicationDocumentsDirectory();
+    final Directory saveDir = Directory(p.join(appDocDir.path, 'Kifdamari'));
+    if (!await saveDir.exists()) {
+      await saveDir.create(recursive: true);
+    }
+    return p.join(saveDir.path, fileName);
+  }
+
+  /// 送信待ち棋譜の退避ファイル（Documents/Kifdamari/pending）へ書き込む。
+  ///
+  /// [existingPath] に既存の退避ファイルがあれば同じファイルを更新する
+  /// （ファイル名を変えずに退避分を更新するため）。
+  Future<String> _writePendingKifFile(
+    ({String fileName, List<int> bytes}) kifData, {
+    required String? existingPath,
+  }) async {
+    final Directory appDocDir = await getApplicationDocumentsDirectory();
+    final Directory pendingDir = Directory(p.join(appDocDir.path, 'Kifdamari', 'pending'));
+    if (!await pendingDir.exists()) {
+      await pendingDir.create(recursive: true);
+    }
+
+    String targetPath;
+    if (existingPath != null &&
+        existingPath.isNotEmpty &&
+        !existingPath.startsWith('content://')) {
+      targetPath = existingPath;
+    } else {
+      targetPath = p.join(pendingDir.path, kifData.fileName);
+    }
+
+    final file = File(targetPath);
+    await file.writeAsBytes(kifData.bytes, flush: true);
+    return targetPath;
+  }
+
+  Future<void> _deleteFileQuietly(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
+  /// 送信待ち棋譜があれば自動送信を試みる（失敗しても保存処理には影響しない）。
+  Future<void> _flushPendingKifs() async {
+    try {
+      await PendingKifSender.instance.sendPendingKifs();
+    } catch (e) {
+      debugPrint("送信待ち棋譜の自動送信エラー: $e");
     }
   }
 

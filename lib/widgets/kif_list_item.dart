@@ -34,6 +34,8 @@ class KifListItem extends StatelessWidget {
         index: index!,
         child: Icon(Icons.drag_handle, color: Colors.grey),
       );
+    } else if (mode == AppMode.normal && kif.isPendingSend) {
+      trailingWidget = _buildPendingBadge();
     }
 
     return Card(
@@ -85,6 +87,25 @@ class KifListItem extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 送信待ち（オフラインで退避保存中）の棋譜であることを示す印
+  Widget _buildPendingBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.orange,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text(
+        '送信待ち',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
       ),
     );

@@ -3,6 +3,7 @@ package com.example.kifdamari
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,6 +15,7 @@ import java.io.OutputStream
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.kifdamari/saf"
     private val REQUEST_CODE_OPEN = 1001
+    private val REQUEST_CODE_OPEN_TREE = 1002
     private var pendingResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -76,6 +78,51 @@ class MainActivity: FlutterActivity() {
                         result.error("WRITE_ERROR", e.localizedMessage, null)
                     }
                 }
+                "pickTree" -> {
+                    pendingResult = result
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                 Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                                 Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                    }
+                    startActivityForResult(intent, REQUEST_CODE_OPEN_TREE)
+                }
+                "createFileInTree" -> {
+                    val treeUriString = call.argument<String>("treeUri")
+                    val fileName = call.argument<String>("fileName")
+                    val bytes = call.argument<ByteArray>("bytes")
+                    if (treeUriString == null || fileName == null || bytes == null) {
+                        result.error("INVALID_ARGS", "treeUri, fileName or bytes is null", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val treeUri = Uri.parse(treeUriString)
+                        val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
+                        val dirUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
+                        val docUri = DocumentsContract.createDocument(
+                            contentResolver, dirUri, "application/octet-stream", fileName
+                        )
+                        if (docUri == null) {
+                            result.error("CREATE_ERROR", "createDocument returned null", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val pfd = contentResolver.openFileDescriptor(docUri, "w")
+                        if (pfd != null) {
+                            val fos = FileOutputStream(pfd.fileDescriptor)
+                            fos.write(bytes)
+                            fos.flush()
+                            pfd.fileDescriptor.sync()
+                            fos.close()
+                            pfd.close()
+                            result.success(docUri.toString())
+                        } else {
+                            result.error("WRITE_ERROR", "ParcelFileDescriptor is null", null)
+                        }
+                    } catch (e: Exception) {
+                        result.error("CREATE_ERROR", e.localizedMessage, null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -84,6 +131,24 @@ class MainActivity: FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_OPEN) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                val uri: Uri? = data.data
+                if (uri != null) {
+                    val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    try {
+                        contentResolver.takePersistableUriPermission(uri, takeFlags)
+                    } catch (e: Exception) {
+                        // フォールバック
+                    }
+                    pendingResult?.success(uri.toString())
+                } else {
+                    pendingResult?.error("NO_URI", "URI not found", null)
+                }
+            } else {
+                pendingResult?.success(null)
+            }
+            pendingResult = null
+        } else if (requestCode == REQUEST_CODE_OPEN_TREE) {
             if (resultCode == Activity.RESULT_OK && data != null) {
                 val uri: Uri? = data.data
                 if (uri != null) {

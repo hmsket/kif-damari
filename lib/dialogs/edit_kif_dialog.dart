@@ -106,6 +106,7 @@ void showEditKifDialog(BuildContext context, KifEntity kif, VoidCallback onRefre
                     kifPath: kifPath,
                     imgPath: kif.imgPath,
                     color: color,
+                    pendingTreeUri: kif.pendingTreeUri,
                   );
 
                   await KifDao().updateKif(updatedKif);
