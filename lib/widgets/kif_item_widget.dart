@@ -79,6 +79,12 @@ class KifItemWidget extends StatelessWidget {
   }
 
   Widget _buildImage() {
+    return buildKifuImage(imgPath);
+  }
+
+  /// 棋譜サムネイル画像を構築する共通ヘルパー
+  /// （imgPath にファイルがあればそれを、なければ初期画像アセットを返す）
+  static Widget buildKifuImage(String? imgPath) {
     if (imgPath != null && imgPath!.isNotEmpty) {
       final file = File(imgPath!);
       if (file.existsSync()) {
