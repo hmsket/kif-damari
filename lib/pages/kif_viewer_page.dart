@@ -690,8 +690,14 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: Colors.black45, width: 1.5),
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -785,13 +791,14 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                         color: hasBranch
                             ? Colors.orange[100]
                             : (_isOverlayDialActive ? Colors.blue[50] : Colors.white),
-                        border: Border.all(
-                          color: hasBranch
-                              ? Colors.orange[700]!
-                              : (_isOverlayDialActive ? Colors.blue[500]! : Colors.black45),
-                          width: (hasBranch || _isOverlayDialActive) ? 2.0 : 1.5,
-                        ),
                         borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
