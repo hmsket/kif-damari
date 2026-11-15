@@ -465,7 +465,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                           Positioned.fill(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.95),
+                                color: Colors.white.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: [
                                   BoxShadow(
@@ -599,24 +599,27 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
   // 💡 文字なし仕様の大型ダイヤルウィジェット
   Widget _buildLargeOverlayDial() {
-    final bool hasBranch = kifTree!.currentNode.nextNodes.length > 1;
-
     return Container(
       key: _overlayDialKey,
       width: 120,
       height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: hasBranch ? Colors.orange[50] : Colors.blue[50],
+        color: Colors.white,
         border: Border.all(
-          color: hasBranch ? Colors.orange[600]! : Colors.blue[400]!,
-          width: 2.5,
+          color: const Color(0xFFE0E0E0),
+          width: 1,
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Color(0x1F000000),
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 2,
+            offset: Offset(0, 1),
           ),
         ],
       ),
@@ -626,22 +629,31 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
           child: Stack(
             alignment: Alignment.center,
             children: [
+              // 中心のフラットな円
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFF5F5F5),
+                ),
+              ),
               // 回転ポインター（ツマミ）
               Positioned(
                 top: 8,
                 child: Container(
                   width: 14,
                   height: 14,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: hasBranch ? Colors.orange[700] : Colors.blue[600],
+                    color: Color(0xFF424242),
                   ),
                 ),
               ),
               // 周囲の目盛りドット
-              Positioned(bottom: 8, child: _buildDialDot()),
-              Positioned(left: 8, child: _buildDialDot()),
-              Positioned(right: 8, child: _buildDialDot()),
+              Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
+              Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
+              Positioned(left: 102.5, top: 57.5, child: _buildDialDot()),
             ],
           ),
         ),
