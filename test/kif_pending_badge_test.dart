@@ -21,7 +21,7 @@ KifEntity _kif({required String? pendingTreeUri}) {
 
 void main() {
   setUpAll(() async {
-    Hive.init(Directory.systemTemp.createTempSync('kifdamari_badge_test'));
+    Hive.init(Directory.systemTemp.createTempSync('kifdamari_badge_test').path);
     await Hive.openBox('settings_box');
   });
 
