@@ -891,11 +891,14 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
                     decoration: BoxDecoration(
                       color: hasBranch ? Colors.orange[100] : Colors.white,
-                      border: Border.all(
-                        color: hasBranch ? Colors.orange[700]! : Colors.black45,
-                        width: hasBranch ? 2.0 : 1.5,
-                      ),
                       borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,

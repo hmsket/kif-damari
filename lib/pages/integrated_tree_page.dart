@@ -930,24 +930,27 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
   }
 
   Widget _buildLargeOverlayDial() {
-    final bool hasBranch = (current?.nextNodes.length ?? 0) > 1;
-
     return Container(
       key: _overlayDialKey,
       width: 120,
       height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: hasBranch ? Colors.orange[50] : Colors.blue[50],
+        color: Colors.white,
         border: Border.all(
-          color: hasBranch ? Colors.orange[600]! : Colors.blue[400]!,
-          width: 2.5,
+          color: const Color(0xFFE0E0E0),
+          width: 1,
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Color(0x1F000000),
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 2,
+            offset: Offset(0, 1),
           ),
         ],
       ),
@@ -957,20 +960,32 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
           child: Stack(
             alignment: Alignment.center,
             children: [
+              // 中心のフラットな円
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFF5F5F5),
+                ),
+              ),
+              // 回転ポインター（ツマミ）
               Positioned(
+                left: 53,
                 top: 8,
                 child: Container(
                   width: 14,
                   height: 14,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: hasBranch ? Colors.orange[700] : Colors.blue[600],
+                    color: Color(0xFF424242),
                   ),
                 ),
               ),
-              Positioned(bottom: 8, child: _buildDialDot()),
-              Positioned(left: 8, child: _buildDialDot()),
-              Positioned(right: 8, child: _buildDialDot()),
+              // 周囲の目盛りドット
+              Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
+              Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
+              Positioned(left: 102.5, top: 57.5, child: _buildDialDot()),
             ],
           ),
         ),
@@ -1113,7 +1128,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
+                  color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
@@ -1332,8 +1347,14 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: Colors.black45, width: 1.5),
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -1426,13 +1447,14 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                         color: hasBranch
                             ? Colors.orange[100]
                             : (_isOverlayDialActive ? Colors.blue[50] : Colors.white),
-                        border: Border.all(
-                          color: hasBranch
-                              ? Colors.orange[700]!
-                              : (_isOverlayDialActive ? Colors.blue[500]! : Colors.black45),
-                          width: (hasBranch || _isOverlayDialActive) ? 2.0 : 1.5,
-                        ),
                         borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
