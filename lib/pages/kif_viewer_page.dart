@@ -722,6 +722,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
               child: IconButton(
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.first_page),
+                iconSize: 36,
                 onPressed: () => setState(() => kifTree!.jumpTo(0)),
               ),
             ),
@@ -850,6 +851,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
               child: IconButton(
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.last_page),
+                iconSize: 36,
                 onPressed: () => setState(() => kifTree!.jumpTo(kifTree!.totalMoveCount)),
               ),
             ),
@@ -965,6 +967,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                   return IconButton(
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.more_vert),
+                    iconSize: 36,
                     onPressed: () {
                       if (controller.isOpen) {
                         controller.close();
