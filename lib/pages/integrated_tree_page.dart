@@ -903,7 +903,9 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       _dialAccumulator += rotationDelta;
     });
 
-    const double threshold = 0.22;
+    final settings = AppSettings();
+    final double threshold =
+        settings.get<double>('dialDegreesPerMove') * math.pi / 180.0;
 
     while (_dialAccumulator >= threshold) {
       if (current!.nextNodes.isNotEmpty) {
