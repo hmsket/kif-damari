@@ -15,6 +15,7 @@ KifEntity _kif({required String? pendingTreeUri}) {
     title: 'テスト棋譜',
     kifOrder: 1,
     kifPath: '/app/Kifdamari/1000.kif',
+    color: 0xFFFFFFFF,
     pendingTreeUri: pendingTreeUri,
   );
 }

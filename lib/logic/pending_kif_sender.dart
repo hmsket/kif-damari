@@ -57,7 +57,7 @@ class PendingKifSender {
     final pendingKifs = await repository.getPendingKifs();
     int sentCount = 0;
 
-    for (final kif in pendingKifs) {
+    for (final kif in List.of(pendingKifs)) {
       final treeUri = kif.pendingTreeUri;
       final localPath = kif.kifPath;
       if (treeUri == null || treeUri.isEmpty) continue;
