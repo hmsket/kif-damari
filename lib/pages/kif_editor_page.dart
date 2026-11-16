@@ -1697,7 +1697,15 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final String kifContent = KifParser.encode(kifTree!);
     final List<int> bytes = await CharsetConverter.encode("Shift_JIS", kifContent);
 
-    final String fileName = "${DateTime.now().millisecondsSinceEpoch}.kif";
+    final DateTime now = DateTime.now();
+    final String fileName =
+        "${now.year.toString().padLeft(4, '0')}"
+        "${now.month.toString().padLeft(2, '0')}"
+        "${now.day.toString().padLeft(2, '0')}"
+        "${now.hour.toString().padLeft(2, '0')}"
+        "${now.minute.toString().padLeft(2, '0')}"
+        "${now.second.toString().padLeft(2, '0')}"
+        ".kif";
 
     return (fileName: fileName, bytes: bytes);
   }
