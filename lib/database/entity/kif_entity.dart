@@ -9,6 +9,10 @@ class KifEntity {
   final String? imgPath;
   final int? color;
 
+  /// デフォルト保存先（SAF ツリー URI）。棋譜ファイルがまだ保存先へ
+  /// 送信できず、アプリ内部フォルダに退避している場合のみ設定される。
+  final String? pendingTreeUri;
+
   KifEntity({
     this.id,
     required this.tabId,
@@ -19,7 +23,11 @@ class KifEntity {
     this.kifPath,
     this.imgPath,
     this.color,
+    this.pendingTreeUri,
   });
+
+  /// 送信待ち（退避中）の棋譜かどうか
+  bool get isPendingSend => pendingTreeUri != null && pendingTreeUri!.isNotEmpty;
 
   factory KifEntity.fromMap(Map<String, dynamic> map) {
     return KifEntity(
@@ -32,6 +40,7 @@ class KifEntity {
       kifPath: map['kif_path'] as String?,
       imgPath: map['img_path'] as String?,
       color: map['color'] as int?,
+      pendingTreeUri: map['pending_tree_uri'] as String?,
     );
   }
 
@@ -46,6 +55,7 @@ class KifEntity {
       'kif_path': kifPath,
       'img_path': imgPath,
       'color': color,
+      'pending_tree_uri': pendingTreeUri,
     };
   }
 }

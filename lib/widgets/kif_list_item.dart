@@ -29,6 +29,8 @@ class KifListItem extends StatelessWidget {
     Widget? trailingWidget;
     if (mode == AppMode.edit) {
       trailingWidget = const Icon(Icons.edit, color: Colors.green);
+    } else if (mode == AppMode.normal && kif.isPendingSend) {
+      trailingWidget = _buildPendingBadge();
     }
 
     return Card(
@@ -80,6 +82,35 @@ class KifListItem extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 送信待ち（オフラインで退避保存中）の棋譜であることを示す印
+  Widget _buildPendingBadge() {
+    return const _PendingSendBadge();
+  }
+}
+
+/// 送信待ち（オフラインで退避保存中）の棋譜であることを示す印
+class _PendingSendBadge extends StatelessWidget {
+  const _PendingSendBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.orange,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text(
+        '送信待ち',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
       ),
     );
@@ -185,6 +216,12 @@ class KifGridItem extends StatelessWidget {
                 top: 6,
                 right: 6,
                 child: _buildBadge(),
+              ),
+            if (mode == AppMode.normal && kif.isPendingSend)
+              const Positioned(
+                top: 6,
+                right: 6,
+                child: _PendingSendBadge(),
               ),
           ],
         ),

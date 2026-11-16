@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/logic/pending_kif_sender.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
@@ -39,6 +40,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _loadTabs();
+    _sendPendingKifs();
+  }
+
+  /// アプリ起動時に、オフラインで退避した「送信待ち」棋譜の自動送信を試みる。
+  Future<void> _sendPendingKifs() async {
+    try {
+      final int sentCount = await PendingKifSender.instance.sendPendingKifs();
+      if (sentCount > 0 && mounted) {
+        _refresh();
+      }
+    } catch (e) {
+      debugPrint('送信待ち棋譜の自動送信に失敗しました: $e');
+    }
   }
 
   void _loadTabs() {

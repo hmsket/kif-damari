@@ -33,6 +33,17 @@ class KifDao {
     return result;
   }
 
+  Future<List<KifEntity>> getPendingKifs() async {
+    final db = await _db;
+    final result = await db.query(
+      'kif',
+      where: 'pending_tree_uri IS NOT NULL AND pending_tree_uri != ?',
+      whereArgs: [''],
+      orderBy: 'id ASC',
+    );
+    return result.map((map) => KifEntity.fromMap(map)).toList();
+  }
+
   Future<int> insertKif(KifEntity kif) async {
     final db = await _db;
     int insertedId = 0;
