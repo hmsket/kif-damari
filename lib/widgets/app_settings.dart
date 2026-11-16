@@ -11,6 +11,7 @@ class AppSettings {
     'kifLimit': defaultKifLimit,
     'thumbnailSize': 120,
     'treeScrollSpeed': 2.0,
+    'dialDegreesPerMove': 12.6,
     'defaultKifColorMode': 'white',
     'defaultKifColor': colorWhite,
     'defaultPlayerName': 'プレイヤー',

@@ -221,7 +221,9 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       _dialAccumulator += rotationDelta;
     });
 
-    const double threshold = 0.22;
+    final settings = AppSettings();
+    final double threshold =
+        settings.get<double>('dialDegreesPerMove') * math.pi / 180.0;
 
     while (_dialAccumulator >= threshold) {
       if (kifTree != null && kifTree!.currentNode.nextNodes.isNotEmpty) {
