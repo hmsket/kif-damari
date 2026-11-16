@@ -109,7 +109,7 @@ void main() {
       );
       expect(repository.kifs, isEmpty);
       expect(fileStore.files.containsKey('/app/pending/1000.kif'), isFalse);
-      expect(fileStore.files.values.single, Uint8List.fromList([1, 2, 3]));
+      expect(remoteWriter.calls.single.bytes, Uint8List.fromList([1, 2, 3]));
     });
 
     test('複数件のうち一部だけ送信できる場合、送信できた分だけ状態が更新される', () async {
