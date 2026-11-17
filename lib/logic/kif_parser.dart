@@ -1,4 +1,5 @@
 import 'package:kifdamari/logic/handicap_presets.dart';
+import 'package:kifdamari/logic/sfen_generator.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/models/kif_tree.dart';
@@ -16,6 +17,32 @@ class KifParser {
     'to': 'と', 'ny': '成香', 'nk': '成桂', 'ng': '成銀',
     'um': '馬', 'ry': '龍'
   };
+
+  /// 盤面図（柿木形式）で使う駒の1文字表記
+  static const _diagramPieceChars = {
+    'fu': '歩', 'ya': '香', 'ke': '桂', 'gi': '銀',
+    'ki': '金', 'ka': '角', 'hi': '飛', 'gy': '玉',
+    'to': 'と', 'ny': '杏', 'nk': '圭', 'ng': '全',
+    'um': '馬', 'ry': '龍',
+  };
+
+  /// 盤面図の駒文字 → 駒コード（王も玉として受け入れる）
+  static const _diagramCharToCode = {
+    '歩': 'fu', '香': 'ya', '桂': 'ke', '銀': 'gi',
+    '金': 'ki', '角': 'ka', '飛': 'hi', '玉': 'gy', '王': 'gy',
+    'と': 'to', '杏': 'ny', '圭': 'nk', '全': 'ng',
+    '馬': 'um', '龍': 'ry', '竜': 'ry',
+  };
+
+  /// 持駒行の略字（成駒）を元の駒コードに戻す
+  static const _promotedToBase = {
+    'to': 'fu', 'ny': 'ya', 'nk': 'ke', 'ng': 'gi',
+    'um': 'ka', 'ry': 'hi',
+  };
+
+  static const _diagramColumnHeader = '  ９ ８ ７ ６ ５ ４ ３ ２ １';
+  static const _diagramRule = '+---------------------------+';
+  static const _diagramRowKanji = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
 
   /// KIFラベルを日本語に変換する
   static String convertToJapanese(
@@ -87,6 +114,9 @@ class KifParser {
     for (var line in lines) {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty) continue;
+
+      // 盤面図の行（持駒行・手番行を含む）は info ヘッダーとして取り込まない
+      if (_isBoardDiagramLine(trimmedLine)) continue;
 
       // コメント行の解析（' や * で始まる行）
       if (trimmedLine.startsWith('*') || trimmedLine.startsWith("'")) {
@@ -193,9 +223,17 @@ class KifParser {
   }
 
   /// 指し手を解釈する前にヘッダーを読み、開始局面（root ノード）を決める。
-  /// 「手合割」ヘッダーがプリセットと一致する場合はその開始局面、
-  /// それ以外（ヘッダー無し・平手・プリセット外・盤面図指定）は平手の初期局面。
+  /// 優先順位: 盤面図 > 「手合割」ヘッダーのプリセット > 平手の初期局面。
+  /// （盤面図の解析に失敗した場合は手合割/平手にフォールバックする）
   static GameNode _buildRootNode(List<String> lines, RegExp infoRegex, RegExp moveRegex) {
+    // 盤面図があればそれを root 局面として採用する（手合割より優先）
+    final diagramState = _parseBoardDiagram(lines, moveRegex);
+    if (diagramState != null) {
+      return GameNode(moveNumber: 0, state: diagramState, moveLabel: '開始局面');
+    }
+
+    // 「手合割」ヘッダーが駒落ちプリセットと一致する場合は、その開始局面を root にする
+    // （ヘッダー無し・平手・プリセット外は従来通り平手の初期局面から開始）
     for (final line in lines) {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty ||
@@ -230,7 +268,11 @@ class KifParser {
     tree.info.forEach((key, value) {
       buffer.writeln('$key：$value');
     });
-    buffer.writeln('手数----指手----消費時間--');
+    // root が平手の初期局面でない場合は、開始局面の盤面図を区切り行の前に書く
+    if (!_isHirateRoot(tree.root.state)) {
+      _writeBoardDiagram(buffer, tree.root.state);
+    }
+    buffer.writeln('手数----指手---------消費時間--');
 
     for (var comment in tree.root.comments) {
       buffer.writeln('*$comment');
@@ -304,5 +346,203 @@ class KifParser {
       buffer.writeln('\n変化：${branchReplyNode.moveNumber}手目');
       _writeNodes(buffer, [branchReplyNode], lastToX, lastToY);
     }
+  }
+
+  /// root 局面が平手の初期局面（盤面・持駒・手番がすべて一致）かどうか
+  static bool _isHirateRoot(BoardState state) {
+    return SfenGenerator.generateKey(state) ==
+        SfenGenerator.generateKey(BoardState.initial());
+  }
+
+  /// 開始局面の盤面図（柿木形式）を書き出す
+  static void _writeBoardDiagram(StringBuffer buffer, BoardState state) {
+    buffer.writeln(_diagramColumnHeader);
+    buffer.writeln(_diagramRule);
+    for (int y = 0; y < 9; y++) {
+      final cells = StringBuffer();
+      for (int x = 0; x < 9; x++) {
+        final piece = state.grid[y][x];
+        if (piece == null) {
+          cells.write(' ・');
+        } else {
+          final name = _diagramPieceChars[piece.substring(1)] ?? '・';
+          cells.write(piece.startsWith('b') ? ' $name' : 'v$name');
+        }
+      }
+      buffer.writeln('|$cells|${_diagramRowKanji[y]}');
+    }
+    buffer.writeln(_diagramRule);
+    buffer.writeln('先手の持駒：${_handDiagram(state.senteHand)}');
+    buffer.writeln('後手の持駒：${_handDiagram(state.goteHand)}');
+    buffer.writeln(state.nextPlayer == Player.sente ? '先手番' : '後手番');
+  }
+
+  /// 持駒を盤面図の持駒行の値（例: 「なし」「歩二　金」）にする。
+  /// 並び順は 飛角金銀桂香歩。
+  static String _handDiagram(Map<String, int> hand) {
+    const order = ['hi', 'ka', 'ki', 'gi', 'ke', 'ya', 'fu'];
+    final parts = <String>[];
+    for (final type in order) {
+      final count = hand[type] ?? 0;
+      if (count <= 0) continue;
+      final name = _diagramPieceChars[type]!;
+      parts.add(count == 1 ? name : '$name${_handCountToKan(count)}');
+    }
+    return parts.isEmpty ? 'なし' : parts.join('　');
+  }
+
+  /// 持駒の枚数を漢数字にする（「二」「十」「十一」など）
+  static String _handCountToKan(int count) {
+    if (count <= 9) return _numToKan[count];
+    if (count < 20) return count == 10 ? '十' : '十${_numToKan[count - 10]}';
+    return '$count';
+  }
+
+  /// 盤面図の各行かどうか（info ヘッダーとして扱わない・指し手としても扱わない）
+  static bool _isBoardDiagramLine(String line) {
+    final t = line.trim();
+    if (t.isEmpty) return false;
+    if (t == _diagramRule) return true;
+    if (_isDiagramColumnHeader(t)) return true;
+    if (t.startsWith('|')) return true;
+    if (t.startsWith('先手の持駒：') || t.startsWith('後手の持駒：')) return true;
+    if (t == '先手番' || t == '後手番') return true;
+    return false;
+  }
+
+  static bool _isDiagramColumnHeader(String t) {
+    final compact = t.replaceAll(RegExp(r'[\s　]'), '');
+    return compact == '９８７６５４３２１' || compact == '987654321';
+  }
+
+  /// 盤面図ブロックを解析して開始局面を復元する。無い・解析不能な場合は null。
+  static BoardState? _parseBoardDiagram(List<String> lines, RegExp moveRegex) {
+    for (int i = 0; i < lines.length; i++) {
+      final t = lines[i].trim();
+      if (t.startsWith('*') || t.startsWith("'")) continue;
+      if (_isDiagramColumnHeader(t)) {
+        final state = _parseDiagramBlock(lines, i);
+        if (state != null) return state;
+        continue;
+      }
+      if (_isBoardDiagramLine(t)) continue;
+      // 指し手が始まったらヘッダー領域は終わり
+      if (moveRegex.firstMatch(t) != null || t.startsWith('手数----')) break;
+    }
+    return null;
+  }
+
+  /// 列番号行の直後から盤面図ブロック（枠・段行・持駒行・手番行）を解析する
+  static BoardState? _parseDiagramBlock(List<String> lines, int start) {
+    int i = start + 1;
+    if (i >= lines.length || lines[i].trim() != _diagramRule) return null;
+    i++;
+
+    final grid = List.generate(9, (_) => List<String?>.filled(9, null));
+    for (int r = 0; r < 9; r++) {
+      if (i >= lines.length) return null;
+      final row = _parseDiagramRow(lines[i].trim(), r);
+      if (row == null) return null;
+      grid[r] = row;
+      i++;
+    }
+    if (i >= lines.length || lines[i].trim() != _diagramRule) return null;
+    i++;
+
+    final hands = <String, Map<String, int>>{'先手': {}, '後手': {}};
+    final seenHands = <String>{};
+    for (int h = 0; h < 2; h++) {
+      if (i >= lines.length) return null;
+      final t = lines[i].trim();
+      String? player;
+      String? value;
+      if (t.startsWith('先手の持駒：')) {
+        player = '先手';
+        value = t.substring('先手の持駒：'.length);
+      } else if (t.startsWith('後手の持駒：')) {
+        player = '後手';
+        value = t.substring('後手の持駒：'.length);
+      } else {
+        return null;
+      }
+      if (seenHands.contains(player)) return null;
+      final hand = _parseDiagramHand(value!);
+      if (hand == null) return null;
+      hands[player] = hand;
+      seenHands.add(player);
+      i++;
+    }
+
+    if (i >= lines.length) return null;
+    final turnLine = lines[i].trim();
+    if (turnLine != '先手番' && turnLine != '後手番') return null;
+
+    return BoardState(
+      grid: grid,
+      senteHand: hands['先手']!,
+      goteHand: hands['後手']!,
+      nextPlayer: turnLine == '先手番' ? Player.sente : Player.gote,
+    );
+  }
+
+  /// 段行（例: | ・v桂...|一）を解析して grid の1行を返す
+  static List<String?>? _parseDiagramRow(String t, int rowIndex) {
+    if (!t.startsWith('|') || t.length < 20) return null;
+    if (t.codeUnitAt(19) != 0x7C) return null; // 19文字目（2個目の '|'）
+
+    final row = <String?>[];
+    for (int c = 0; c < 9; c++) {
+      final cell = t.substring(1 + c * 2, 3 + c * 2);
+      final first = cell[0];
+      final second = cell[1];
+      if (first == ' ') {
+        if (second == '・') {
+          row.add(null);
+          continue;
+        }
+        final code = _diagramCharToCode[second];
+        if (code == null) return null;
+        row.add('b$code');
+      } else if (first == 'v' || first == 'V') {
+        final code = _diagramCharToCode[second];
+        if (code == null) return null;
+        row.add('w$code');
+      } else {
+        return null;
+      }
+    }
+
+    // 行末の段（一..九）が行位置と一致することを確認（無い場合は許容）
+    final suffix = t.substring(20).trim();
+    if (suffix.isNotEmpty && _kanToNum[suffix] != rowIndex + 1) return null;
+
+    return row;
+  }
+
+  /// 持駒行の値（例: 「なし」「歩二　金」）を解析する。不正な場合は null。
+  static Map<String, int>? _parseDiagramHand(String value) {
+    final hand = <String, int>{};
+    final v = value.trim();
+    if (v.isEmpty || v == 'なし') return hand;
+
+    for (final token in v.split(RegExp(r'[\s　]+'))) {
+      if (token.isEmpty) continue;
+      final rawCode = _diagramCharToCode[token[0]];
+      if (rawCode == null) return null;
+      // 持駒は成駒にならないため、略字は元の駒に戻す
+      final code = _promotedToBase[rawCode] ?? rawCode;
+
+      int count = 1;
+      if (token.length > 1) {
+        count = 0;
+        for (final ch in token.substring(1).split('')) {
+          final d = _kanToNum[ch];
+          if (d == null) return null;
+          count = count * 10 + d;
+        }
+      }
+      hand[code] = (hand[code] ?? 0) + count;
+    }
+    return hand;
   }
 }

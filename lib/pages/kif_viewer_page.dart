@@ -947,7 +947,12 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     leadingIcon: const Icon(Icons.copy, size: 20),
                     child: const Text('棋譜ファイルをコピー'),
                     onPressed: () {
-                      final kifContent = _rawKifContent;
+                      // 保存・共有と同じ KifParser.encode の出力をコピーする
+                      // （kifTree が無い＝棋譜ファイルが読めていない場合は従来通りエラー表示）
+                      final kifContent =
+                          (kifTree == null || _rawKifContent == null || _rawKifContent.isEmpty)
+                              ? null
+                              : KifParser.encode(kifTree!);
                       if (kifContent == null || kifContent.isEmpty) {
                         ShowErrorSnackbar.show(context, 'コピーできる棋譜ファイルがありません');
                         return;
