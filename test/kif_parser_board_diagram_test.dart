@@ -77,7 +77,7 @@ void main() {
 
       final encoded = KifParser.encode(tree);
 
-      expect(encoded, contains('先手の持駒：歩二　金'));
+      expect(encoded, contains('先手の持駒：金　歩二'));
       expect(encoded, contains('後手の持駒：なし'));
       expect(encoded, contains('後手番'));
       expect(encoded, contains('| と 馬 ・ ・ ・ ・ ・ 飛 ・|八'));
@@ -141,7 +141,7 @@ $_shichimaiochiDiagram手数----指手---------消費時間--
       expect(state.nextPlayer, Player.gote);
       expect(
         SfenGenerator.generateKey(state),
-        'lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/+P+B5R1/LNSGKGSNL w G2P',
+        '1nsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/+P+B5R1/LNSGKGSNL w GP2',
       );
     });
 
