@@ -1,3 +1,4 @@
+import 'package:kifdamari/logic/handicap_presets.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
 
@@ -68,5 +69,23 @@ class KifTree {
     while (currentNode.moveNumber < targetMoveNumber && currentNode.nextNodes.isNotEmpty) {
       currentNode = currentNode.nextNodes.first;
     }
+  }
+
+  // 指し手が1つも入っていない（root に nextNodes が無い）時だけ手合割を変更できる
+  bool get canChangeHandicap => root.nextNodes.isEmpty;
+
+  // 手合割プリセットの開始局面で root の局面を差し替える（root のコメントは保持する）。
+  // info の「手合割」に選んだ名前を記録し、現在局面を root に戻す。
+  // 指し手が入っている場合・プリセットに無い名前の場合は何もせず false を返す。
+  bool applyHandicap(String label) {
+    if (!canChangeHandicap) return false;
+
+    final state = HandicapPresets.stateFor(label);
+    if (state == null) return false;
+
+    root.state = state;
+    info['手合割'] = label;
+    currentNode = root;
+    return true;
   }
 }
