@@ -3,7 +3,7 @@ import 'package:kifdamari/models/board_state.dart';
 class GameNode {
   final int moveNumber;
   final String? moveLabel;
-  final BoardState state;
+  BoardState state;
 
   final List<String> comments;
 

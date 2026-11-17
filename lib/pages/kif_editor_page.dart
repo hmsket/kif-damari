@@ -19,6 +19,7 @@ import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/handicap_selector.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
@@ -1333,6 +1334,11 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     isSente: !_isReversed,
                     isUpper: false,
                   ),
+                  HandicapSelector(
+                    label: kifTree!.info['手合割'],
+                    enabled: kifTree!.canChangeHandicap,
+                    onSelected: _applyHandicap,
+                  ),
                   Expanded(
                     child: Stack(
                       children: [
@@ -1691,6 +1697,18 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _checkSaveStatus();
       });
     }
+  }
+
+  void _applyHandicap(String label) {
+    if (!kifTree!.applyHandicap(label)) return;
+
+    setState(() {
+      _selectedFile = null;
+      _selectedRank = null;
+      _selectedHandPiece = null;
+      _syncCommentFromCurrentNode();
+      _checkSaveStatus();
+    });
   }
 
   Future<({String fileName, List<int> bytes})?> _prepareKifData() async {
