@@ -1,3 +1,5 @@
+import 'package:kifdamari/logic/handicap_presets.dart';
+import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 
@@ -68,14 +70,17 @@ class KifParser {
 
   static KifTree decode(String text) {
     final lines = text.split(RegExp(r'\r?\n'));
-    final tree = KifTree.initial();
-    GameNode currentNode = tree.root;
 
     // 💡 修正箇所：先頭が「キー：値」になっている任意のヘッダー行にマッチさせる
     // ただし指し手行（数字で始まる行）やコメント行等と誤検知しないよう除外指定
     final infoRegex = RegExp(r"^([^0-9\s\*\'\=\-\#\&\/].*?)[：:](.*)$");
     final moveRegex = RegExp(r"^\s*(\d+)\s+([１-９同])\s*([一二三四五六七八九 ]?)\s*([^\s(]+)(?:\((\d)(\d)\))?");
     final branchRegex = RegExp(r"^変化[：:\s]*(\d+)\s*手(?:目)?");
+
+    // 「手合割」ヘッダーが駒落ちプリセットと一致する場合は、その開始局面を root にする
+    // （ヘッダー無し・平手・プリセット外は従来通り平手の初期局面から開始）
+    final tree = KifTree(_buildRootNode(lines, infoRegex, moveRegex));
+    GameNode currentNode = tree.root;
 
     int parsedMoveCount = 0;
 
@@ -185,6 +190,38 @@ class KifParser {
     }
 
     return tree;
+  }
+
+  /// 指し手を解釈する前にヘッダーを読み、開始局面（root ノード）を決める。
+  /// 「手合割」ヘッダーがプリセットと一致する場合はその開始局面、
+  /// それ以外（ヘッダー無し・平手・プリセット外・盤面図指定）は平手の初期局面。
+  static GameNode _buildRootNode(List<String> lines, RegExp infoRegex, RegExp moveRegex) {
+    for (final line in lines) {
+      final trimmedLine = line.trim();
+      if (trimmedLine.isEmpty ||
+          trimmedLine.startsWith('*') ||
+          trimmedLine.startsWith("'")) {
+        continue;
+      }
+      if (moveRegex.firstMatch(trimmedLine) != null) {
+        // 指し手が始まったらヘッダーは終わり
+        break;
+      }
+      final infoMatch = infoRegex.firstMatch(trimmedLine);
+      if (infoMatch != null && infoMatch.group(1)!.trim() == '手合割') {
+        final state = HandicapPresets.stateFor(infoMatch.group(2)!.trim());
+        if (state != null) {
+          return GameNode(moveNumber: 0, state: state, moveLabel: '開始局面');
+        }
+        // プリセット外（歩三兵・裸玉など）は従来通り平手として読む
+        break;
+      }
+    }
+    return GameNode(
+      moveNumber: 0,
+      state: BoardState.initial(),
+      moveLabel: '開始局面',
+    );
   }
 
   static String encode(KifTree tree) {
