@@ -21,10 +21,10 @@ void main() {
     });
 
     test('上手（後手）の駒が落ちている', () {
-      // 香落ち: 後手の左香（9一）が無い
+      // 香落ち: 後手の左香（1一）が無い
       final kyochi = HandicapPresets.stateFor('香落ち')!;
-      expect(kyochi.grid[0][0], isNull);
-      expect(kyochi.grid[0][8], 'wya');
+      expect(kyochi.grid[0][0], 'wya');
+      expect(kyochi.grid[0][8], isNull);
 
       // 二枚落ち: 後手の角・飛が無い
       final nimaichi = HandicapPresets.stateFor('二枚落ち')!;
@@ -76,7 +76,7 @@ void main() {
       expect(first.state.nextPlayer, Player.gote);
       // 2手目は後手の指し手として正しく適用される
       final second = first.nextNodes.first;
-      expect(second.state.grid[5][9 - 3], 'wfu');
+      expect(second.state.grid[3][9 - 3], 'wfu');
       expect(second.state.nextPlayer, Player.sente);
     });
 
@@ -87,7 +87,7 @@ void main() {
         SfenGenerator.generateKey(HandicapPresets.stateFor('二枚落ち')!),
       );
       final second = tree.root.nextNodes.first.nextNodes.first;
-      expect(second.state.grid[5][9 - 8], 'wfu');
+      expect(second.state.grid[3][9 - 8], 'wfu');
     });
 
     test('飛車落ちのKIFも開始局面が切り替わる', () {
