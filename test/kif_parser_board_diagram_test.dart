@@ -141,7 +141,7 @@ $_shichimaiochiDiagram手数----指手---------消費時間--
       expect(state.nextPlayer, Player.gote);
       expect(
         SfenGenerator.generateKey(state),
-        '1nsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/+P+B5R1/LNSGKGSNL w GP2',
+        '1nsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/+P+B5R1/LNSGKGSNL w G2P',
       );
     });
 
