@@ -66,6 +66,9 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
   List<PositionAppearanceEntity> _appearances = const [];
   Map<int, KifEntity> _kifById = const {};
 
+  // 他棋譜ピルの表示状態。読み込み中は前の状態を保ち、有無が実際に変わった時だけ更新する。
+  bool _hasOtherKifAppearance = false;
+
   final ScrollController _commentScrollController = ScrollController();
 
   _CommentFace _commentFace = _CommentFace.kifComment;
@@ -293,8 +296,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     final key = kifTree?.currentNode.positionKey;
     if (key == null || key == _loadedPositionKey) return;
     _loadedPositionKey = key;
-    _appearances = const [];
-    _kifById = const {};
+    // 読み込みが終わるまでピルの表示状態（前の局面の有無）を保持する。
     _loadPositionInfo(key);
   }
 
@@ -303,33 +305,35 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       final position = await PositionDao().getByKey(key);
       if (position == null) {
         if (!mounted || _loadedPositionKey != key) return;
-        setState(() {
-          _appearances = const [];
-          _kifById = const {};
-        });
+        _applyLoadedPositionInfo(const [], const {});
         return;
       }
       final appearances = await PositionAppearanceDao().getByPositionId(position.id!);
       final kifs = await KifDao().getByIds(appearances.map((a) => a.kifId).toList());
       if (!mounted || _loadedPositionKey != key) return;
-      setState(() {
-        _appearances = appearances;
-        _kifById = {for (final k in kifs) k.id!: k};
-      });
+      _applyLoadedPositionInfo(appearances, {for (final k in kifs) k.id!: k});
     } catch (e) {
       debugPrint('出現情報の取得に失敗しました: $e');
       if (mounted && _loadedPositionKey == key) {
-        setState(() {
-          _appearances = const [];
-          _kifById = const {};
-        });
+        _applyLoadedPositionInfo(const [], const {});
       }
     }
   }
 
-  // 現在の局面が「他の棋譜にも出現する」かどうか
-  bool get _hasOtherKifAppearance =>
-      _appearances.any((a) => a.kifId != _currentKifEntity.id);
+  void _applyLoadedPositionInfo(
+    List<PositionAppearanceEntity> appearances,
+    Map<int, KifEntity> kifById,
+  ) {
+    final hasOtherKif = appearances.any((a) => a.kifId != _currentKifEntity.id);
+    setState(() {
+      _appearances = appearances;
+      _kifById = kifById;
+      // ピルの表示状態は有無が実際に変わった時だけ切り替える。
+      if (_hasOtherKifAppearance != hasOtherKif) {
+        _hasOtherKifAppearance = hasOtherKif;
+      }
+    });
+  }
 
   void _openLeftSidebar() {
     setState(() {
