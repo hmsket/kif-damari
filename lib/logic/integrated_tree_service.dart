@@ -8,7 +8,6 @@ import 'package:kifdamari/database/database_helper.dart';
 import 'package:kifdamari/database/entity/position_appearance_entity.dart';
 import 'package:kifdamari/database/entity/position_entity.dart';
 import 'package:kifdamari/database/entity/transition_entity.dart';
-import 'package:kifdamari/logic/position_comment_merger.dart';
 import 'package:kifdamari/logic/sfen_generator.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
@@ -63,10 +62,10 @@ class IntegratedTreeService {
         final positionDao = PositionDao();
         final existingPositions = await positionDao.getByKeys(uniqueKeys.toList(), executor: txn);
         final idByKey = <String, int>{};
-        final commentById = <int, String>{};
+        final positionCommentById = <int, String>{};
         for (final position in existingPositions) {
           idByKey[position.positionKey] = position.id!;
-          commentById[position.id!] = position.comment;
+          positionCommentById[position.id!] = position.comment;
         }
 
         for (final node in nodes) {
@@ -80,7 +79,7 @@ class IntegratedTreeService {
               executor: txn,
             );
             idByKey[key] = insertedId;
-            commentById[insertedId] = '';
+            positionCommentById[insertedId] = '';
           } else if (node.parent == null) {
             await positionDao.markAsRoot(idByKey[key]!, executor: txn);
           }
@@ -89,20 +88,7 @@ class IntegratedTreeService {
         for (final node in nodes) {
           final positionId = idByKey[keyByNode[node]!]!;
           node.positionKey = keyByNode[node];
-
-          final existingComment = commentById[positionId] ?? '';
-          final merged = PositionCommentMerger.merge(
-            existingComment,
-            node.comments.join('\n'),
-          );
-          if (merged != existingComment) {
-            await positionDao.updateComment(positionId, merged, executor: txn);
-          }
-          commentById[positionId] = merged;
-
-          node.comments
-            ..clear()
-            ..addAll(merged.isEmpty ? <String>[] : merged.split('\n'));
+          _applyPositionCommentsToNode(node, positionCommentById[positionId] ?? '');
         }
 
         final transitionDao = TransitionDao();
@@ -345,11 +331,11 @@ class IntegratedTreeService {
         moveLabel: '開始局面',
       );
       rootNode.positionKey = root.positionKey;
-      _applyCommentsToNode(rootNode, root.comment);
+      _applyPositionCommentsToNode(rootNode, root.comment);
 
       final positionIdByKey = <String, int>{root.positionKey: root.id!};
       final positionKeyById = <int, String>{root.id!: root.positionKey};
-      final commentsById = <int, String>{root.id!: root.comment};
+      final positionCommentById = <int, String>{root.id!: root.comment};
 
       var frontier = <GameNode>[rootNode];
       final transitionDao = TransitionDao();
@@ -375,7 +361,7 @@ class IntegratedTreeService {
           for (final position in toPositions) {
             positionKeyById[position.id!] = position.positionKey;
             positionIdByKey[position.positionKey] = position.id!;
-            commentsById[position.id!] = position.comment;
+            positionCommentById[position.id!] = position.comment;
           }
         }
 
@@ -401,7 +387,7 @@ class IntegratedTreeService {
               moveLabel: edge.moveLabel,
             );
             child.positionKey = toKey;
-            _applyCommentsToNode(child, commentsById[edge.toPositionId] ?? '');
+            _applyPositionCommentsToNode(child, positionCommentById[edge.toPositionId] ?? '');
             node.addChild(child);
             nextFrontier.add(child);
             nodeCount++;
@@ -426,8 +412,8 @@ class IntegratedTreeService {
     return false;
   }
 
-  static void _applyCommentsToNode(GameNode node, String comment) {
-    node.comments
+  static void _applyPositionCommentsToNode(GameNode node, String comment) {
+    node.positionComments
       ..clear()
       ..addAll(comment.isEmpty ? <String>[] : comment.split('\n'));
   }
@@ -574,7 +560,7 @@ class IntegratedTreeService {
       parent: parentNode,
     );
     child.positionKey = childKey;
-    _applyCommentsToNode(child, comment);
+    _applyPositionCommentsToNode(child, comment);
     return (child, childPositionId);
   }
 }

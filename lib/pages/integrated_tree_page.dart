@@ -285,7 +285,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       if (node == null) continue;
       stack.addAll(node.nextNodes);
       if (node.positionKey == positionKey) {
-        node.comments
+        node.positionComments
           ..clear()
           ..addAll(comments);
       }
@@ -297,14 +297,14 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
     if (node == null || !_isCommentEditable) return;
 
     final positionKey = node.positionKey;
-    final result = await showCommentEditDialog(context, node.joinedComment);
+    final result = await showCommentEditDialog(context, node.joinedPositionComment);
     if (result == null || !mounted) return;
 
     setState(() {
       if (positionKey != null) {
         _applyCommentToNodes(positionKey, result);
       } else {
-        node.comments
+        node.positionComments
           ..clear()
           ..addAll(result);
       }
@@ -1096,7 +1096,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                 child: SingleChildScrollView(
                   controller: _commentScrollController,
                   child: Linkify(
-                    text: "${current!.joinedComment}",
+                    text: "${current!.joinedPositionComment}",
                     style: TextStyle(
                       fontSize: settings.get<double>('fontSize'),
                     ),
