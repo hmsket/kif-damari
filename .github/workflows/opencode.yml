@@ -89,7 +89,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads" --jq '.[] | "\(.ref) \(.object.sha)"' | sort > /tmp/refs_before.txt
           wc -l /tmp/refs_before.txt
 
-      - name: Run OpenCode (primary - GLM-5.3-Flash Free)
+      - name: Run OpenCode (primary - Hy4 Flash Free)
         id: oc_primary
         timeout-minutes: 40
         continue-on-error: true
@@ -97,7 +97,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.OPENCODE_PAT }}
         with:
-          model: opencode/deepseek-v4.1-flash-free
+          model: opencode/hy4-flash-free
           use_github_token: true
 
       - name: Run OpenCode (fallback - DeepSeek V4.1 Flash Free)
