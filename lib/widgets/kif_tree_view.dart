@@ -550,7 +550,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                               ),
                             ),
                           // 💡 コメント付き局面ノードの印（青い吹き出し・右上に配置）
-                          if (node.comments.isNotEmpty)
+                          if (node.comments.isNotEmpty || node.positionComments.isNotEmpty)
                             const Positioned(
                               top: 2,
                               right: 2,
