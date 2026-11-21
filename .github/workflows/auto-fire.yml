@@ -1,0 +1,50 @@
+name: auto-fire
+
+# Issue に `opencode` ラベルが付いたら、定型の発火コメントを
+# OPENCODE_PAT (本人として動作する PAT) で自動投稿する。
+# その issue_comment を既存の opencode.yml が拾ってエージェントが走る。
+#
+# 発火条件:
+#   - Issue の作成者がリポジトリ所有者 (hmsket) のときだけ (公開リポの悪用防止)
+#   - `opencode` ラベルが付いていること (opened 時点で付いていても、
+#     後から labeled で付けても発火する)
+#   - 同じ Issue に自動発火コメントが既にある場合は二重発火しない
+#
+# 必要な Secrets: OPENCODE_PAT (Issues へのコメント権限を含むこと)
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  auto-fire:
+    if: >-
+      github.event.issue.user.login == 'hmsket' &&
+      contains(github.event.issue.labels.*.name, 'opencode')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Post firing comment (once per issue)
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          already=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/comments" \
+            --jq '[.[] | select(.body | contains("<!-- auto-fire -->"))] | length')
+          if [ "$already" != "0" ]; then
+            echo "Already auto-fired on issue #$ISSUE_NUMBER; skipping."
+            exit 0
+          fi
+          cat > /tmp/fire_comment.md <<EOF
+          /opencode Issue #$ISSUE_NUMBER を実装してください。
+
+          Issue本文と既存コードを確認してから、新しいブランチを作成して編集し、自分で commit と push を行い、自分で PR を作成してください。返信で PR の URL を必ず報告してください。
+
+          範囲は Issue 本文の内容のみ。Issue 本文に前提や補足が書かれている場合は、それに従ってください。
+
+          flutter analyze と flutter test が通る状態で PR を作成してください。
+
+          <!-- auto-fire -->
+          EOF
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/fire_comment.md
