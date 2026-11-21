@@ -6,6 +6,7 @@ import 'package:charset_converter/charset_converter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
+import 'package:kifdamari/database/dao/position_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/dialogs/discard_changes_dialog.dart';
@@ -26,6 +27,8 @@ import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+
+enum _CommentFace { kifComment, positionMemo }
 
 class KifEditorPage extends StatefulWidget {
   final KifEntity kifEntity;
@@ -86,6 +89,11 @@ class _KifEditorPageState extends State<KifEditorPage> {
   // コメント入力欄を制御するコントローラー
   final TextEditingController _commentController = TextEditingController();
 
+  // コメント欄の表示面（表＝棋譜コメント／裏＝局面メモ）
+  _CommentFace _commentFace = _CommentFace.kifComment;
+  GameNode? _lastCommentNode;
+  double _commentSwipeDx = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -104,9 +112,13 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final encoded = KifParser.encode(kifTree!);
 
     final StringBuffer commentBuffer = StringBuffer();
+    final StringBuffer memoBuffer = StringBuffer();
     void collectComments(GameNode node) {
       if (node.comments.isNotEmpty) {
         commentBuffer.write('node_${node.moveNumber}_${node.comments.join(",")}');
+      }
+      if (node.positionComments.isNotEmpty) {
+        memoBuffer.write('node_${node.moveNumber}_${node.positionComments.join(",")}');
       }
       for (final child in node.nextNodes) {
         collectComments(child);
@@ -115,7 +127,40 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     collectComments(kifTree!.root);
 
-    return '$encoded\n__COMMENTS_HASH__:${commentBuffer.toString()}';
+    return '$encoded\n__COMMENTS_HASH__:${commentBuffer.toString()}'
+        '\n__MEMOS_HASH__:${memoBuffer.toString()}';
+  }
+
+  void _resetCommentFace() {
+    _lastCommentNode = null;
+    _commentFace = _CommentFace.kifComment;
+    _commentSwipeDx = 0.0;
+  }
+
+  void _syncCommentFaceWithPosition() {
+    final node = kifTree!.currentNode;
+    if (identical(_lastCommentNode, node)) return;
+    _lastCommentNode = node;
+    _commentFace = _CommentFace.kifComment;
+    _commentSwipeDx = 0.0;
+  }
+
+  void _setCommentFace(_CommentFace face) {
+    if (_commentFace == face) return;
+    setState(() {
+      _commentFace = face;
+    });
+  }
+
+  void _handleCommentSwipeEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0.0;
+    final dx = velocity.abs() > 100 ? velocity : _commentSwipeDx;
+    _commentSwipeDx = 0.0;
+    if (dx < -40) {
+      _setCommentFace(_CommentFace.positionMemo);
+    } else if (dx > 40) {
+      _setCommentFace(_CommentFace.kifComment);
+    }
   }
 
   void _syncCommentFromCurrentNode() {
@@ -135,6 +180,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   Future<void> _initKifData() async {
+    _resetCommentFace();
     final String? path = _currentEntity.kifPath;
     if (path == null || path.isEmpty) {
       setState(() {
@@ -1046,57 +1092,161 @@ class _KifEditorPageState extends State<KifEditorPage> {
     );
   }
 
+  /// 局面メモは同じ局面（positionKey）を指すノードすべてに反映する。
+  void _applyPositionMemoToNodes(GameNode targetNode, List<String> memo) {
+    final positionKey = targetNode.positionKey;
+    if (positionKey == null) {
+      targetNode.positionComments
+        ..clear()
+        ..addAll(memo);
+      return;
+    }
+
+    void apply(GameNode node) {
+      if (node.positionKey == positionKey) {
+        node.positionComments
+          ..clear()
+          ..addAll(memo);
+      }
+      for (final child in node.nextNodes) {
+        apply(child);
+      }
+    }
+
+    apply(kifTree!.root);
+  }
+
   void _showCommentEditDialog() async {
-    final oldComment = kifTree!.currentNode.joinedComment;
+    final node = kifTree!.currentNode;
+    final showPositionMemo = _commentFace == _CommentFace.positionMemo;
+    final oldComment = showPositionMemo ? node.joinedPositionMemo : node.joinedKifComment;
     final result = await showCommentEditDialog(context, oldComment);
     if (result == null || !mounted) return;
     setState(() {
-      kifTree!.currentNode.comments.clear();
-      kifTree!.currentNode.comments.addAll(result);
+      if (showPositionMemo) {
+        _applyPositionMemoToNodes(node, result);
+      } else {
+        node.comments
+          ..clear()
+          ..addAll(result);
+      }
       _syncCommentFromCurrentNode();
       _checkSaveStatus();
     });
   }
 
-  Widget _buildCommentField() {
+  Widget _buildCommentPanel() {
     final settings = AppSettings();
-    final String currentComment = kifTree!.currentNode.joinedComment;
+    final node = kifTree!.currentNode;
+    final showPositionMemo = _commentFace == _CommentFace.positionMemo;
+    final String currentText =
+        showPositionMemo ? node.joinedPositionMemo : node.joinedKifComment;
+    final bool hasPositionMemo = node.joinedPositionMemo.trim().isNotEmpty;
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _showCommentEditDialog,
+    return GestureDetector(
+      onHorizontalDragStart: (_) => _commentSwipeDx = 0.0,
+      onHorizontalDragUpdate: (details) => _commentSwipeDx += details.delta.dx,
+      onHorizontalDragEnd: _handleCommentSwipeEnd,
+      onHorizontalDragCancel: () => _commentSwipeDx = 0.0,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: double.infinity,
-              child: IgnorePointer(
-                child: SingleChildScrollView(
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: Text(
-                    currentComment.isEmpty ? 'タップしてこの局面のコメントを入力' : currentComment,
-                    style: TextStyle(
-                      fontSize: settings.get<double>('fontSize'),
-                      color: currentComment.isEmpty ? Colors.grey[400] : Colors.black87,
-                    ),
-                    strutStyle: StrutStyle(
-                      fontSize: settings.get<double>('fontSize'),
-                      height: 1.5,
-                      forceStrutHeight: true,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _showCommentEditDialog,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: Text(
+                          currentText.isEmpty
+                              ? (showPositionMemo
+                                  ? 'タップしてこの局面のメモを入力'
+                                  : 'タップしてこの局面のコメントを入力')
+                              : currentText,
+                          style: TextStyle(
+                            fontSize: settings.get<double>('fontSize'),
+                            color: currentText.isEmpty ? Colors.grey[400] : Colors.black87,
+                          ),
+                          strutStyle: StrutStyle(
+                            fontSize: settings.get<double>('fontSize'),
+                            height: 1.5,
+                            forceStrutHeight: true,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  Positioned(
+                    top: 0,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.75),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        showPositionMemo ? 'この局面のメモ' : '棋譜コメント',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _CommentFace.values
+                            .map(
+                              (face) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                child: _buildCommentFaceDot(face, hasPositionMemo),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommentFaceDot(_CommentFace face, bool hasPositionMemo) {
+    final isActive = face == _commentFace;
+    final showRing = face == _CommentFace.positionMemo && hasPositionMemo;
+
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: showRing ? Border.all(color: Colors.orange, width: 2) : null,
+      ),
+      child: Center(
+        child: Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive ? Colors.grey[700] : Colors.grey[400],
           ),
         ),
       ),
@@ -1197,6 +1347,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    _syncCommentFaceWithPosition();
 
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
@@ -1342,7 +1494,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                   Expanded(
                     child: Stack(
                       children: [
-                        _buildCommentField(),
+                        _buildCommentPanel(),
                         // ドラッグ時にコメント欄の上に浮かび上がる文字なしシンプル大型ダイヤル
                         if (_isOverlayDialActive)
                           Positioned.fill(
@@ -1769,10 +1921,64 @@ class _KifEditorPageState extends State<KifEditorPage> {
     return _applyTemplate(detailTemplate, _generateValueMap());
   }
 
+  /// 編集中の局面メモをノード単位で退避する（registerKifTree が DB 値で上書きする前に行う）。
+  Map<GameNode, String> _capturePositionMemos(KifTree tree) {
+    final memos = <GameNode, String>{};
+    void collect(GameNode node) {
+      memos[node] = node.joinedPositionMemo;
+      for (final child in node.nextNodes) {
+        collect(child);
+      }
+    }
+    collect(tree.root);
+    return memos;
+  }
+
+  void _restorePositionMemos(KifTree tree, Map<GameNode, String> memos) {
+    void restore(GameNode node) {
+      final memo = memos[node];
+      if (memo != null) {
+        node.positionComments
+          ..clear()
+          ..addAll(memo.isEmpty ? <String>[] : memo.split('\n'));
+      }
+      for (final child in node.nextNodes) {
+        restore(child);
+      }
+    }
+    restore(tree.root);
+  }
+
+  /// 局面メモはアプリ内 DB のみに保存する（.kif には書き込まない）。
+  Future<void> _savePositionMemos(Map<GameNode, String> memos) async {
+    final memoByKey = <String, String>{};
+    for (final entry in memos.entries) {
+      final key = entry.key.positionKey;
+      if (key == null || key.isEmpty) continue;
+      memoByKey.putIfAbsent(key, () => entry.value);
+    }
+
+    final dao = PositionDao();
+    for (final entry in memoByKey.entries) {
+      final position = await dao.getByKey(entry.key);
+      final positionId = position?.id;
+      if (positionId == null) continue;
+      final saved = await IntegratedTreeService.savePositionComment(
+        positionId,
+        entry.value,
+      );
+      if (!saved) {
+        throw Exception('局面メモの保存に失敗しました: ${entry.key}');
+      }
+    }
+  }
+
   Future<void> _saveKifData() async {
     if (kifTree == null) return;
 
+    final memosByNode = _capturePositionMemos(kifTree!);
     await IntegratedTreeService.registerKifTree(kifTree!, kifId: _currentEntity.id);
+    _restorePositionMemos(kifTree!, memosByNode);
 
     final kifData = await _prepareKifData();
     if (kifData == null) return;
@@ -1798,6 +2004,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
         pendingTreeUri: saveResult.pendingTreeUri,
       );
       await KifDao().updateKif(updatedKif);
+
+      // 棋譜コメント（.kif）と一緒に局面メモ（DB）も保存する。
+      await _savePositionMemos(memosByNode);
 
       _currentEntity = updatedKif;
 
