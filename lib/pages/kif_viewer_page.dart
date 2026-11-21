@@ -31,6 +31,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kifdamari/models/game_node.dart';
 
+enum _CommentFace { kifComment, positionMemo }
+
 class KifViewerPage extends StatefulWidget {
   final KifEntity kifEntity;
   final int initialMoveNumber;
@@ -66,6 +68,10 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
   final ScrollController _commentScrollController = ScrollController();
 
+  _CommentFace _commentFace = _CommentFace.kifComment;
+  GameNode? _lastCommentNode;
+  double _commentSwipeDx = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -79,7 +85,43 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     super.dispose();
   }
 
+  void _resetCommentFace() {
+    _lastCommentNode = null;
+    _commentFace = _CommentFace.kifComment;
+    _commentSwipeDx = 0.0;
+  }
+
+  void _syncCommentFaceWithPosition() {
+    final node = kifTree!.currentNode;
+    if (identical(_lastCommentNode, node)) return;
+    _lastCommentNode = node;
+    _commentFace = _CommentFace.kifComment;
+    _commentSwipeDx = 0.0;
+  }
+
+  void _setCommentFace(_CommentFace face) {
+    if (_commentFace == face) return;
+    setState(() {
+      _commentFace = face;
+      if (_commentScrollController.hasClients) {
+        _commentScrollController.jumpTo(0);
+      }
+    });
+  }
+
+  void _handleCommentSwipeEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0.0;
+    final dx = velocity.abs() > 100 ? velocity : _commentSwipeDx;
+    _commentSwipeDx = 0.0;
+    if (dx < -40) {
+      _setCommentFace(_CommentFace.positionMemo);
+    } else if (dx > 40) {
+      _setCommentFace(_CommentFace.kifComment);
+    }
+  }
+
   Future<void> _initKifData() async {
+    _resetCommentFace();
     final String? path = _currentKifEntity.kifPath;
     if (path == null || path.isEmpty) {
       setState(() {
@@ -355,8 +397,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final settings = AppSettings();
-
     if (_isLoading || kifTree == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -364,6 +404,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     }
 
     _refreshPositionInfoIfNeeded();
+    _syncCommentFaceWithPosition();
 
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
@@ -420,49 +461,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                     child: Stack(
                       children: [
-                        // 通常時のコメント欄（表示専用・編集は棋譜編集画面で行う）
-                        Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          padding: const EdgeInsets.all(12.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Scrollbar(
-                            controller: _commentScrollController,
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              controller: _commentScrollController,
-                              child: Linkify(
-                                text: "${kifTree!.currentNode.joinedComment}",
-                                style: TextStyle(
-                                  fontSize: settings.get<double>('fontSize'),
-                                ),
-                                strutStyle: StrutStyle(
-                                  fontSize: settings.get<double>('fontSize'),
-                                  height: 1.5,
-                                  forceStrutHeight: true,
-                                ),
-                                linkStyle: const TextStyle(
-                                  color: Colors.blue,
-                                  decoration: TextDecoration.none,
-                                ),
-                                onOpen: (link) async {
-                                  final url = Uri.parse(link.url);
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(
-                                      url,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  } else {
-                                    ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
+                        _buildCommentPanel(),
                         // 💡 ドラッグ時にコメント欄の上に浮かび上がる文字なしシンプル大型ダイヤル
                         if (_isOverlayDialActive)
                           Positioned.fill(
@@ -596,6 +595,127 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCommentPanel() {
+    final settings = AppSettings();
+    final node = kifTree!.currentNode;
+    final showPositionMemo = _commentFace == _CommentFace.positionMemo;
+    final hasPositionMemo = node.joinedPositionMemo.trim().isNotEmpty;
+
+    return GestureDetector(
+      onHorizontalDragStart: (_) => _commentSwipeDx = 0.0,
+      onHorizontalDragUpdate: (details) => _commentSwipeDx += details.delta.dx,
+      onHorizontalDragEnd: _handleCommentSwipeEnd,
+      onHorizontalDragCancel: () => _commentSwipeDx = 0.0,
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Scrollbar(
+                controller: _commentScrollController,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _commentScrollController,
+                  child: Linkify(
+                    text: showPositionMemo
+                        ? node.joinedPositionMemo
+                        : node.joinedKifComment,
+                    style: TextStyle(
+                      fontSize: settings.get<double>('fontSize'),
+                    ),
+                    strutStyle: StrutStyle(
+                      fontSize: settings.get<double>('fontSize'),
+                      height: 1.5,
+                      forceStrutHeight: true,
+                    ),
+                    linkStyle: const TextStyle(
+                      color: Colors.blue,
+                      decoration: TextDecoration.none,
+                    ),
+                    onOpen: (link) async {
+                      final url = Uri.parse(link.url);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } else {
+                        ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  showPositionMemo ? 'この局面のメモ' : '棋譜コメント',
+                  style: TextStyle(fontSize: 10, color: Colors.grey[700]),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _CommentFace.values
+                      .map(
+                        (face) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: _buildCommentFaceDot(face, hasPositionMemo),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommentFaceDot(_CommentFace face, bool hasPositionMemo) {
+    final isActive = face == _commentFace;
+    final showRing = face == _CommentFace.positionMemo && hasPositionMemo;
+
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: showRing ? Border.all(color: Colors.orange, width: 2) : null,
+      ),
+      child: Center(
+        child: Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive ? Colors.grey[700] : Colors.grey[400],
+          ),
+        ),
       ),
     );
   }
