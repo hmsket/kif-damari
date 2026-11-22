@@ -27,14 +27,26 @@ class KifListWidget extends StatefulWidget {
   State<KifListWidget> createState() => KifListWidgetState();
 }
 
-class KifListWidgetState extends State<KifListWidget> {
+class KifListWidgetState extends State<KifListWidget>
+    with AutomaticKeepAliveClientMixin {
   Future<List<KifEntity>>? _kifuFuture;
   List<KifEntity>? _tempKifs;
-  
+
   int _lastKifCount = 0;
   bool _isFirstLoadDone = false;
 
   final Set<int> _selectedKifIds = {};
+
+  final ScrollController _scrollController = ScrollController();
+  double _savedScrollOffset = 0.0;
+  double _savedScrollProgress = 0.0;
+  bool _restoreByProgress = false;
+  bool _restorePending = false;
+  bool _restoreScheduled = false;
+  bool? _lastIsGridView;
+
+  @override
+  bool get wantKeepAlive => true;
 
   int get selectedCount => _selectedKifIds.length;
 
@@ -49,7 +61,64 @@ class KifListWidgetState extends State<KifListWidget> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_saveScrollPosition);
     _loadKifu();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_saveScrollPosition);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 現在のスクロール位置をピクセル値と全体に対する比率で覚える。
+  void _saveScrollPosition() {
+    final positions = _scrollController.positions;
+    if (positions.isEmpty) return;
+    final position = positions.first;
+    // レイアウト前の値で、覚えている位置を上書きしない。
+    if (!position.hasViewportDimension || !position.hasContentDimensions) {
+      return;
+    }
+    _savedScrollOffset = position.pixels;
+    final maxScrollExtent = position.maxScrollExtent;
+    _savedScrollProgress = maxScrollExtent > 0
+        ? (position.pixels / maxScrollExtent).clamp(0.0, 1.0)
+        : 0.0;
+  }
+
+  void _scheduleScrollRestore() {
+    if (_restoreScheduled) return;
+    _restoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreScheduled = false;
+      _restoreScrollPosition();
+    });
+  }
+
+  /// 再読み込み後に、覚えた位置を新しい maxScrollExtent にクランプして復元する。
+  void _restoreScrollPosition() {
+    if (!_restorePending || !mounted) return;
+    final positions = _scrollController.positions;
+    if (positions.isEmpty) return;
+
+    final position = positions.first;
+    // レイアウトが完了していない間は復元しない（保存位置を壊さない）。
+    if (!position.hasViewportDimension || !position.hasContentDimensions) {
+      return;
+    }
+    final maxScrollExtent = position.maxScrollExtent;
+    final target = (_restoreByProgress
+            ? _savedScrollProgress * maxScrollExtent
+            : _savedScrollOffset)
+        .clamp(0.0, maxScrollExtent)
+        .toDouble();
+    _restorePending = false;
+    _restoreByProgress = false;
+    if ((position.pixels - target).abs() > 1) {
+      _scrollController.jumpTo(target);
+    }
   }
 
   @override
@@ -68,6 +137,8 @@ class KifListWidgetState extends State<KifListWidget> {
   }
 
   void _loadKifu() {
+    _saveScrollPosition();
+    _restorePending = true;
     setState(() {
       _tempKifs = null;
       _kifuFuture = KifDao().getKifsByTab(widget.tabId);
@@ -101,10 +172,18 @@ class KifListWidgetState extends State<KifListWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     // 設定変更（表示形式の切替）にも追随できるよう ValueListenableBuilder で包む
     return ValueListenableBuilder(
       valueListenable: AppSettings().listenable,
       builder: (context, _, __) {
+        final isGrid = _isGridView;
+        if (_lastIsGridView != null && _lastIsGridView != isGrid) {
+          _saveScrollPosition();
+          _restoreByProgress = true;
+          _restorePending = true;
+        }
+        _lastIsGridView = isGrid;
         return FutureBuilder<List<KifEntity>>(
           future: _kifuFuture,
           builder: (context, snapshot) {
@@ -160,6 +239,10 @@ class KifListWidgetState extends State<KifListWidget> {
               ),
             );
           }
+          // スクロール可能なウィジェットを組み立てた後のフレームで位置を復元する。
+          if (_restorePending) {
+            _scheduleScrollRestore();
+          }
           if (widget.mode == AppMode.sort) {
             return _isGridView ? _buildSortGrid(kifs) : _buildSortList(kifs);
           }
@@ -174,6 +257,7 @@ class KifListWidgetState extends State<KifListWidget> {
   /// 並べ替えモード（詳細リスト表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortList(List<KifEntity> kifs) {
     return ReorderableListView.builder(
+      scrollController: _scrollController,
       itemCount: kifs.length,
       buildDefaultDragHandles: false,
       proxyDecorator: (child, index, animation) {
@@ -212,6 +296,7 @@ class KifListWidgetState extends State<KifListWidget> {
   /// 詳細リスト表示（通常・編集・削除モード）
   Widget _buildList(List<KifEntity> kifs) {
     return ListView.builder(
+      controller: _scrollController,
       itemCount: kifs.length,
       itemBuilder: (context, index) {
         final kif = kifs[index];
@@ -243,6 +328,7 @@ class KifListWidgetState extends State<KifListWidget> {
   /// グリッド表示（通常・編集・削除モード）: 列数は画面幅で自動
   Widget _buildGrid(List<KifEntity> kifs) {
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 200,
@@ -281,6 +367,7 @@ class KifListWidgetState extends State<KifListWidget> {
   /// 並べ替えモード（グリッド表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortGrid(List<KifEntity> kifs) {
     return ReorderableGridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 200,
