@@ -257,7 +257,7 @@ class KifListWidgetState extends State<KifListWidget>
   /// 並べ替えモード（詳細リスト表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortList(List<KifEntity> kifs) {
     return ReorderableListView.builder(
-      controller: _scrollController,
+      scrollController: _scrollController,
       itemCount: kifs.length,
       buildDefaultDragHandles: false,
       proxyDecorator: (child, index, animation) {
