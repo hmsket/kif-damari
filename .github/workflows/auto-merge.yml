@@ -12,11 +12,11 @@ name: auto-merge
 #   1. flutter-ci が成功で終わった PR である
 #   2. PR に紐づく Issue に `auto-merge-ok` ラベルが付いている
 #      (紐づけは PR 本文の "Closes #N" 等、またはブランチ名 opencode/issue-N から解決)
-#   3. 変更ファイル数 <= 6、変更行数 (追加+削除) <= 250
-#   4. 禁止パスに触れていない:
+#   3. 禁止パスに触れていない:
 #      .github/ 配下、scripts/ 配下、pubspec.yaml / pubspec.lock、
 #      Gradle 設定 (*.kts / *.gradle)、署名まわり (*.jks / *.keystore / key.properties)
-#   5. ドラフトではなく、コンフリクトがない (MERGEABLE)
+#   4. ドラフトではなく、コンフリクトがない (MERGEABLE)
+#   (変更ファイル数・変更行数の制限はなし)
 #
 # マージは OPENCODE_PAT で実行する (本人として動作し、履歴に残る)。
 # マージ後は PR に自動マージの記録コメントを残す。
@@ -25,6 +25,13 @@ name: auto-merge
 # 【v2 修正 2026-11-24】PR #88 で発覚: CI 完了直後は GitHub の mergeable
 # 判定がまだ UNKNOWN で、「マージ不可」と誤判定して見送ってしまった。
 # mergeable は最大約3分ポーリングして確定 (MERGEABLE / CONFLICTING) を待つ。
+#
+# 【v3 変更 2026-11-24】PR #91 (338行) が変更行数上限 250 で見送られた件で、
+# ユーザー判断により変更行数の制限を撤廃。ファイル数 <= 6 と禁止パスの
+# チェックは残す。
+#
+# 【v4 変更 2026-11-24】ユーザー判断により変更ファイル数の制限も撤廃。
+# 残る条件は CI 成功 / ラベル / 禁止パス / 非ドラフト / MERGEABLE のみ。
 #
 # 止め方 (キルスイッチ):
 #   - 個別に止める: Issue から `auto-merge-ok` ラベルを外す
@@ -97,7 +104,7 @@ jobs:
             fail "auto-merge-ok label not present on issue #$ISSUE"
             exit 0
           fi
-          meta=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json isDraft,mergeable,additions,deletions,changedFiles)
+          meta=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json isDraft,additions,deletions,changedFiles)
           if [ "$(printf '%s' "$meta" | jq -r '.isDraft')" = "true" ]; then
             fail "PR is draft"
             exit 0
@@ -117,21 +124,13 @@ jobs:
           fi
           files=$(printf '%s' "$meta" | jq -r '.changedFiles')
           lines=$(printf '%s' "$meta" | jq -r '.additions + .deletions')
-          if [ "$files" -gt 6 ]; then
-            fail "changed files $files > 6"
-            exit 0
-          fi
-          if [ "$lines" -gt 250 ]; then
-            fail "changed lines $lines > 250"
-            exit 0
-          fi
           names=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json files --jq '.files[].path')
           if printf '%s\n' "$names" | grep -qE '^\.github/|^scripts/|(^|/)pubspec\.(yaml|lock)$|\.(kts|gradle)$|\.(jks|keystore)$|(^|/)key\.properties$'; then
             fail "forbidden path touched"
             exit 0
           fi
           echo "ok=true" >> "$GITHUB_OUTPUT"
-          echo "All conditions passed (files=$files, lines=$lines)"
+          echo "All conditions passed (files=$files, lines=$lines; no size limits)"
 
       - name: Merge the PR
         if: steps.check.outputs.ok == 'true'
