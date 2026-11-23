@@ -73,6 +73,42 @@ void main() {
     expect(deleted, same(child));
   });
 
+  testWidgets('画面外のノードはウィジェット化されない', (tester) async {
+    final root = buildNode(0);
+    GameNode current = root;
+    for (int i = 1; i <= 120; i++) {
+      final node = buildNode(i, moveLabel: '+7776FU');
+      current.addChild(node);
+      current = node;
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: KifTreeView(
+            rootNode: root,
+            currentNode: root,
+            onNodeSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 画面外（下方）のノードは組み立てられていない
+    expect(
+      tester.widgetList(find.byType(AnimatedContainer)).length,
+      lessThan(120),
+    );
+    expect(find.text('120手目'), findsNothing);
+
+    // 下端までスクロールすると、その範囲のノードが遅延なく表示される
+    await tester.drag(find.byType(KifTreeView), const Offset(0, -5000));
+    await tester.pumpAndSettle();
+
+    expect(find.text('120手目'), findsOneWidget);
+  });
+
   testWidgets('削除コールバックがなければ（閲覧モード）×ボタンは出ない', (tester) async {
     final root = buildNode(0);
     final child = buildNode(1, moveLabel: '+7776FU');
