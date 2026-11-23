@@ -28,11 +28,20 @@ name: spiral-next
 #     (CI 自動修正が2回で打ち切る場合も同様に止まる = 安全な止まり方)。
 #
 # 必要な Secrets: OPENCODE_PAT (Issues の書き込み権限を含むこと)
+#
+# 【v2 変更 2026-11-24】PR #103 (#90) が自動マージされたのに #92 が放出
+# されなかった件への対策。マージの瞬間は、opencode ワークフローの
+# ci-build ジョブがまだ実行中で、ゲートが「稼働中」と判定して見送った
+# (見送りには再試行がなく、連鎖が止まった)。schedule トリガー (20分毎) を
+# 安全網として追加し、同じゲート＋放出を定期的に再チェックする。
+# これにより、一時的な「稼働中」で止まっても次の巡回で自動復旧する。
 
 on:
   pull_request:
     types: [closed]
   workflow_dispatch:
+  schedule:
+    - cron: '*/20 * * * *'
 
 concurrency:
   group: spiral-next
@@ -45,7 +54,7 @@ permissions:
 
 jobs:
   release-next:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
