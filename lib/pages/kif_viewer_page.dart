@@ -617,81 +617,82 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Positioned.fill(
+            Expanded(
               child: Scrollbar(
                 controller: _commentScrollController,
                 thumbVisibility: true,
                 child: SingleChildScrollView(
                   controller: _commentScrollController,
-                  child: Linkify(
-                    text: showPositionMemo
-                        ? node.joinedPositionMemo
-                        : node.joinedKifComment,
-                    style: TextStyle(
-                      fontSize: settings.get<double>('fontSize'),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: Linkify(
+                      text: showPositionMemo
+                          ? node.joinedPositionMemo
+                          : node.joinedKifComment,
+                      style: TextStyle(
+                        fontSize: settings.get<double>('fontSize'),
+                      ),
+                      strutStyle: StrutStyle(
+                        fontSize: settings.get<double>('fontSize'),
+                        height: 1.5,
+                        forceStrutHeight: true,
+                      ),
+                      linkStyle: const TextStyle(
+                        color: Colors.blue,
+                        decoration: TextDecoration.none,
+                      ),
+                      onOpen: (link) async {
+                        final url = Uri.parse(link.url);
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(
+                            url,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        } else {
+                          ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                        }
+                      },
                     ),
-                    strutStyle: StrutStyle(
-                      fontSize: settings.get<double>('fontSize'),
-                      height: 1.5,
-                      forceStrutHeight: true,
-                    ),
-                    linkStyle: const TextStyle(
-                      color: Colors.blue,
-                      decoration: TextDecoration.none,
-                    ),
-                    onOpen: (link) async {
-                      final url = Uri.parse(link.url);
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(
-                          url,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      } else {
-                        ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
-                      }
-                    },
                   ),
                 ),
               ),
             ),
-            Positioned(
-              top: 0,
-              right: 4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.75),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  showPositionMemo ? 'この局面のメモ' : '棋譜コメント',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[700]),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _CommentFace.values
-                      .map(
-                        (face) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          child: _buildCommentFaceDot(face, hasPositionMemo),
-                        ),
-                      )
-                      .toList(),
-                ),
+            SizedBox(
+              height: 20,
+              child: Row(
+                children: [
+                  const Spacer(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _CommentFace.values
+                        .map(
+                          (face) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: _buildCommentFaceDot(face, hasPositionMemo),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        showPositionMemo ? 'この局面のメモ' : '棋譜コメント',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
