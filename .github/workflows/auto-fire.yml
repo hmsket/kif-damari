@@ -5,22 +5,28 @@ name: auto-fire
 # その issue_comment を既存の opencode.yml が拾ってエージェントが走る。
 #
 # 発火条件:
+#   - `labeled` イベントで、付いたラベルが `opencode` のときだけ
+#     (opened と labeled の二重発火を避けるため labeled のみに絞る。
+#      ラベル付きで Issue を作った場合も labeled は1回だけ飛ぶ)
 #   - Issue の作成者がリポジトリ所有者 (hmsket) のときだけ (公開リポの悪用防止)
-#   - `opencode` ラベルが付いていること (opened 時点で付いていても、
-#     後から labeled で付けても発火する)
 #   - 同じ Issue に自動発火コメントが既にある場合は二重発火しない
+#   - 同じ Issue に対する同時実行は直列化する (concurrency)
 #
 # 必要な Secrets: OPENCODE_PAT (Issues へのコメント権限を含むこと)
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
+
+concurrency:
+  group: auto-fire-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   auto-fire:
     if: >-
       github.event.issue.user.login == 'hmsket' &&
-      contains(github.event.issue.labels.*.name, 'opencode')
+      github.event.label.name == 'opencode'
     runs-on: ubuntu-latest
     permissions:
       issues: write
