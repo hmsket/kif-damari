@@ -141,7 +141,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
     final node = kifTree!.currentNode;
     if (identical(_lastCommentNode, node)) return;
     _lastCommentNode = node;
-    _commentFace = _CommentFace.kifComment;
     _commentSwipeDx = 0.0;
   }
 
