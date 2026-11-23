@@ -1,0 +1,110 @@
+name: ci-autofix
+
+# flutter-ci の結果を PR に自動で知らせるためのワークフロー。
+#
+# 成功時: PR に「CI成功 + APK固定リンク」のコメントを投稿する (通知用)。
+# 失敗時: 失敗ログから analyze の error 行だけを抜き出し、OPENCODE_PAT 経由で
+#         /opencode の修正指示コメントを PR に投稿して自動修正を起動する。
+#         PAT は本人 (hmsket) として投稿されるため opencode ワークフローが発火する。
+#         自動修正は最大2回まで (マーカー付きコメントの数で数える)。
+#         3回目以降は「打ち切り」コメントだけを残して人間に返す。
+#         analyze の error が見つからない失敗 (署名・ネットワーク等) は
+#         コードを直せないので、通知コメントだけにして自動修正はしない。
+#
+# 注意: 自動修正が実際に走るのは、スマホの Tailscale が ON の間だけ
+#       (opencode 側がスマホ出口ノードを必要とするため)。
+
+on:
+  workflow_run:
+    workflows: ["flutter-ci"]
+    types: [completed]
+
+permissions:
+  actions: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  report:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Find target PR
+        id: ctx
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="${{ github.event.workflow_run.head_branch }}"
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "No open PR for branch: $branch"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "Target PR: #$pr"
+
+      - name: Comment on success
+        if: steps.ctx.outputs.skip != 'true' && github.event.workflow_run.conclusion == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ steps.ctx.outputs.pr }}" --repo "$GITHUB_REPOSITORY" --body "✅ CI成功しました。最新APKはこちら: https://github.com/hmsket/kif-damari/releases/download/dev/kifdamari.apk"
+
+      - name: Count previous autofix attempts
+        id: tries
+        if: steps.ctx.outputs.skip != 'true' && github.event.workflow_run.conclusion == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          count=$(gh api "repos/$GITHUB_REPOSITORY/issues/${{ steps.ctx.outputs.pr }}/comments" --paginate --jq '[.[] | select(.body | contains("<!-- ci-autofix -->"))] | length')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Previous autofix attempts: $count"
+
+      - name: Extract analyze errors from the failed log
+        id: errs
+        if: steps.ctx.outputs.skip != 'true' && github.event.workflow_run.conclusion == 'failure' && steps.tries.outputs.count < 2
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run view "${{ github.event.workflow_run.id }}" --repo "$GITHUB_REPOSITORY" --log-failed > failed.log 2>/dev/null || true
+          grep 'error •' failed.log | sed 's/^.*error •/error •/' | sort -u | head -20 > errors.txt || true
+          if [ -s errors.txt ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat errors.txt
+
+      - name: Post autofix instruction (via PAT so opencode fires)
+        if: steps.errs.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+        run: |
+          n=$(( ${{ steps.tries.outputs.count }} + 1 ))
+          {
+            echo "<!-- ci-autofix -->"
+            echo "🤖 CI自動修正（${n}回目）"
+            echo ""
+            echo "/opencode CI（flutter analyze）が失敗しました。以下のエラーを修正してください。対象はこのエラーの解消のみで、それ以外の変更はしないでください。検証コマンドは実行しないでください。"
+            echo ""
+            echo '```'
+            cat errors.txt
+            echo '```'
+          } > comment.md
+          gh pr comment "${{ steps.ctx.outputs.pr }}" --repo "$GITHUB_REPOSITORY" --body-file comment.md
+
+      - name: Comment when failure is not an analyze error
+        if: steps.ctx.outputs.skip != 'true' && github.event.workflow_run.conclusion == 'failure' && steps.tries.outputs.count < 2 && steps.errs.outputs.found == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ steps.ctx.outputs.pr }}" --repo "$GITHUB_REPOSITORY" --body "⚠️ CIが失敗しましたが、analyze の error は見つかりませんでした（署名・ネットワーク等の可能性があります）。自動修正は行いません。Actions のログを確認してください: ${{ github.event.workflow_run.html_url }}"
+
+      - name: Comment when autofix gives up
+        if: steps.ctx.outputs.skip != 'true' && github.event.workflow_run.conclusion == 'failure' && steps.tries.outputs.count == 2
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ steps.ctx.outputs.pr }}" --repo "$GITHUB_REPOSITORY" --body "🛑 CIが失敗しました。自動修正は2回試したので、ここで打ち切ります。Actions のログを確認してください: ${{ github.event.workflow_run.html_url }}"

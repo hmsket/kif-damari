@@ -1,0 +1,151 @@
+name: auto-merge
+
+# 低リスク Issue の PR を、条件をすべて満たした場合だけ自動でマージする。
+#
+# 前提の役割分担:
+#   - 「低リスクかどうか」の判断は Issue 作成時に人間側 (Muse + 仕様確定) で行い、
+#     低リスクな Issue にだけ `auto-merge-ok` ラベルを付ける。
+#   - このワークフローは機械的な条件チェックだけを行い、1つでも外れたら
+#     何もせず人間に残す (マージしないことが安全側)。
+#
+# マージ条件 (すべて必須):
+#   1. flutter-ci が成功で終わった PR である
+#   2. PR に紐づく Issue に `auto-merge-ok` ラベルが付いている
+#      (紐づけは PR 本文の "Closes #N" 等、またはブランチ名 opencode/issue-N から解決)
+#   3. 変更ファイル数 <= 6、変更行数 (追加+削除) <= 250
+#   4. 禁止パスに触れていない:
+#      .github/ 配下、scripts/ 配下、pubspec.yaml / pubspec.lock、
+#      Gradle 設定 (*.kts / *.gradle)、署名まわり (*.jks / *.keystore / key.properties)
+#   5. ドラフトではなく、コンフリクトがない (MERGEABLE)
+#
+# マージは OPENCODE_PAT で実行する (本人として動作し、履歴に残る)。
+# マージ後は PR に自動マージの記録コメントを残す。
+# 条件を外れて見送った場合は、理由コメントを1回だけ残す (マーカーで重複防止)。
+#
+# 止め方 (キルスイッチ):
+#   - 個別に止める: Issue から `auto-merge-ok` ラベルを外す
+#   - 全部止める: このワークフローを GitHub の Actions 画面で disable する
+#
+# 必要な Secrets: OPENCODE_PAT (Contents / Pull requests の書き込み権限を含むこと)
+#
+# 注意: ci-autofix.yml と同じく、対象ワークフロー名 "flutter-ci" は
+#       設置時点のリポジトリのワークフロー名と一致していること。
+
+on:
+  workflow_run:
+    workflows: ["flutter-ci"]
+    types: [completed]
+
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Find target PR and linked issue
+        id: ctx
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="${{ github.event.workflow_run.head_branch }}"
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "No open PR for branch: $branch"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          body=$(gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json body --jq '.body // ""')
+          issue=$(printf '%s' "$body" | grep -oiE '(closes|fixes|resolves) #[0-9]+' | grep -oE '[0-9]+' | head -1)
+          if [ -z "$issue" ]; then
+            issue=$(printf '%s' "$branch" | grep -oE 'issue[-_][0-9]+' | grep -oE '[0-9]+' | head -1)
+          fi
+          if [ -z "$issue" ]; then
+            echo "No linked issue found for PR #$pr"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "issue=$issue" >> "$GITHUB_OUTPUT"
+          echo "Target: PR #$pr / Issue #$issue"
+
+      - name: Check conditions
+        id: check
+        if: steps.ctx.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+        run: |
+          fail() { echo "reason=$1" >> "$GITHUB_OUTPUT"; echo "ok=false" >> "$GITHUB_OUTPUT"; echo "Check failed: $1"; }
+          labels=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name]')
+          if [ "$(printf '%s' "$labels" | grep -c '"auto-merge-ok"')" = "0" ]; then
+            fail "auto-merge-ok label not present on issue #$ISSUE"
+            exit 0
+          fi
+          meta=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json isDraft,mergeable,additions,deletions,changedFiles)
+          if [ "$(printf '%s' "$meta" | jq -r '.isDraft')" = "true" ]; then
+            fail "PR is draft"
+            exit 0
+          fi
+          if [ "$(printf '%s' "$meta" | jq -r '.mergeable')" != "MERGEABLE" ]; then
+            fail "PR is not mergeable"
+            exit 0
+          fi
+          files=$(printf '%s' "$meta" | jq -r '.changedFiles')
+          lines=$(printf '%s' "$meta" | jq -r '.additions + .deletions')
+          if [ "$files" -gt 6 ]; then
+            fail "changed files $files > 6"
+            exit 0
+          fi
+          if [ "$lines" -gt 250 ]; then
+            fail "changed lines $lines > 250"
+            exit 0
+          fi
+          names=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json files --jq '.files[].path')
+          if printf '%s\n' "$names" | grep -qE '^\.github/|^scripts/|(^|/)pubspec\.(yaml|lock)$|\.(kts|gradle)$|\.(jks|keystore)$|(^|/)key\.properties$'; then
+            fail "forbidden path touched"
+            exit 0
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "All conditions passed (files=$files, lines=$lines)"
+
+      - name: Merge the PR
+        if: steps.check.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+        run: |
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "🤖 自動マージしました（Issue #$ISSUE の auto-merge-ok ラベル + CI成功 + 差分チェック通過）。問題があれば revert してください。
+
+          <!-- auto-merge -->"
+
+      - name: Comment once when skipped despite the label
+        if: steps.check.outputs.ok == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          REASON: ${{ steps.check.outputs.reason }}
+        run: |
+          case "$REASON" in
+            *"label not present"*) exit 0 ;;
+          esac
+          already=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '[.[] | select(.body | contains("<!-- auto-merge-skip -->"))] | length')
+          if [ "$already" != "0" ]; then
+            exit 0
+          fi
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "🤖 自動マージを見送りました: $REASON 。手動で確認してください。
+
+          <!-- auto-merge-skip -->"
