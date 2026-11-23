@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 Future<List<String>?> showCommentEditDialog(BuildContext context, String currentComment) {
   final TextEditingController dialogController = TextEditingController(text: currentComment);
   final FocusNode dialogFocusNode = FocusNode();
+  int? dragPointerId;
+  double? dragStartY;
 
   return Navigator.of(context).push<List<String>>(
     PageRouteBuilder(
@@ -22,56 +24,77 @@ Future<List<String>?> showCommentEditDialog(BuildContext context, String current
               alignment: Alignment.bottomCenter,
               child: Padding(
                 padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: Material(
-                  color: Colors.white,
-                  elevation: 24,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: SafeArea(
-                    child: Container(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('コメント編集', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.brown)),
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 20),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: dialogController,
-                            focusNode: dialogFocusNode,
-                            maxLines: 5,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: 'この局面のコメントを入力...',
-                              filled: true,
-                              fillColor: const Color(0XFFF5F5F7),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (event) {
+                    dragPointerId = event.pointer;
+                    dragStartY = event.position.dy;
+                  },
+                  onPointerUp: (event) {
+                    if (event.pointer != dragPointerId) return;
+                    dragPointerId = null;
+                    final double? startY = dragStartY;
+                    dragStartY = null;
+                    if (startY != null && event.position.dy - startY >= 50) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  onPointerCancel: (event) {
+                    if (event.pointer != dragPointerId) return;
+                    dragPointerId = null;
+                    dragStartY = null;
+                  },
+                  child: Material(
+                    color: Colors.white,
+                    elevation: 24,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    child: SafeArea(
+                      child: Container(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('コメント編集', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.brown)),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 20),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: dialogController,
+                              focusNode: dialogFocusNode,
+                              maxLines: 5,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                hintText: 'この局面のコメントを入力...',
+                                filled: true,
+                                fillColor: const Color(0XFFF5F5F7),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                              onPressed: () {
-                                final text = dialogController.text;
-                                Navigator.pop(context, text.isEmpty ? <String>[] : text.split('\n'));
-                              },
-                              child: const Text('決定', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                                onPressed: () {
+                                  final text = dialogController.text;
+                                  Navigator.pop(context, text.isEmpty ? <String>[] : text.split('\n'));
+                                },
+                                child: const Text('決定', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
