@@ -22,6 +22,10 @@ name: auto-merge
 # マージ後は PR に自動マージの記録コメントを残す。
 # 条件を外れて見送った場合は、理由コメントを1回だけ残す (マーカーで重複防止)。
 #
+# 【v2 修正 2026-11-24】PR #88 で発覚: CI 完了直後は GitHub の mergeable
+# 判定がまだ UNKNOWN で、「マージ不可」と誤判定して見送ってしまった。
+# mergeable は最大約3分ポーリングして確定 (MERGEABLE / CONFLICTING) を待つ。
+#
 # 止め方 (キルスイッチ):
 #   - 個別に止める: Issue から `auto-merge-ok` ラベルを外す
 #   - 全部止める: このワークフローを GitHub の Actions 画面で disable する
@@ -51,7 +55,7 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Find target PR and linked issue
         id: ctx
@@ -98,8 +102,17 @@ jobs:
             fail "PR is draft"
             exit 0
           fi
-          if [ "$(printf '%s' "$meta" | jq -r '.mergeable')" != "MERGEABLE" ]; then
-            fail "PR is not mergeable"
+          mergeable=""
+          for i in 1 2 3 4 5 6 7 8 9; do
+            mergeable=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json mergeable --jq '.mergeable')
+            echo "mergeable check $i: $mergeable"
+            if [ "$mergeable" = "MERGEABLE" ] || [ "$mergeable" = "CONFLICTING" ]; then
+              break
+            fi
+            sleep 20
+          done
+          if [ "$mergeable" != "MERGEABLE" ]; then
+            fail "PR is not mergeable (state: $mergeable)"
             exit 0
           fi
           files=$(printf '%s' "$meta" | jq -r '.changedFiles')
