@@ -1238,7 +1238,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.brown[800],
+                              color: Colors.black87,
                             ),
                           ),
                           TextButton.icon(
@@ -1254,7 +1254,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                               size: 18,
                               color: _isTreeDeleteMode
                                   ? Colors.red[600]
-                                  : Colors.brown[800],
+                                  : Colors.black87,
                             ),
                             label: Text(
                               _isTreeDeleteMode ? '参照モードへ' : '削除モード',
@@ -1263,7 +1263,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                                 fontWeight: FontWeight.bold,
                                 color: _isTreeDeleteMode
                                     ? Colors.red[600]
-                                    : Colors.brown[800],
+                                    : Colors.black87,
                               ),
                             ),
                           ),
