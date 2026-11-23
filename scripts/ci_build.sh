@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # kif-damari の CI ビルド本体 (解析・テスト・署名・APK ビルド・dev リリース公開)。
 # flutter-ci.yml と、opencode.yml の ci-build ジョブの両方から呼ばれる共有スクリプト。
+# 【高速化 2026-11-23】arm64 のみビルド (dev APK は arm64 だけ使うため)。
 # 内容は flutter-ci.yml の従来ステップと同一。片方を変えたら両方の呼び出し側と
 # このファイルの整合を確認すること。
 #
@@ -60,7 +61,7 @@ else
   echo "::warning::KEYSTORE_BASE64 is not set. The APK will be signed with an ephemeral debug key and cannot update previous installs."
 fi
 
-flutter build apk --release --split-per-abi
+flutter build apk --release --target-platform android-arm64  # arm64 のみ (従来は --split-per-abi で3 ABI分ビルドしていた)
 
 mkdir -p build/ci-artifact
 cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/ci-artifact/kifdamari-apk-arm64.apk
