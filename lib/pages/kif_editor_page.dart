@@ -1807,40 +1807,12 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   Future<void> _showEditPlayerNameDialog({required String key, required String currentName}) async {
-    final controller = TextEditingController(
-      text: (currentName == '先手' || currentName == '後手') ? '' : currentName,
-    );
-
     final String? newName = await showDialog<String>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('$keyの氏名変更'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: '$keyの氏名を入力',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'キャンセル',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-              child: const Text(
-                '変更',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
+      builder: (context) => _EditPlayerNameDialogContent(
+        playerKey: key,
+        currentName: currentName,
+      ),
     );
 
     if (newName != null && kifTree != null) {
@@ -2337,5 +2309,160 @@ class _KifEditorPageState extends State<KifEditorPage> {
       temp = temp.parent;
     }
     return false;
+  }
+}
+
+class _EditPlayerNameDialogContent extends StatefulWidget {
+  final String playerKey;
+  final String currentName;
+
+  const _EditPlayerNameDialogContent({
+    super.key,
+    required this.playerKey,
+    required this.currentName,
+  });
+
+  @override
+  State<_EditPlayerNameDialogContent> createState() => _EditPlayerNameDialogContentState();
+}
+
+class _EditPlayerNameDialogContentState extends State<_EditPlayerNameDialogContent> {
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    final currentName = widget.currentName;
+    _controller = TextEditingController(
+      text: (currentName == '先手' || currentName == '後手') ? '' : currentName,
+    );
+    _focusNode.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Color _getLabelColor() {
+    if (_focusNode.hasFocus) {
+      return const Color(0xFF222222);
+    }
+    return const Color(0xFF888888);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28.0),
+        ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${widget.playerKey}の氏名変更',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: '${widget.playerKey}の氏名',
+                  labelStyle: TextStyle(
+                    color: _getLabelColor(),
+                    fontSize: 14,
+                    fontWeight: _focusNode.hasFocus ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  hintText: '${widget.playerKey}の氏名を入力',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 14,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFFAFAFA),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF222222), width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      side: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text(
+                      'キャンセル',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, _controller.text.trim()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF222222),
+                      foregroundColor: Colors.white,
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text(
+                      '変更',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
