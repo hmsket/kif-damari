@@ -3,50 +3,37 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kifdamari/widgets/handicap_selector.dart';
 
 void main() {
-  Future<void> pumpSelector(
-    WidgetTester tester, {
-    String? label,
-    required bool enabled,
-    required ValueChanged<String> onSelected,
-  }) async {
-    await tester.pumpWidget(MaterialApp(
+  Widget buildPickerButton({
+    required String? label,
+    required ValueChanged<String?> onPicked,
+  }) {
+    return MaterialApp(
       home: Scaffold(
-        body: HandicapSelector(
-          label: label,
-          enabled: enabled,
-          onSelected: onSelected,
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            key: const ValueKey('open_handicap_picker'),
+            onPressed: () async {
+              onPicked(await HandicapSelector.pick(context, label: label));
+            },
+            child: const Text('open'),
+          ),
         ),
       ),
-    ));
-    await tester.pumpAndSettle();
+    );
   }
 
-  testWidgets('info に手合割が無い棋譜でも「平手」として表示される', (tester) async {
-    await pumpSelector(
-      tester,
-      label: null,
-      enabled: true,
-      onSelected: (_) {},
-    );
-
-    expect(find.text('手合割'), findsOneWidget);
-    expect(find.text('平手'), findsOneWidget);
-  });
-
-  testWidgets('タップするとプリセット一覧が開き、選ぶと選択がコールバックに渡る', (tester) async {
+  testWidgets('プリセット一覧が開き、選ぶと手合割名が返る', (tester) async {
     String? selected;
-    await pumpSelector(
-      tester,
+    await tester.pumpWidget(buildPickerButton(
       label: null,
-      enabled: true,
-      onSelected: (value) => selected = value,
-    );
+      onPicked: (value) => selected = value,
+    ));
 
-    await tester.tap(find.byKey(const ValueKey('handicap_selector')));
+    await tester.tap(find.byKey(const ValueKey('open_handicap_picker')));
     await tester.pumpAndSettle();
 
     expect(find.text('手合割を選択'), findsOneWidget);
-    expect(find.text('平手'), findsNWidgets(2));
+    expect(find.text('平手'), findsOneWidget);
     expect(find.text('二枚落ち'), findsOneWidget);
     expect(find.text('十枚落ち'), findsOneWidget);
 
@@ -57,21 +44,16 @@ void main() {
     expect(selected, '二枚落ち');
   });
 
-  testWidgets('指し手がある場合は選択できず、その旨が表示される', (tester) async {
-    String? selected;
-    await pumpSelector(
-      tester,
-      label: '平手',
-      enabled: false,
-      onSelected: (value) => selected = value,
-    );
+  testWidgets('現在の手合割にはチェックが付く', (tester) async {
+    await tester.pumpWidget(buildPickerButton(
+      label: '二枚落ち',
+      onPicked: (_) {},
+    ));
 
-    expect(find.text('指し手があるため変更できません'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('handicap_selector')));
+    await tester.tap(find.byKey(const ValueKey('open_handicap_picker')));
     await tester.pumpAndSettle();
 
-    expect(find.text('手合割を選択'), findsNothing);
-    expect(selected, isNull);
+    expect(find.text('二枚落ち'), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
   });
 }

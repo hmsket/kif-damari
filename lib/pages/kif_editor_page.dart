@@ -1062,6 +1062,13 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     onPressed: _saveKifData,
                   ),
                   MenuItemButton(
+                    leadingIcon: const Icon(Icons.swap_horiz, size: 20),
+                    onPressed: kifTree!.canChangeHandicap ? _selectHandicap : null,
+                    child: kifTree!.canChangeHandicap
+                        ? const Text('手合割を変更')
+                        : Text('手合割：${kifTree!.info['手合割'] ?? '平手'}（変更不可）'),
+                  ),
+                  MenuItemButton(
                     leadingIcon: const Icon(Icons.account_tree, size: 20),
                     child: const Text('棋譜ツリーを表示'),
                     onPressed: () {
@@ -1486,11 +1493,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     isSente: !_isReversed,
                     isUpper: false,
                   ),
-                  HandicapSelector(
-                    label: kifTree!.info['手合割'],
-                    enabled: kifTree!.canChangeHandicap,
-                    onSelected: _applyHandicap,
-                  ),
                   Expanded(
                     child: Stack(
                       children: [
@@ -1849,6 +1851,16 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _checkSaveStatus();
       });
     }
+  }
+
+  Future<void> _selectHandicap() async {
+    if (kifTree == null || !kifTree!.canChangeHandicap) return;
+    final String? selected = await HandicapSelector.pick(
+      context,
+      label: kifTree?.info['手合割'],
+    );
+    if (selected == null || !mounted) return;
+    _applyHandicap(selected);
   }
 
   void _applyHandicap(String label) {
