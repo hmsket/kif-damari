@@ -103,11 +103,12 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
     final built = await IntegratedTreeService.buildTreeFromRoot(widget.rootPosition);
     if (!mounted) return;
 
-    // 指定局面があればそこを現在地にする（根から現在地までの分岐選択も整える）
+    // 指定局面があればそこまでの経路を読み足して現在地にする（分岐選択も整える）
     GameNode? initial = built?.root;
     final initialKey = widget.initialPositionKey;
-    if (built != null && initialKey != null) {
-      final found = _findNodeByKey(built.root, initialKey);
+    if (built != null && initialKey != null && initialKey != built.root.positionKey) {
+      final found = await IntegratedTreeService.loadPathToPosition(built, initialKey);
+      if (!mounted) return;
       if (found != null) {
         initial = found;
         GameNode temp = found;
@@ -126,15 +127,12 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
     });
   }
 
-  /// ツリー内から positionKey が一致する最初のノードを探す（幅優先）
-  static GameNode? _findNodeByKey(GameNode root, String positionKey) {
-    final queue = <GameNode>[root];
-    while (queue.isNotEmpty) {
-      final node = queue.removeAt(0);
-      if (node.positionKey == positionKey) return node;
-      queue.addAll(node.nextNodes);
-    }
-    return null;
+  /// 現在地の先（子ノード）を必要な時に読み足す。
+  void _loadChildrenOf(GameNode node) async {
+    final t = tree;
+    if (t == null) return;
+    final added = await IntegratedTreeService.loadChildren(t, node);
+    if (added && mounted) setState(() {});
   }
 
   bool get _hasLoadError => !_isLoading && tree == null;
@@ -227,6 +225,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       }
       _isRightSidebarOpen = false;
     });
+    _loadChildrenOf(node);
   }
 
   void _clearSelectionState() {
@@ -250,6 +249,7 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       current = node.parent;
       _clearSelectionState();
     });
+    _loadChildrenOf(node.parent!);
   }
 
   void _jumpToRoot() {
@@ -260,15 +260,24 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       }
       _clearSelectionState();
     });
+    _loadChildrenOf(current!);
   }
 
-  void _jumpToLast() {
-    if (current == null) return;
+  Future<void> _jumpToLast() async {
+    final t = tree;
+    final start = current;
+    if (t == null || start == null) return;
+    GameNode node = start;
+
+    // 辿る先の枝をその都度読み足しながら、最後の局面まで進む
+    while (true) {
+      await IntegratedTreeService.loadChildren(t, node);
+      if (node.nextNodes.isEmpty) break;
+      node = node.nextNodes[node.selectedBranchIndex];
+    }
+    if (!mounted) return;
     setState(() {
-      while (current!.nextNodes.isNotEmpty) {
-        final node = current!;
-        current = node.nextNodes[node.selectedBranchIndex];
-      }
+      current = node;
       _clearSelectionState();
     });
   }
@@ -312,7 +321,11 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
 
     final positionId = positionKey == null ? null : tree!.positionIdByKey[positionKey];
     if (positionId == null) return;
-    final saved = await IntegratedTreeService.savePositionComment(positionId, result.join('\n'));
+    final comment = result.join('\n');
+    final saved = await IntegratedTreeService.savePositionComment(positionId, comment);
+    if (saved && tree != null) {
+      tree!.positionCommentById[positionId] = comment;
+    }
     if (!saved && mounted) {
       ShowErrorSnackbar.show(context, 'コメントの保存に失敗しました');
     }
@@ -370,6 +383,9 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       if (mounted) ShowErrorSnackbar.show(context, '局面の削除に失敗しました');
       return;
     }
+
+    // 後から同じ局面を読み足したときにコメントが復活しないよう、保持値も消す
+    t.positionCommentById[toId] = '';
 
     setState(() {
       parent.nextNodes.remove(node);
@@ -821,6 +837,11 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
     final parentNode = current;
     if (t == null || parentNode == null) return;
 
+    // 親の子を先に読み込んでおき、既存枝の重複生成を防ぐ
+    final loaded = await IntegratedTreeService.loadChildren(t, parentNode);
+    if (!mounted) return;
+    if (loaded) setState(() {});
+
     final parentKey = parentNode.positionKey;
     final parentPositionId = parentKey == null ? null : t.positionIdByKey[parentKey];
     if (parentPositionId == null) {
@@ -855,6 +876,8 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
       parentNode.selectedBranchIndex = parentNode.nextNodes.length - 1;
       if (child.positionKey != null) {
         t.positionIdByKey[child.positionKey!] = childPositionId;
+        t.positionKeyById[childPositionId] = child.positionKey!;
+        t.positionCommentById[childPositionId] = '';
       }
       current = child;
       _clearSelectionState();
@@ -910,10 +933,12 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
     while (_dialAccumulator >= threshold) {
       if (current!.nextNodes.isNotEmpty) {
         final node = current!;
+        final next = node.nextNodes[node.selectedBranchIndex];
         setState(() {
-          current = node.nextNodes[node.selectedBranchIndex];
+          current = next;
           _clearSelectionState();
         });
+        _loadChildrenOf(next);
         HapticFeedback.selectionClick();
       }
       _dialAccumulator -= threshold;
@@ -921,10 +946,12 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
 
     while (_dialAccumulator <= -threshold) {
       if (current!.parent != null) {
+        final parent = current!.parent!;
         setState(() {
-          current = current!.parent;
+          current = parent;
           _clearSelectionState();
         });
+        _loadChildrenOf(parent);
         HapticFeedback.selectionClick();
       }
       _dialAccumulator += threshold;
