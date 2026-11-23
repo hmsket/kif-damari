@@ -221,8 +221,6 @@ void _showEditNameDialog() {
                                       _updateImage(); 
                                     },
                             ),
-                            const Divider(height: 1),
-
                             // 对局者名編集ボタン
                             ListTile(
                               contentPadding: EdgeInsets.zero,
@@ -242,8 +240,6 @@ void _showEditNameDialog() {
                               ),
                               onTap: _showPlayerNames ? _showEditNameDialog : null,
                             ),
-                            const Divider(height: 1),
-
                             // 最終手強調トグル
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,

@@ -55,7 +55,6 @@ class HomeDrawer extends StatelessWidget {
           ),
           // 局面管理（③統合ツリーの入口）
           const SizedBox(height: 8),
-          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.account_tree),
             title: const Text('統合ツリー'),
@@ -69,7 +68,6 @@ class HomeDrawer extends StatelessWidget {
               );
             },
           ),
-          const Divider(height: 1),
           // 局面検索（①検索ロジックとパターン編集画面）
           ListTile(
             leading: const Icon(Icons.search),
@@ -84,7 +82,6 @@ class HomeDrawer extends StatelessWidget {
               );
             },
           ),
-          const Divider(height: 1),
           const Padding(
             padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
             child: Text(

@@ -572,7 +572,6 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                         ],
                       ),
                     ),
-                    const Divider(height: 1),
                     Expanded(
                       child: KifTreeView(
                         rootNode: kifTree!.root,

@@ -1564,7 +1564,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
                             ],
                           ),
                         ),
-                        const Divider(height: 1),
                         Expanded(
                           child: KifTreeView(
                             rootNode: kifTree!.root,

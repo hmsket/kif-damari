@@ -81,9 +81,7 @@ class DefaultColorSetting extends StatelessWidget {
                     modeTile(KifColors.modeFixed),
                     modeTile(KifColors.modeRandom),
                     if (mode == KifColors.modeFixed) ...[
-                      const SizedBox(height: 8),
-                      const Divider(height: 1),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,

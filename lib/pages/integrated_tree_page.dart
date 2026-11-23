@@ -1278,7 +1278,6 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
                         ],
                       ),
                     ),
-                    const Divider(height: 1),
                     Expanded(
                       child: KifTreeView(
                         rootNode: tree!.root,
