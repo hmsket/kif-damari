@@ -29,12 +29,21 @@ class IntegratedTreeRootSummary {
   });
 }
 
-/// 統合ツリーを根から展開したもの（ゲームプレイ用の positionId 対応表を含む）
+/// 統合ツリーを根から展開したもの（読み込んだ範囲だけを保持する）
 class IntegratedTree {
   final GameNode root;
-  final Map<String, int> positionIdByKey;
 
-  const IntegratedTree(this.root, this.positionIdByKey);
+  /// 読み済みの局面の positionKey -> positionId 対応表
+  final Map<String, int> positionIdByKey = {};
+
+  /// 子の読み込みに使う、読み済み局面の内部情報
+  final Map<int, String> positionKeyById = {};
+  final Map<int, String> positionCommentById = {};
+
+  /// 子を読み込み済みのノード（同一性で判定）
+  final Set<GameNode> expandedNodes = Set<GameNode>.identity();
+
+  IntegratedTree(this.root);
 }
 
 class IntegratedTreeService {
@@ -320,87 +329,149 @@ class IntegratedTreeService {
     }
   }
 
-  /// 指定した根から統合ツリーをメモリ上に展開する。
-  /// 合流はツリーの複製として展開し、祖先に戻るエッジ（＝循環）のみスキップする。
+  /// 指定した根から統合ツリーを開く。
+  /// 最初は根とその子だけを読み込み、それより先は [loadChildren] で必要な時に読み足す。
   static Future<IntegratedTree?> buildTreeFromRoot(PositionEntity root) async {
     try {
-      final rootState = SfenGenerator.stateFromKey(root.positionKey);
-      final rootNode = GameNode(
+      final rootNode = GameNode.fromPositionKey(
         moveNumber: 0,
-        state: rootState,
         moveLabel: '開始局面',
+        key: root.positionKey,
       );
-      rootNode.positionKey = root.positionKey;
+      // 根の盤面は開いてすぐ表示するためだけを先に解析する
+      rootNode.state = SfenGenerator.stateFromKey(root.positionKey);
+
+      final tree = IntegratedTree(rootNode);
+      tree.positionIdByKey[root.positionKey] = root.id!;
+      tree.positionKeyById[root.id!] = root.positionKey;
+      tree.positionCommentById[root.id!] = root.comment;
       _applyPositionCommentsToNode(rootNode, root.comment);
 
-      final positionIdByKey = <String, int>{root.positionKey: root.id!};
-      final positionKeyById = <int, String>{root.id!: root.positionKey};
-      final positionCommentById = <int, String>{root.id!: root.comment};
-
-      var frontier = <GameNode>[rootNode];
-      final transitionDao = TransitionDao();
-      final positionDao = PositionDao();
-
-      int nodeCount = 1;
-      while (frontier.isNotEmpty) {
-        if (nodeCount > 20000) break;
-
-        final fromIds = frontier
-            .map((node) => positionIdByKey[node.positionKey!])
-            .whereType<int>()
-            .toSet()
-            .toList();
-        if (fromIds.isEmpty) break;
-
-        final edges = await transitionDao.getByFromPositionIds(fromIds);
-
-        // 未取得の子局面を読み込む
-        final newToIds = edges.map((e) => e.toPositionId).where((id) => !positionKeyById.containsKey(id)).toSet().toList();
-        if (newToIds.isNotEmpty) {
-          final toPositions = await positionDao.getByIds(newToIds);
-          for (final position in toPositions) {
-            positionKeyById[position.id!] = position.positionKey;
-            positionIdByKey[position.positionKey] = position.id!;
-            positionCommentById[position.id!] = position.comment;
-          }
-        }
-
-        final edgesByFrom = <int, List<TransitionEntity>>{};
-        for (final edge in edges) {
-          edgesByFrom.putIfAbsent(edge.fromPositionId, () => []).add(edge);
-        }
-
-        final nextFrontier = <GameNode>[];
-        for (final node in frontier) {
-          final fromId = positionIdByKey[node.positionKey!]!;
-          final children = edgesByFrom[fromId] ?? const [];
-          for (final edge in children) {
-            final toKey = positionKeyById[edge.toPositionId];
-            if (toKey == null) continue;
-
-            // 循環（祖先へ戻る枝）のみスキップ。合流由来の複製は許す
-            if (_hasAncestorWithKey(node, toKey)) continue;
-
-            final child = GameNode(
-              moveNumber: node.moveNumber + 1,
-              state: SfenGenerator.stateFromKey(toKey),
-              moveLabel: edge.moveLabel,
-            );
-            child.positionKey = toKey;
-            _applyPositionCommentsToNode(child, positionCommentById[edge.toPositionId] ?? '');
-            node.addChild(child);
-            nextFrontier.add(child);
-            nodeCount++;
-          }
-        }
-        frontier = nextFrontier;
-      }
-
-      return IntegratedTree(rootNode, positionIdByKey);
+      await loadChildren(tree, rootNode);
+      return tree;
     } catch (e) {
       debugPrint('統合ツリーの構築に失敗しました: $e');
       return null;
     }
+  }
+
+  /// ノードの子（その先の局面）を読み足す。新たに子を追加した場合だけ true を返す。
+  /// 合流はツリーの複製として展開し、祖先に戻るエッジ（＝循環）のみスキップする。
+  static Future<bool> loadChildren(IntegratedTree tree, GameNode node) async {
+    if (tree.expandedNodes.contains(node)) return false;
+    tree.expandedNodes.add(node);
+
+    try {
+      final fromId = tree.positionIdByKey[node.positionKey];
+      if (fromId == null) return false;
+
+      final edges = await TransitionDao().getByFromPositionIds([fromId]);
+      if (edges.isEmpty) return false;
+
+      final newToIds = edges
+          .map((e) => e.toPositionId)
+          .where((id) => !tree.positionKeyById.containsKey(id))
+          .toSet()
+          .toList();
+      if (newToIds.isNotEmpty) {
+        final toPositions = await PositionDao().getByIds(newToIds);
+        for (final position in toPositions) {
+          tree.positionKeyById[position.id!] = position.positionKey;
+          tree.positionIdByKey[position.positionKey] = position.id!;
+          tree.positionCommentById[position.id!] = position.comment;
+        }
+      }
+
+      var added = false;
+      for (final edge in edges) {
+        final toKey = tree.positionKeyById[edge.toPositionId];
+        if (toKey == null) continue;
+
+        // 循環（祖先へ戻る枝）のみスキップ。合流由来の複製は許す
+        if (_hasAncestorWithKey(node, toKey)) continue;
+
+        final child = GameNode.fromPositionKey(
+          moveNumber: node.moveNumber + 1,
+          moveLabel: edge.moveLabel,
+          key: toKey,
+        );
+        _applyPositionCommentsToNode(
+          child,
+          tree.positionCommentById[edge.toPositionId] ?? '',
+        );
+        node.addChild(child);
+        added = true;
+      }
+      return added;
+    } catch (e) {
+      tree.expandedNodes.remove(node);
+      debugPrint('統合ツリーの子局面の読み込みに失敗しました: $e');
+      return false;
+    }
+  }
+
+  /// 局面検索から開いたときの現在地まで、DB の枝を辿って経路上のノードを読み足す。
+  static Future<GameNode?> loadPathToPosition(IntegratedTree tree, String targetKey) async {
+    try {
+      final path = await _findKeyPath(tree, targetKey);
+      if (path == null) return null;
+
+      var node = tree.root;
+      for (int i = 1; i < path.length; i++) {
+        await loadChildren(tree, node);
+        GameNode? next;
+        for (final child in node.nextNodes) {
+          if (child.positionKey == path[i]) {
+            next = child;
+            break;
+          }
+        }
+        if (next == null) return null;
+        node = next;
+      }
+      // 現在地の枝も選べるよう、その先だけ読み足す
+      await loadChildren(tree, node);
+      return node;
+    } catch (e) {
+      debugPrint('統合ツリーの現在地の読み込みに失敗しました: $e');
+      return null;
+    }
+  }
+
+  /// 根から対象局面までの positionKey 列を、枝を遡って求める（根のみなら [根キー]）。
+  static Future<List<String>?> _findKeyPath(IntegratedTree tree, String targetKey) async {
+    final rootId = tree.positionIdByKey[tree.root.positionKey];
+    if (rootId == null) return null;
+    if (targetKey == tree.root.positionKey) return <String>[targetKey];
+
+    final target = await PositionDao().getByKey(targetKey);
+    if (target?.id == null) return null;
+
+    final transitionDao = TransitionDao();
+    final positionDao = PositionDao();
+    final visited = <int>{target.id!};
+    final queue = <(int, List<String>)>[(target.id!, <String>[targetKey])];
+    int head = 0;
+
+    while (head < queue.length && queue.length < 100000) {
+      final (currentId, path) = queue[head++];
+      final incoming = await transitionDao.getByToPositionId(currentId);
+      final parentIds = incoming
+          .map((e) => e.fromPositionId)
+          .where((id) => !visited.contains(id))
+          .toSet()
+          .toList();
+      if (parentIds.isEmpty) continue;
+
+      final parents = await positionDao.getByIds(parentIds);
+      for (final parent in parents) {
+        if (parent.id == null || !visited.add(parent.id!)) continue;
+        final newPath = <String>[parent.positionKey, ...path];
+        if (parent.id == rootId) return newPath;
+        queue.add((parent.id!, newPath));
+      }
+    }
+    return null;
   }
 
   static bool _hasAncestorWithKey(GameNode node, String key) {
