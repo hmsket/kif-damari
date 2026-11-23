@@ -1169,62 +1169,63 @@ class _KifEditorPageState extends State<KifEditorPage> {
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.all(12.0),
-              child: Stack(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Positioned.fill(
+                  Expanded(
                     child: IgnorePointer(
                       child: SingleChildScrollView(
                         physics: const NeverScrollableScrollPhysics(),
-                        child: Text(
-                          currentText.isEmpty
-                              ? (showPositionMemo
-                                  ? 'タップしてこの局面のメモを入力'
-                                  : 'タップして棋譜コメントを入力')
-                              : currentText,
-                          style: TextStyle(
-                            fontSize: settings.get<double>('fontSize'),
-                            color: currentText.isEmpty ? Colors.grey[400] : Colors.black87,
-                          ),
-                          strutStyle: StrutStyle(
-                            fontSize: settings.get<double>('fontSize'),
-                            height: 1.5,
-                            forceStrutHeight: true,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12.0),
+                          child: Text(
+                            currentText.isEmpty
+                                ? (showPositionMemo
+                                    ? 'タップしてこの局面のメモを入力'
+                                    : 'タップして棋譜コメントを入力')
+                                : currentText,
+                            style: TextStyle(
+                              fontSize: settings.get<double>('fontSize'),
+                              color: currentText.isEmpty ? Colors.grey[400] : Colors.black87,
+                            ),
+                            strutStyle: StrutStyle(
+                              fontSize: settings.get<double>('fontSize'),
+                              height: 1.5,
+                              forceStrutHeight: true,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  Positioned(
-                    top: 0,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.75),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        showPositionMemo ? 'この局面のメモ' : '棋譜コメント',
-                        style: TextStyle(fontSize: 10, color: Colors.grey[700]),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _CommentFace.values
-                            .map(
-                              (face) => Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 3),
-                                child: _buildCommentFaceDot(face, hasPositionMemo),
-                              ),
-                            )
-                            .toList(),
-                      ),
+                  SizedBox(
+                    height: 20,
+                    child: Row(
+                      children: [
+                        const Spacer(),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _CommentFace.values
+                              .map(
+                                (face) => Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  child: _buildCommentFaceDot(face, hasPositionMemo),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              showPositionMemo ? 'この局面のメモ' : '棋譜コメント',
+                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
