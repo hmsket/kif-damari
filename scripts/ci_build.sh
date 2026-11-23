@@ -61,7 +61,7 @@ else
   echo "::warning::KEYSTORE_BASE64 is not set. The APK will be signed with an ephemeral debug key and cannot update previous installs."
 fi
 
-flutter build apk --release --target-platform android-arm64  # arm64 のみ (従来は --split-per-abi で3 ABI分ビルドしていた)
+flutter build apk --release --split-per-abi --target-platform android-arm64  # arm64 のみ (従来は --split-per-abi で3 ABI分ビルドしていた)
 
 mkdir -p build/ci-artifact
 cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/ci-artifact/kifdamari-apk-arm64.apk
