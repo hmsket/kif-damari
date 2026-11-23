@@ -505,6 +505,8 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
         : '開始局面';
 
     return Positioned(
+      // 💡 表示範囲の変化で子リストが入れ替わっても、ノードごとの状態を維持する
+      key: ValueKey<GameNode>(node),
       left: left,
       top: top,
       width: nodeWidth,
