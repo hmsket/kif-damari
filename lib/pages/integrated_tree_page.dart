@@ -265,8 +265,9 @@ class _IntegratedTreePageState extends State<IntegratedTreePage>
 
   Future<void> _jumpToLast() async {
     final t = tree;
-    var node = current;
-    if (t == null || node == null) return;
+    final start = current;
+    if (t == null || start == null) return;
+    GameNode node = start;
 
     // 辿る先の枝をその都度読み足しながら、最後の局面まで進む
     while (true) {

@@ -449,8 +449,8 @@ class IntegratedTreeService {
 
     final transitionDao = TransitionDao();
     final positionDao = PositionDao();
-    final visited = <int>{target.id!};
-    final queue = <(int, List<String>)>[(target.id!, <String>[targetKey])];
+    final visited = <int>{target!.id!};
+    final queue = <(int, List<String>)>[(target!.id!, <String>[targetKey])];
     int head = 0;
 
     while (head < queue.length && queue.length < 100000) {
