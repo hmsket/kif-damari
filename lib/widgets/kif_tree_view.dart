@@ -41,6 +41,11 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
   static const double columnWidth = 95.0; // 分岐（横方向）の間隔
   static const double nodeWidth = 75.0;   // ノード（ボタン）の幅
   static const double nodeHeight = 50.0;  // ノード（ボタン）の高さ
+  static const double scenePadding = 30.0; // ツリー全体の余白（Container.padding と同値）
+
+  // 💡 画面外ノードのウィジェット化を省く際の余白（スクロール中に
+  // 画面へ入る直前に組み立てておき、表示の欠落やちらつきを防ぐ）
+  static const double cullingMargin = 200.0;
 
   // 💡 スクロール挙動の調整用定数
   // ドラッグ移動の倍率は設定「treeScrollSpeed」から読み込む（既定値 2.0）
@@ -148,6 +153,46 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
   /// コンテンツ全体の論理サイズ（InteractiveViewerのchildと同じ値）
   double get contentWidth => (maxColumn + 1) * columnWidth + 120;
   double get contentHeight => (maxRow + 1) * rowHeight + 120;
+
+  /// 現在の変換行列とビューポートから、画面に見えているシーン座標の矩形を求める。
+  /// 表示範囲に cullingMargin を足し、スクロール直前にノードを組み立てておく。
+  Rect _visibleSceneRect(Size viewportSize, Matrix4 matrix) {
+    if (viewportSize.isEmpty) {
+      return Rect.fromLTWH(
+        -cullingMargin,
+        -cullingMargin,
+        cullingMargin * 2,
+        cullingMargin * 2,
+      );
+    }
+    final Matrix4 inverse = Matrix4.inverted(matrix);
+    return MatrixUtils.transformRect(
+      inverse,
+      Offset.zero & viewportSize,
+    ).inflate(cullingMargin);
+  }
+
+  /// ノード（影・×ボタンを含む少し広めの矩形）が表示範囲と重なるか判定する。
+  bool _isNodeVisible(Point<double> pos, Rect visibleRect) {
+    final double left = scenePadding + pos.x * columnWidth;
+    final double top = scenePadding + pos.y * rowHeight;
+    return Rect.fromLTWH(
+      left - 8.0,
+      top - 8.0,
+      nodeWidth + 16.0,
+      nodeHeight + 16.0,
+    ).overlaps(visibleRect);
+  }
+
+  /// LayoutBuilder の制約からビューポートサイズを求める。
+  /// 制約が無限（親がスクロール可能など）の場合は画面サイズで代用する。
+  Size _resolveViewportSize(BuildContext context, BoxConstraints constraints) {
+    final Size fallback = MediaQuery.maybeSizeOf(context) ?? const Size(800, 600);
+    return Size(
+      constraints.hasBoundedWidth ? constraints.maxWidth : fallback.width,
+      constraints.hasBoundedHeight ? constraints.maxHeight : fallback.height,
+    );
+  }
 
   // 💡 ドラッグ（パン）と慣性スクロールの自前処理
   // InteractiveViewer標準のパンは panEnabled: false で無効化し、
@@ -441,6 +486,135 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     return subtreeWidths[node]!;
   }
 
+  Widget _buildNodeWidget(GameNode node, Point<double> pos) {
+    final double left = pos.x * columnWidth;
+    final double top = pos.y * rowHeight;
+
+    final bool isCurrent = node == widget.currentNode;
+    final bool hasBranch = node.nextNodes.length > 1;
+    final bool isRoot = node.moveNumber == 0;
+
+    // 💡 修正点: 1手前（親ノード）の着手先座標を取得して「同」の判定に引き渡す
+    final parentState = node.parent?.state;
+    final String label = node.moveLabel != null && node.moveLabel!.isNotEmpty
+        ? KifParser.convertToJapanese(
+            node.moveLabel!,
+            lastToX: parentState?.lastMoveToX,
+            lastToY: parentState?.lastMoveToY,
+          )
+        : '開始局面';
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: nodeWidth,
+      height: nodeHeight,
+      child: GestureDetector(
+        onTap: () => widget.onNodeSelected(node),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: isCurrent && !widget.flatNodeCards
+                ? Colors.orange[300]
+                : Colors.white,
+            border: Border.all(
+              color: isCurrent ? Colors.orange[800]! : Colors.grey[400]!,
+              width: isCurrent ? 2.5 : 1.5,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: widget.flatNodeCards
+                ? null
+                : isCurrent
+                    ? [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.4),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
+                        )
+                      ],
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    isRoot ? '0手目' : '${node.moveNumber}手目',
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: isCurrent ? Colors.brown[900] : Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    isRoot ? '開始局面' : label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      color: isCurrent ? Colors.black : Colors.brown[900],
+                    ),
+                  ),
+                ],
+              ),
+              // 💡 分岐アイコン（×ボタンと重ならないよう左上に配置）
+              if (hasBranch && !isCurrent && widget.showBranchIcon)
+                const Positioned(
+                  top: 2,
+                  left: 2,
+                  child: Icon(
+                    Icons.alt_route,
+                    size: 10,
+                    color: Colors.orange,
+                  ),
+                ),
+              // 💡 コメント付き局面ノードの印（青い吹き出し・右上に配置）
+              if (node.comments.isNotEmpty || node.positionComments.isNotEmpty)
+                const Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Icon(
+                    Icons.chat_bubble,
+                    size: 10,
+                    color: Colors.blue,
+                  ),
+                ),
+              // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
+              if (!isRoot && widget.onNodeDeleted != null)
+                Positioned(
+                  top: -5,
+                  right: -5,
+                  child: GestureDetector(
+                    onTap: () => widget.onNodeDeleted!(node),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4), // タップ領域の確保
+                      child: Icon(
+                        Icons.cancel,
+                        size: 20,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (nodePositions.isEmpty) {
@@ -449,170 +623,58 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
 
     // 💡 標準のパン（panEnabled: false で無効化）の代わりに、上側の Listener で
     // ドラッグ移動（設定のスクロール速度倍）と慣性スクロールを自前処理する。
-    final Widget tree = InteractiveViewer(
-      transformationController: _transformationController, // コントローラーを紐付け
-      boundaryMargin: const EdgeInsets.all(treeBoundaryMargin), 
-      minScale: 0.1, 
-      maxScale: 2.0,
-      constrained: false, 
-      panEnabled: false, // 💡 パンは自前処理（ピンチズームは標準のまま）
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque, 
-        child: Container(
-          width: contentWidth,
-          height: contentHeight,
-          padding: const EdgeInsets.all(30.0),
-          color: Colors.transparent, 
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: KifTreePainter(
-                    nodePositions: nodePositions,
-                    rowHeight: rowHeight,
-                    columnWidth: columnWidth,
-                    nodeWidth: nodeWidth,
-                    nodeHeight: nodeHeight,
-                    currentNode: widget.currentNode,
-                  ),
-                ),
-              ),
-              ...nodePositions.entries.map((entry) {
-                final node = entry.key;
-                final pos = entry.value;
-
-                final double left = pos.x * columnWidth;
-                final double top = pos.y * rowHeight;
-
-                final bool isCurrent = node == widget.currentNode;
-                final bool hasBranch = node.nextNodes.length > 1;
-                final bool isRoot = node.moveNumber == 0;
-
-                // 💡 修正点: 1手前（親ノード）の着手先座標を取得して「同」の判定に引き渡す
-                final parentState = node.parent?.state;
-                final String label = node.moveLabel != null && node.moveLabel!.isNotEmpty
-                    ? KifParser.convertToJapanese(
-                        node.moveLabel!,
-                        lastToX: parentState?.lastMoveToX,
-                        lastToY: parentState?.lastMoveToY,
-                      )
-                    : '開始局面';
-
-                return Positioned(
-                  left: left,
-                  top: top,
-                  width: nodeWidth,
-                  height: nodeHeight,
-                  child: GestureDetector(
-                    onTap: () => widget.onNodeSelected(node),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      decoration: BoxDecoration(
-                        color: isCurrent && !widget.flatNodeCards
-                            ? Colors.orange[300]
-                            : Colors.white,
-                        border: Border.all(
-                          color: isCurrent ? Colors.orange[800]! : Colors.grey[400]!,
-                          width: isCurrent ? 2.5 : 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: widget.flatNodeCards
-                            ? null
-                            : isCurrent
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.orange.withOpacity(0.4),
-                                      blurRadius: 6,
-                                      spreadRadius: 1,
-                                    )
-                                  ]
-                                : [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 2,
-                                      offset: const Offset(0, 1),
-                                    )
-                                  ],
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                isRoot ? '0手目' : '${node.moveNumber}手目',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: isCurrent ? Colors.brown[900] : Colors.grey[600],
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                isRoot ? '開始局面' : label,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                                  color: isCurrent ? Colors.black : Colors.brown[900],
-                                ),
-                              ),
-                            ],
+    final Widget tree = LayoutBuilder(
+      builder: (context, constraints) {
+        final Size viewportSize = _resolveViewportSize(context, constraints);
+        return InteractiveViewer(
+          transformationController: _transformationController, // コントローラーを紐付け
+          boundaryMargin: const EdgeInsets.all(treeBoundaryMargin),
+          minScale: 0.1,
+          maxScale: 2.0,
+          constrained: false,
+          panEnabled: false, // 💡 パンは自前処理（ピンチズームは標準のまま）
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: contentWidth,
+              height: contentHeight,
+              padding: const EdgeInsets.all(scenePadding),
+              color: Colors.transparent,
+              // 💡 変換行列の変化（パン・ズーム）に合わせて表示範囲だけを再構築する
+              child: AnimatedBuilder(
+                animation: _transformationController,
+                builder: (context, _) {
+                  final Rect visibleRect = _visibleSceneRect(
+                    viewportSize,
+                    _transformationController.value,
+                  );
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: KifTreePainter(
+                            nodePositions: nodePositions,
+                            rowHeight: rowHeight,
+                            columnWidth: columnWidth,
+                            nodeWidth: nodeWidth,
+                            nodeHeight: nodeHeight,
+                            currentNode: widget.currentNode,
                           ),
-                          // 💡 分岐アイコン（×ボタンと重ならないよう左上に配置）
-                          if (hasBranch && !isCurrent && widget.showBranchIcon)
-                            const Positioned(
-                              top: 2,
-                              left: 2,
-                              child: Icon(
-                                Icons.alt_route,
-                                size: 10,
-                                color: Colors.orange,
-                              ),
-                            ),
-                          // 💡 コメント付き局面ノードの印（青い吹き出し・右上に配置）
-                          if (node.comments.isNotEmpty || node.positionComments.isNotEmpty)
-                            const Positioned(
-                              top: 2,
-                              right: 2,
-                              child: Icon(
-                                Icons.chat_bubble,
-                                size: 10,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
-                          if (!isRoot && widget.onNodeDeleted != null)
-                            Positioned(
-                              top: -5,
-                              right: -5,
-                              child: GestureDetector(
-                                onTap: () => widget.onNodeDeleted!(node),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(4), // タップ領域の確保
-                                  child: Icon(
-                                    Icons.cancel,
-                                    size: 20,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }),
-            ],
+                      // 💡 画面に見えている範囲（＋余白）のノードだけをウィジェット化する
+                      ...nodePositions.entries
+                          .where((entry) => _isNodeVisible(entry.value, visibleRect))
+                          .map((entry) => _buildNodeWidget(entry.key, entry.value)),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     // 💡 InteractiveViewer自身のパンは無効なので、指の動きを直接受け取って
