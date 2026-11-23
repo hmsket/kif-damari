@@ -1380,7 +1380,6 @@ class _KifEditorPageState extends State<KifEditorPage> {
         _handleBackNavigation();
       },
       child: Scaffold(
-        backgroundColor: const Color(0XFFF1F1F5),
         resizeToAvoidBottomInset: false,
         appBar: AppBar(
           leading: IconButton(
