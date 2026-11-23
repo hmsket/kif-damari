@@ -6,6 +6,12 @@ name: flutter-ci
 #   https://github.com/hmsket/kif-damari/releases/download/dev/kifdamari.apk
 # 署名: Secrets に KEYSTORE_BASE64 / KEY_ALIAS / KEY_PASSWORD / STORE_PASSWORD が
 #   設定されていればそのキーストアで署名し、上書きインストールで更新できる。
+#
+# 【高速化 2026-11-23】
+#  1) Flutter を 3.47.9 に固定 (従来は channel: stable = 最新)。
+#     ci_build.sh も 3.47.9 固定なので、従来は「最新を入れてから
+#     3.47.9 を clone し直す」二重ダウンロードになっていた。
+#  2) setup-java に cache: gradle を追加 (Gradle の依存関係をキャッシュ)。
 
 on:
   pull_request:
@@ -28,11 +34,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: "3.47.9"
           cache: true
 
       - name: Run CI build (shared script)
