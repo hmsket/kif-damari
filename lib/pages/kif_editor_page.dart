@@ -1179,7 +1179,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                           currentText.isEmpty
                               ? (showPositionMemo
                                   ? 'タップしてこの局面のメモを入力'
-                                  : 'タップしてこの局面のコメントを入力')
+                                  : 'タップして棋譜コメントを入力')
                               : currentText,
                           style: TextStyle(
                             fontSize: settings.get<double>('fontSize'),
