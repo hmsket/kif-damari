@@ -1,0 +1,93 @@
+name: spiral-next
+
+# スパイラルキュー: 前の PR がマージされたら、次のドラフト Issue を
+# 自動で放出 (opencode ラベル付与) してスパイラルを回し続ける。
+#
+# 運用:
+#   - 在庫のドラフト Issue には `spiral-queue` ラベルを付けておく (発火しない)。
+#   - 低リスクなものには最初から `auto-merge-ok` も付けておいてよい
+#     (PR ができるまでは無害で、自動マージの判定は PR 側で行われる)。
+#   - 放出は番号の小さい順 (先入れ先出し)。
+#
+# 放出条件 (すべて満たすときだけ):
+#   1. トリガーが「PR のマージ」である (手動実行 workflow_dispatch でも可)
+#   2. 稼働中ではない: opencode ワークフローの実行中 run がなく、
+#      opencode/* ブランチの open な PR もない
+#      (マージされずに残った Issue があっても、PR が無ければ止まらない)
+#   3. `spiral-queue` 付きで `opencode` 未付与の open Issue が存在する
+#
+# 放出時は PAT でラベルを付ける。PAT (実ユーザー) の labeled イベントは
+# auto-fire.yml を起動できる (GITHUB_TOKEN のイベントは他ワークフローを
+# 起動できないため、ここでは PAT が必須)。
+# ラベルが付いたら auto-fire が発火コメントを投稿し、エージェントが走る。
+#
+# 止め方:
+#   - 個別: Issue から `spiral-queue` ラベルを外す
+#   - 全体: このワークフローを disable する
+#   - なお、放出された Issue の PR がマージされなければ次は放出されない
+#     (CI 自動修正が2回で打ち切る場合も同様に止まる = 安全な止まり方)。
+#
+# 必要な Secrets: OPENCODE_PAT (Issues の書き込み権限を含むこと)
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+concurrency:
+  group: spiral-next
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  release-next:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check nothing is in flight
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow opencode.yml --status in_progress --json databaseId --jq 'length')
+          queued=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow opencode.yml --status queued --json databaseId --jq 'length')
+          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("opencode/"))] | length')
+          echo "opencode runs in_progress=$runs queued=$queued, open agent PRs=$prs"
+          if [ "$runs" != "0" ] || [ "$queued" != "0" ] || [ "$prs" != "0" ]; then
+            echo "busy=true" >> "$GITHUB_OUTPUT"
+            echo "Something is still in flight; not releasing the next issue."
+          else
+            echo "busy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pick the next queued issue
+        id: pick
+        if: steps.gate.outputs.busy == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          next=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label spiral-queue --json number,labels --jq '[.[] | select([.labels[].name] | index("opencode") | not)] | min_by(.number) | .number // empty')
+          if [ -z "$next" ]; then
+            echo "Queue is empty."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "issue=$next" >> "$GITHUB_OUTPUT"
+          echo "Next queued issue: #$next"
+
+      - name: Release it (add the opencode label via PAT)
+        if: steps.pick.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.OPENCODE_PAT }}
+          ISSUE: ${{ steps.pick.outputs.issue }}
+        run: |
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --add-label opencode
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body "🤖 スパイラルキューから自動で放出しました（前の PR のマージを検知）。auto-fire が発火します。
+
+          <!-- spiral-next -->"
