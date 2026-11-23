@@ -1168,7 +1168,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
             onTap: _showCommentEditDialog,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

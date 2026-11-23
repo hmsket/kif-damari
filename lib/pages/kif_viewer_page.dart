@@ -617,7 +617,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
