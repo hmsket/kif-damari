@@ -68,6 +68,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
   Map<GameNode, Point<double>> nodePositions = HashMap<GameNode, Point<double>>.identity();
   double maxColumn = 0;
   double maxRow = 0;
+  List<Object>? _layoutStructure;
 
   @override
   void initState() {
@@ -93,7 +94,9 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
   @override
   void didUpdateWidget(KifTreeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _buildTreeLayout();
+    if (!_sameStructure(_layoutStructure!, _computeStructure(widget.rootNode))) {
+      _buildTreeLayout();
+    }
 
     if (oldWidget.currentNode != widget.currentNode) {
       // 💡 自動スクロールが起きるので慣性スクロールを停止する（即時）
@@ -355,9 +358,32 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     }
   }
 
+  List<Object> _computeStructure(GameNode root) {
+    final result = <Object>[];
+    void visit(GameNode node) {
+      result.add(node);
+      result.add(node.moveNumber);
+      result.add(node.nextNodes.length);
+      for (final child in node.nextNodes) {
+        visit(child);
+      }
+    }
+    visit(root);
+    return result;
+  }
+
+  static bool _sameStructure(List<Object> a, List<Object> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   // 外部から渡されたルートノードを基に、各ノードの2次元グリッド座標 (X: 分岐列, Y: 手数) を計算します
   void _buildTreeLayout() {
     rootNode = widget.rootNode;
+    _layoutStructure = _computeStructure(rootNode);
 
     nodePositions = HashMap<GameNode, Point<double>>.identity();
     maxColumn = 0;
@@ -592,12 +618,14 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
     // 💡 InteractiveViewer自身のパンは無効なので、指の動きを直接受け取って
     // パン（設定のスクロール速度倍）と慣性スクロールを処理する。
     // ノードのタップ選択には影響しない（Listenerはジェスチャ競合に参加しない）。
-    return Listener(
-      onPointerDown: _onPointerDown,
-      onPointerMove: _onPointerMove,
-      onPointerUp: _onPointerUp,
-      onPointerCancel: _onPointerCancel,
-      child: tree,
+    return RepaintBoundary(
+      child: Listener(
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: _onPointerUp,
+        onPointerCancel: _onPointerCancel,
+        child: tree,
+      ),
     );
   }
 }
