@@ -73,7 +73,7 @@ class AppearanceSidebar extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Divider(height: 1),
+                  const SizedBox(height: 8),
                   Expanded(
                     child: appearances.isEmpty
                         ? const Center(

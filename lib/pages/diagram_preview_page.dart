@@ -221,7 +221,7 @@ void _showEditNameDialog() {
                                       _updateImage(); 
                                     },
                             ),
-                            const Divider(height: 1),
+                            const SizedBox(height: 8),
 
                             // 对局者名編集ボタン
                             ListTile(
@@ -242,7 +242,7 @@ void _showEditNameDialog() {
                               ),
                               onTap: _showPlayerNames ? _showEditNameDialog : null,
                             ),
-                            const Divider(height: 1),
+                            const SizedBox(height: 8),
 
                             // 最終手強調トグル
                             SwitchListTile(

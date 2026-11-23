@@ -55,8 +55,8 @@ class VersionInfoPage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const Divider(height: 24),
-                  
+                  const SizedBox(height: 12),
+
                   Text(
                     item['title'] as String,
                     style: const TextStyle(

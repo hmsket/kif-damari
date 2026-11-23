@@ -40,7 +40,7 @@ class PositionSearchResultPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildOverview(),
-            const Divider(height: 1),
+            const SizedBox(height: 8),
             Expanded(
               child: rows.isEmpty
                   ? const Center(child: Text('見つかりませんでした'))
