@@ -21,6 +21,7 @@ import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_popup_menu_style.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/appearance_sidebar.dart';
+import 'package:kifdamari/widgets/large_overlay_dial.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
@@ -732,76 +733,9 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
   // 💡 文字なし仕様の大型ダイヤルウィジェット
   Widget _buildLargeOverlayDial() {
-    return Container(
-      key: _overlayDialKey,
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-        border: Border.all(
-          color: const Color(0xFFE0E0E0),
-          width: 1,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F000000),
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Transform.rotate(
-        angle: _dialRotation,
-        child: SizedBox.expand(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // 中心のフラットな円
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFF5F5F5),
-                ),
-              ),
-              // 回転ポインター（ツマミ）
-              Positioned(
-                top: 8,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF424242),
-                  ),
-                ),
-              ),
-              // 周囲の目盛りドット
-              Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
-              Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
-              Positioned(left: 102.5, top: 57.5, child: _buildDialDot()),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDialDot() {
-    return Container(
-      width: 5,
-      height: 5,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.grey[400],
-      ),
+    return LargeOverlayDial(
+      controlKey: _overlayDialKey,
+      rotation: _dialRotation,
     );
   }
 
