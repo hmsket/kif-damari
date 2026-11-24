@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kifdamari/settings/advanced_features_setting.dart';
 import 'package:kifdamari/settings/default_color_setting.dart';
 import 'package:kifdamari/settings/default_save_location_setting.dart';
 import 'package:kifdamari/settings/dial_degrees_per_move_setting.dart';
@@ -64,12 +63,6 @@ class SettingPage extends StatelessWidget {
                 TreeScrollSpeedSetting(settings: settings),
 
                 DialDegreesPerMoveSetting(settings: settings),
-
-                const SizedBox(height: 12),
-
-                _buildSectionTitle('上級機能'),
-
-                AdvancedFeaturesSetting(settings: settings),
 
               ],
             );
