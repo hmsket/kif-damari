@@ -76,7 +76,7 @@ class _KifTemplateEditPageState extends State<_KifTemplateEditPage> {
   void initState() {
     super.initState();
     _savedTitle = widget.settings.get('kifTitle') ?? '{先手} vs {後手}';
-    _savedDetail = widget.settings.get('kifDetail') ?? '{棋戦} / {戦型} / {対局日}';
+    _savedDetail = widget.settings.get('kifDetail') ?? '棋戦：{棋戦}\n戦型：{戦型}\n対局日：{対局日}';
 
     _titleController = TextEditingController(text: _savedTitle);
     _detailController = TextEditingController(text: _savedDetail);
@@ -201,7 +201,7 @@ class _KifTemplateEditPageState extends State<_KifTemplateEditPage> {
     final detail = _detailController.text.trim();
 
     final newTitle = title.isNotEmpty ? title : '{先手} vs {後手}';
-    final newDetail = detail.isNotEmpty ? detail : '{棋戦} / {戦型} / {対局日}';
+    final newDetail = detail.isNotEmpty ? detail : '棋戦：{棋戦}\n戦型：{戦型}\n対局日：{対局日}';
 
     await widget.settings.set('kifTitle', newTitle);
     await widget.settings.set('kifDetail', newDetail);
