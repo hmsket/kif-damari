@@ -18,6 +18,7 @@ import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
+import 'package:kifdamari/widgets/app_popup_menu_style.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/appearance_sidebar.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
@@ -996,14 +997,10 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
               fit: BoxFit.scaleDown,
               child: MenuAnchor(
                 alignmentOffset: const Offset(0, 0),
-                style: MenuStyle(
-                  shape: WidgetStateProperty.all(
-                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  elevation: WidgetStateProperty.all(8),
-                ),
+                style: AppPopupMenuStyle.menuStyle,
                 menuChildren: [
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.edit, size: 20),
                     child: const Text('棋譜を編集する'),
                     onPressed: () async {
@@ -1058,16 +1055,19 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     },
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.share, size: 20),
                     child: const Text('棋譜ファイルを共有'),
                     onPressed: _shareKifData,
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.collections, size: 20),
                     child: const Text('この局面でサムネイルを生成'),
                     onPressed: () => _handleMakeThumbnail(),
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.copy, size: 20),
                     child: const Text('棋譜ファイルをコピー'),
                     onPressed: () {
@@ -1087,11 +1087,13 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                     },
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.account_tree, size: 20),
                     child: const Text('棋譜ツリーを表示'),
                     onPressed: _openRightSidebar,
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.cached, size: 20),
                     child: const Text('盤面を反転'),
                     onPressed: () {
