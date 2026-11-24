@@ -6,6 +6,7 @@ import 'package:kifdamari/logic/pending_kif_sender.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/circular_icon_background.dart';
 import 'package:kifdamari/widgets/constants.dart';
 import 'package:kifdamari/widgets/home_drawer.dart';
 import 'package:kifdamari/widgets/kif_colors.dart';
@@ -381,7 +382,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                     onTap: () => showDeleteTabDialog(context, t, _refresh),
                                     child: const Padding(
                                       padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                      child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                                      child: CircularIconBackground(
+                                        size: 28,
+                                        child: Icon(Icons.cancel, size: 20, color: Colors.red),
+                                      ),
                                     ),
                                   ),
                                 if (_currentMode == AppMode.edit)
@@ -389,7 +393,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                     onTap: () => showEditTabDialog(context, t, _refresh),
                                     child: const Padding(
                                       padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                      child: Icon(Icons.edit, size: 20, color: Colors.green),
+                                      child: CircularIconBackground(
+                                        size: 28,
+                                        child: Icon(Icons.edit, size: 20, color: Colors.green),
+                                      ),
                                     ),
                                   ),
                                 Text(t.title),
