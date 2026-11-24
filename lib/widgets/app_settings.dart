@@ -3,7 +3,18 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:kifdamari/widgets/constants.dart';
 
 class AppSettings {
-  final Box _box = Hive.box('settings_box');
+  AppSettings() {
+    try {
+      _box = Hive.box('settings_box');
+    } catch (_) {
+      _box = null;
+    }
+  }
+
+  Box<dynamic>? _box;
+
+  static final Map<String, dynamic> _fallbackValues = {};
+  static final ValueNotifier<dynamic> _fallbackRevision = ValueNotifier<dynamic>(0);
 
   final Map<String, dynamic> _defaults = {
     'isDarkMode': false,
@@ -19,15 +30,27 @@ class AppSettings {
     'kifDetail': '{棋戦} / {戦型} / {対局日}',
     'defaultSaveTreeUri': '',
     'homeViewMode': 'grid',
+    'showAdvancedFeatures': false,
   };
 
-  ValueListenable<Box<dynamic>> get listenable => _box.listenable();
+  ValueListenable<dynamic> get listenable => _box?.listenable() ?? _fallbackRevision;
 
   T get<T>(String key) {
-    return _box.get(key, defaultValue: _defaults[key]) as T;
+    final value = _box?.get(key, defaultValue: _defaults[key]) ??
+        _fallbackValues[key] ??
+        _defaults[key];
+    return value as T;
   }
 
   Future<void> set(String key, dynamic value) async {
-    await _box.put(key, value);
+    final box = _box;
+    if (box == null) {
+      _fallbackValues[key] = value;
+      _fallbackRevision.value++;
+      return;
+    }
+    await box.put(key, value);
   }
+
+  bool get showAdvancedFeatures => get<bool>('showAdvancedFeatures') ?? false;
 }
