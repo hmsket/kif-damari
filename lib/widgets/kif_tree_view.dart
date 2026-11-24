@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart'; // Ticker
 import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/models/game_node.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/comment_bubble_icon.dart';
 
 class KifTreeView extends StatefulWidget {
   final GameNode rootNode;
@@ -592,11 +593,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                 const Positioned(
                   top: 2,
                   right: 2,
-                  child: Icon(
-                    Icons.chat_bubble_rounded,
-                    size: 10,
-                    color: Colors.blue,
-                  ),
+                  child: CommentBubbleIcon(size: 10),
                 ),
               // 💡 削除用×ボタン（開始局面以外 & onNodeDeletedが渡されている編集モード時のみ表示）
               if (!isRoot && widget.onNodeDeleted != null)

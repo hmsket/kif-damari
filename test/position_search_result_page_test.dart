@@ -5,6 +5,7 @@ import 'package:kifdamari/logic/position_searcher.dart';
 import 'package:kifdamari/logic/sfen_generator.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/pages/position_search_result_page.dart';
+import 'package:kifdamari/widgets/comment_bubble_icon.dart';
 
 /// (筋, 段, 駒コード) から盤面キーを作るテスト用ヘルパー。
 String keyFromPlacements(List<(int, int, String)> placements) {
@@ -145,7 +146,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.chat_bubble), findsOneWidget);
+      expect(find.byType(CommentBubbleIcon), findsOneWidget);
       expect(find.text('先に角を交換したい'), findsOneWidget);
       // 2行目以降は出さない
       expect(find.text('ここからは▼棒銀が強い'), findsNothing);
@@ -163,7 +164,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.chat_bubble), findsNothing);
+      expect(find.byType(CommentBubbleIcon), findsNothing);
     });
 
     testWidgets('ヒット0件は「見つかりませんでした」を表示する（パターンの概要は出す）', (tester) async {

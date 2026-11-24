@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/models/game_node.dart';
+import 'package:kifdamari/widgets/comment_bubble_icon.dart';
 import 'package:kifdamari/widgets/kif_tree_view.dart';
 
 void main() {
@@ -128,7 +129,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.chat_bubble_rounded), findsOneWidget);
+    expect(find.byType(CommentBubbleIcon), findsOneWidget);
     expect(find.byIcon(Icons.chat_bubble), findsNothing);
   });
 
@@ -183,7 +184,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.chat_bubble_rounded), findsNothing);
+    expect(find.byType(CommentBubbleIcon), findsNothing);
     expect(find.byIcon(Icons.alt_route), findsNothing);
     expect(find.byIcon(Icons.cancel), findsNWidgets(2));
   });
@@ -204,7 +205,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.chat_bubble_rounded), findsNWidgets(3));
+    expect(find.byType(CommentBubbleIcon), findsNWidgets(3));
     expect(find.byIcon(Icons.alt_route), findsOneWidget);
   });
 
@@ -226,7 +227,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.chat_bubble_rounded), findsNWidgets(3));
+    expect(find.byType(CommentBubbleIcon), findsNWidgets(3));
     expect(find.byIcon(Icons.alt_route), findsNothing);
   });
 }
