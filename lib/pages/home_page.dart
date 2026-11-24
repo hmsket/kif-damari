@@ -453,12 +453,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               : null,
           body: SafeArea(
             child: tabs.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.only(bottom: 40.0), 
-                      child: Text(
-                        "タブがありません\n＋ボタンから追加してください",
-                        textAlign: TextAlign.center,
+                      padding: const EdgeInsets.only(bottom: 40.0),
+                      child: OutlinedButton.icon(
+                        onPressed: () => showAddTabDialog(context, _refresh),
+                        icon: const Icon(Icons.add, size: 20),
+                        label: const Text(
+                          'タブを追加する',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          side: BorderSide(
+                            color: Colors.grey.shade400,
+                          ),
+                          elevation: 0,
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
                       ),
                     ),
                   )
