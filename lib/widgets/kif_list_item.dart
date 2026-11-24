@@ -67,13 +67,11 @@ class KifListItem extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 10.0),
                 child: SizedBox(
-                  width: 10,
-                  child: Checkbox(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    value: isSelected,
-                    onChanged: onChanged,
-                  ),
+                  width: 32,
+                  height: 32,
+                  child: isSelected
+                      ? const _DeleteSelectionBadge()
+                      : const SizedBox.shrink(),
                 ),
               ),
             Expanded(
@@ -93,6 +91,18 @@ class KifListItem extends StatelessWidget {
   /// 送信待ち（オフラインで退避保存中）の棋譜であることを示す印
   Widget _buildPendingBadge() {
     return const _PendingSendBadge();
+  }
+}
+
+/// 削除モードで選択中の棋譜であることを示す印
+class _DeleteSelectionBadge extends StatelessWidget {
+  const _DeleteSelectionBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return const CircularIconBackground(
+      child: Icon(Icons.delete, color: Colors.red),
+    );
   }
 }
 
@@ -155,12 +165,9 @@ class KifGridItem extends StatelessWidget {
 
   Widget _buildBadge() {
     if (mode == AppMode.delete) {
-      return Checkbox(
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        value: isSelected,
-        onChanged: onChanged,
-      );
+      return isSelected
+          ? const _DeleteSelectionBadge()
+          : const SizedBox.shrink();
     } else if (mode == AppMode.edit) {
       return const CircularIconBackground(
         child: Icon(Icons.edit, color: Colors.green),
@@ -212,8 +219,8 @@ class KifGridItem extends StatelessWidget {
             ),
             if (mode == AppMode.delete)
               Positioned(
-                top: 0,
-                left: 0,
+                top: 6,
+                left: 6,
                 child: _buildBadge(),
               ),
             if (mode == AppMode.edit)
