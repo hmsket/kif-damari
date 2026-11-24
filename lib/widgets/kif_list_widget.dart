@@ -31,6 +31,7 @@ class KifListWidgetState extends State<KifListWidget>
     with AutomaticKeepAliveClientMixin {
   Future<List<KifEntity>>? _kifuFuture;
   List<KifEntity>? _tempKifs;
+  Future<List<KifEntity>>? _appliedFuture;
 
   int _lastKifCount = 0;
   bool _isFirstLoadDone = false;
@@ -140,7 +141,8 @@ class KifListWidgetState extends State<KifListWidget>
     _saveScrollPosition();
     _restorePending = true;
     setState(() {
-      _tempKifs = null;
+      // 再読み込み中も直前に表示していた一覧を保持する（点滅防止）。
+      // 初回読み込み時のみ _tempKifs が null のためスピナーを表示する。
       _kifuFuture = KifDao().getKifsByTab(widget.tabId);
     });
   }
@@ -187,7 +189,18 @@ class KifListWidgetState extends State<KifListWidget>
         return FutureBuilder<List<KifEntity>>(
           future: _kifuFuture,
           builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && _tempKifs == null) {
+          // 新しい Future の結果が届いたら、保持している一覧を差し替える。
+          // 同じ Future の再ビルドでは差し替えない（並べ替え中の _tempKifs を尊重する）。
+          if (snapshot.connectionState == ConnectionState.done &&
+              snapshot.hasData &&
+              !identical(_kifuFuture, _appliedFuture)) {
+            _tempKifs = snapshot.data;
+            _appliedFuture = _kifuFuture;
+          }
+
+          // スピナーは一度も一覧を表示していない初回読み込み時のみ。
+          if (_tempKifs == null &&
+              snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -240,7 +253,8 @@ class KifListWidgetState extends State<KifListWidget>
             );
           }
           // スクロール可能なウィジェットを組み立てた後のフレームで位置を復元する。
-          if (_restorePending) {
+          // 新しい一覧が反映される前（前の一覧を表示中）には復元しない。
+          if (_restorePending && identical(_kifuFuture, _appliedFuture)) {
             _scheduleScrollRestore();
           }
           if (widget.mode == AppMode.sort) {
