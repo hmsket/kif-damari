@@ -5,6 +5,7 @@ import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/logic/pending_kif_sender.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
+import 'package:kifdamari/widgets/app_popup_menu_style.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/circular_icon_background.dart';
 import 'package:kifdamari/widgets/constants.dart';
@@ -194,6 +195,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         final tabs = snapshot.data ?? [];
         final selectedCount = _getSelectedCount(tabs);
         final hasSelection = selectedCount > 0;
+        final sortCurrentTabId = tabs.isNotEmpty && _currentTabIndex < tabs.length
+            ? tabs[_currentTabIndex].id
+            : null;
+        final sortCurrentState = _listKeys[sortCurrentTabId]?.currentState;
+        final bool hasKif = sortCurrentState != null && !sortCurrentState.isKifEmpty;
 
         if (_tabController == null || _tabController!.length != tabs.length) {
           _tabController?.dispose();
@@ -287,6 +293,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 )
               else ...[
                 MenuAnchor(
+                  style: AppPopupMenuStyle.menuStyle,
                   builder: (BuildContext context, MenuController controller, Widget? child) {
                     return IconButton(
                       icon: const Icon(Icons.add),
@@ -302,11 +309,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   },
                   menuChildren: [
                     MenuItemButton(
+                      style: AppPopupMenuStyle.itemStyle,
                       onPressed: () => showAddTabDialog(context, _refresh),
                       child: const Text('タブを追加'),
                     ),
                     if (tabs.isNotEmpty)
                       MenuItemButton(
+                        style: AppPopupMenuStyle.itemStyle,
                         onPressed: () => _onAddKifPressed(context, tabs[_currentTabIndex].id!),
                         child: const Text('棋譜を追加'),
                       ),
@@ -319,30 +328,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       ? () => _updateMode(AppMode.edit) 
                       : null,
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.swap_vert),
-                  tooltip: '並び替え',
-                  enabled: tabs.isNotEmpty,
-                  onSelected: (value) {
-                    if (value == 'sort_tabs') {
-                      showSortTabsDialog(context, tabs, _refresh); 
-                    } else if (value == 'sort_kifs') {
-                      final currentTabId = tabs[_currentTabIndex].id;
-                      final state = _listKeys[currentTabId]?.currentState;
-                      if (state == null || state.isKifEmpty) return;
-                      _updateMode(AppMode.sort);
-                    }
+                MenuAnchor(
+                  style: AppPopupMenuStyle.menuStyle,
+                  builder: (BuildContext context, MenuController controller, Widget? child) {
+                    return IconButton(
+                      icon: const Icon(Icons.swap_vert),
+                      tooltip: '並び替え',
+                      onPressed: tabs.isNotEmpty
+                          ? () {
+                              if (controller.isOpen) {
+                                controller.close();
+                              } else {
+                                controller.open();
+                              }
+                            }
+                          : null,
+                    );
                   },
-                  itemBuilder: (context) {
-                    final currentTabId = tabs.isNotEmpty ? tabs[_currentTabIndex].id : null;
-                    final state = _listKeys[currentTabId]?.currentState;
-                    final bool hasKif = state != null && !state.isKifEmpty;
-                    return [
-                      const PopupMenuItem(value: 'sort_tabs', child: Text('タブを並び替え')),                     
-                      if (hasKif)
-                        const PopupMenuItem(value: 'sort_kifs', child: Text('棋譜を並び替え')),
-                    ];
-                  },
+                  menuChildren: [
+                    MenuItemButton(
+                      style: AppPopupMenuStyle.itemStyle,
+                      onPressed: () => showSortTabsDialog(context, tabs, _refresh),
+                      child: const Text('タブを並び替え'),
+                    ),
+                    if (hasKif)
+                      MenuItemButton(
+                        style: AppPopupMenuStyle.itemStyle,
+                        onPressed: () {
+                          final currentTabId = tabs[_currentTabIndex].id;
+                          final state = _listKeys[currentTabId]?.currentState;
+                          if (state == null || state.isKifEmpty) return;
+                          _updateMode(AppMode.sort);
+                        },
+                        child: const Text('棋譜を並び替え'),
+                      ),
+                  ],
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete),
