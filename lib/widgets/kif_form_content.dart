@@ -216,20 +216,122 @@ class _KifFormContentState extends State<KifFormContent> {
 
                       // タブ選択プルダウン（横幅を適正に絞りコンパクトに）
                       if (widget.tabs.isNotEmpty)
-                        DropdownButtonFormField<int>(
-                          focusNode: _tabFocusNode,
-                          value: _selectedTabId,
+                        ButtonTheme(
+                          alignedDropdown: true,
+                          child: DropdownButtonFormField<int>(
+                            focusNode: _tabFocusNode,
+                            value: _selectedTabId,
+                            borderRadius: BorderRadius.circular(16),
+                            dropdownColor: Colors.white,
+                            focusColor: Colors.transparent,
+                            menuMaxHeight: 320,
+                            itemHeight: 48,
+                            decoration: InputDecoration(
+                              labelText: 'タブ',
+                              labelStyle: TextStyle(
+                                color: _getLabelColor(_tabFocusNode),
+                                fontSize: 13,
+                                fontWeight: (_tabFocusNode.hasFocus || widget.errorMessage != null)
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFAFAFA),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFF222222), width: 1.5),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _selectedTabId = value);
+                              }
+                            },
+                            // 選択済みの表示（入力枠内）
+                            selectedItemBuilder: (context) {
+                              return widget.tabs.map((t) {
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    t.title,
+                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                  ),
+                                );
+                              }).toList();
+                            },
+                            // ポップアップリストの各項目
+                            items: widget.tabs.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final t = entry.value;
+                              final isSelected = t.id == _selectedTabId;
+
+                              return DropdownMenuItem<int>(
+                                value: t.id!,
+                                child: Container(
+                                  height: 48,
+                                  alignment: Alignment.centerLeft,
+                                  decoration: BoxDecoration(
+                                    border: index < widget.tabs.length - 1
+                                        ? const Border(
+                                            bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
+                                          )
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          t.title,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isSelected ? const Color(0xFF222222) : Colors.black87,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (isSelected) ...[
+                                        const SizedBox(width: 8),
+                                        const Icon(
+                                          Icons.check,
+                                          size: 18,
+                                          color: Color(0xFF222222),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+
+                      // カラー選択プルダウン
+// カラー選択プルダウン（タブと同様の仕切り線＆スッキリデザイン）
+                      ButtonTheme(
+                        alignedDropdown: true,
+                        child: DropdownButtonFormField<int>(
+                          focusNode: _colorFocusNode,
+                          value: _selectedColor,
                           borderRadius: BorderRadius.circular(16),
-                          dropdownColor: Colors.white,
-                          focusColor: Colors.transparent,
+                          dropdownColor: Colors.white, // ポップアップ背景を純白に統一
+                          focusColor: Colors.transparent, // タップ時の標準灰色背景を無効化
                           menuMaxHeight: 320,
                           itemHeight: 48,
                           decoration: InputDecoration(
-                            labelText: 'タブ',
+                            labelText: '色',
                             labelStyle: TextStyle(
-                              color: _getLabelColor(_tabFocusNode),
+                              color: _getLabelColor(_colorFocusNode),
                               fontSize: 13,
-                              fontWeight: (_tabFocusNode.hasFocus || widget.errorMessage != null)
+                              fontWeight: (_colorFocusNode.hasFocus || widget.errorMessage != null)
                                   ? FontWeight.bold
                                   : FontWeight.normal,
                             ),
@@ -246,195 +348,99 @@ class _KifFormContentState extends State<KifFormContent> {
                               borderSide: const BorderSide(color: Color(0xFF222222), width: 1.5),
                             ),
                           ),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _selectedTabId = value);
-                            }
-                          },
                           // 選択済みの表示（入力枠内）
                           selectedItemBuilder: (context) {
-                            return widget.tabs.map((t) {
+                            return _colorData.map((data) {
+                              final colorVal = data['value'] as int;
+                              final label = data['label'] as String;
+
                               return Align(
                                 alignment: Alignment.centerLeft,
-                                child: Text(
-                                  t.title,
-                                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // 入力枠内にも色の丸を表示
+                                    Container(
+                                      width: 18,
+                                      height: 18,
+                                      decoration: BoxDecoration(
+                                        color: Color(colorVal),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.black26, width: 0.8),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      label,
+                                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                    ),
+                                  ],
                                 ),
                               );
                             }).toList();
                           },
-                          // ポップアップリストの各項目
-                          items: widget.tabs.asMap().entries.map((entry) {
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _selectedColor = val);
+                            }
+                          },
+                          // メニュー項目（仕切り線＋カラーチップ＋チェックマーク）
+                          items: _colorData.asMap().entries.map((entry) {
                             final index = entry.key;
-                            final t = entry.value;
-                            final isSelected = t.id == _selectedTabId;
+                            final data = entry.value;
+                            final colorVal = data['value'] as int;
+                            final label = data['label'] as String;
+                            final isSelected = colorVal == _selectedColor;
 
                             return DropdownMenuItem<int>(
-                              value: t.id!,
+                              value: colorVal,
                               child: Container(
                                 height: 48,
                                 alignment: Alignment.centerLeft,
                                 decoration: BoxDecoration(
-                                  border: index < widget.tabs.length - 1
+                                  // 最後の項目以外に薄い仕切り線を引く
+                                  border: index < _colorData.length - 1
                                       ? const Border(
                                           bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
                                         )
                                       : null,
                                 ),
                                 child: Row(
-                                  mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    // カラープレビュー用の円
+                                    Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        color: Color(colorVal),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.black26, width: 0.8),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        t.title,
+                                        label,
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: isSelected ? const Color(0xFF222222) : Colors.black87,
                                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (isSelected) ...[
-                                      const SizedBox(width: 8),
+                                    // 選択中項目の右側にチェックマークを表示
+                                    if (isSelected)
                                       const Icon(
                                         Icons.check,
                                         size: 18,
                                         color: Color(0xFF222222),
                                       ),
-                                    ],
                                   ],
                                 ),
                               ),
                             );
                           }).toList(),
                         ),
-                      const SizedBox(height: 12),
-
-                      // カラー選択プルダウン
-// カラー選択プルダウン（タブと同様の仕切り線＆スッキリデザイン）
-                      DropdownButtonFormField<int>(
-                        focusNode: _colorFocusNode,
-                        value: _selectedColor,
-                        borderRadius: BorderRadius.circular(16),
-                        dropdownColor: Colors.white, // ポップアップ背景を純白に統一
-                        focusColor: Colors.transparent, // タップ時の標準灰色背景を無効化
-                        menuMaxHeight: 320,
-                        itemHeight: 48,
-                        decoration: InputDecoration(
-                          labelText: '色',
-                          labelStyle: TextStyle(
-                            color: _getLabelColor(_colorFocusNode),
-                            fontSize: 13,
-                            fontWeight: (_colorFocusNode.hasFocus || widget.errorMessage != null)
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFFAFAFA),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF222222), width: 1.5),
-                          ),
-                        ),
-                        // 選択済みの表示（入力枠内）
-                        selectedItemBuilder: (context) {
-                          return _colorData.map((data) {
-                            final colorVal = data['value'] as int;
-                            final label = data['label'] as String;
-
-                            return Align(
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // 入力枠内にも色の丸を表示
-                                  Container(
-                                    width: 18,
-                                    height: 18,
-                                    decoration: BoxDecoration(
-                                      color: Color(colorVal),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.black26, width: 0.8),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    label,
-                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList();
-                        },
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() => _selectedColor = val);
-                          }
-                        },
-                        // メニュー項目（仕切り線＋カラーチップ＋チェックマーク）
-                        items: _colorData.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final data = entry.value;
-                          final colorVal = data['value'] as int;
-                          final label = data['label'] as String;
-                          final isSelected = colorVal == _selectedColor;
-
-                          return DropdownMenuItem<int>(
-                            value: colorVal,
-                            child: Container(
-                              height: 48,
-                              alignment: Alignment.centerLeft,
-                              decoration: BoxDecoration(
-                                // 最後の項目以外に薄い仕切り線を引く
-                                border: index < _colorData.length - 1
-                                    ? const Border(
-                                        bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
-                                      )
-                                    : null,
-                              ),
-                              child: Row(
-                                children: [
-                                  // カラープレビュー用の円
-                                  Container(
-                                    width: 26,
-                                    height: 26,
-                                    decoration: BoxDecoration(
-                                      color: Color(colorVal),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.black26, width: 0.8),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      label,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: isSelected ? const Color(0xFF222222) : Colors.black87,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                  // 選択中項目の右側にチェックマークを表示
-                                  if (isSelected)
-                                    const Icon(
-                                      Icons.check,
-                                      size: 18,
-                                      color: Color(0xFF222222),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
                       ),
 
                       if (widget.errorMessage != null) ...[
