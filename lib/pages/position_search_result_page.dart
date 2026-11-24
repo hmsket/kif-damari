@@ -6,6 +6,7 @@ import 'package:kifdamari/logic/sfen_generator.dart';
 import 'package:kifdamari/models/board_state.dart';
 import 'package:kifdamari/pages/integrated_tree_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
+import 'package:kifdamari/widgets/comment_bubble_icon.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 
 /// 局面検索の結果一覧画面（Issue #38）。
@@ -126,11 +127,7 @@ class PositionSearchResultPage extends StatelessWidget {
                       Row(
                         children: [
                           // 個別棋譜ツリーのコメント印と同じ青い吹き出し
-                          const Icon(
-                            Icons.chat_bubble,
-                            size: 14,
-                            color: Colors.blue,
-                          ),
+                          const CommentBubbleIcon(size: 14),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
