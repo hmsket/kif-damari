@@ -861,6 +861,13 @@ class _KifEditorPageState extends State<KifEditorPage> {
       child: Row(
         children: [
           Expanded(
+            flex: 1,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: const SizedBox(width: 24, height: 40),
+            ),
+          ),
+          Expanded(
             flex: 2,
             child: FittedBox(
               fit: BoxFit.scaleDown,
