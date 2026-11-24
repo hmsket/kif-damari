@@ -12,8 +12,10 @@ name: spiral-next
 # 放出条件 (すべて満たすときだけ):
 #   1. トリガーが「PR のマージ」である (手動実行 workflow_dispatch でも可)
 #   2. 稼働中ではない: opencode ワークフローの実行中 run がなく、
-#      opencode/* ブランチの open な PR もない
-#      (マージされずに残った Issue があっても、PR が無ければ止まらない)
+#      opencode/* ブランチの open な PR もなく、放出済み (spiral-queue +
+#      opencode の両ラベル付き) で直近2時間以内に動きのあった open な
+#      Issue もない (二重放出防止。2時間動きのない放出済み Issue は
+#      孤児とみなして止まらない)
 #   3. `spiral-queue` 付きで `opencode` 未付与の open Issue が存在する
 #
 # 放出時は PAT でラベルを付ける。PAT (実ユーザー) の labeled イベントは
@@ -35,11 +37,23 @@ name: spiral-next
 # (見送りには再試行がなく、連鎖が止まった)。schedule トリガー (20分毎) を
 # 安全網として追加し、同じゲート＋放出を定期的に再チェックする。
 # これにより、一時的な「稼働中」で止まっても次の巡回で自動復旧する。
+#
+# 【v3 変更 2026-11-24】v2 の schedule は実際には一度も発火しなかった
+# (PR #107 マージ後、08:10 以降の schedule 実行が存在しないことを確認。
+# GitHub の schedule は混雑時に遅延・欠落しうる公式仕様のため当てにしない)。
+# 代わりに workflow_run トリガーを安全網の本命にする: opencode /
+# flutter-ci の実行が完了するたびにゲート＋放出を再チェックする。
+# 特に opencode 完了トリガーは「稼働中が解けた瞬間」そのもので、
+# マージ瞬間のレースも根本的に避けられる。workflow_run は
+# auto-merge / ci-autofix で配信実績がある。schedule は最後の保険として残す。
 
 on:
   pull_request:
     types: [closed]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["opencode", "flutter-ci"]
+    types: [completed]
   schedule:
     - cron: '*/20 * * * *'
 
@@ -66,8 +80,9 @@ jobs:
           runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow opencode.yml --status in_progress --json databaseId --jq 'length')
           queued=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow opencode.yml --status queued --json databaseId --jq 'length')
           prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("opencode/"))] | length')
-          echo "opencode runs in_progress=$runs queued=$queued, open agent PRs=$prs"
-          if [ "$runs" != "0" ] || [ "$queued" != "0" ] || [ "$prs" != "0" ]; then
+          inflight=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label spiral-queue --label opencode --json number,updatedAt --jq '[.[] | select((.updatedAt | fromdateiso8601) > (now - 7200))] | length')
+          echo "opencode runs in_progress=$runs queued=$queued, open agent PRs=$prs, released-but-open issues=$inflight"
+          if [ "$runs" != "0" ] || [ "$queued" != "0" ] || [ "$prs" != "0" ] || [ "$inflight" != "0" ]; then
             echo "busy=true" >> "$GITHUB_OUTPUT"
             echo "Something is still in flight; not releasing the next issue."
           else
