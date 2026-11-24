@@ -27,7 +27,7 @@ class AppSettings {
     'defaultKifColor': colorWhite,
     'defaultPlayerName': 'プレイヤー',
     'kifTitle': '{先手} vs {後手}',
-    'kifDetail': '{棋戦} / {戦型} / {対局日}',
+    'kifDetail': '棋戦：{棋戦}\n戦型：{戦型}\n対局日：{対局日}',
     'defaultSaveTreeUri': '',
     'homeViewMode': 'grid',
     'showAdvancedFeatures': false,
