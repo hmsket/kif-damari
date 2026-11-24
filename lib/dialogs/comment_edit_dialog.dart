@@ -32,6 +32,7 @@ class _CommentEditSheetState extends State<_CommentEditSheet> {
   double? _dragStartY;
   double _dragOffset = 0;
   bool _isDragging = false;
+  bool _isClosing = false;
 
   @override
   void initState() {
@@ -103,7 +104,15 @@ class _CommentEditSheetState extends State<_CommentEditSheet> {
     });
   }
 
+  void _close([List<String>? result]) {
+    if (_isClosing) return;
+    _isClosing = true;
+    Navigator.pop(context, result);
+  }
+
   void _dismiss() {
+    if (_isClosing) return;
+    _isClosing = true;
     final double target = MediaQuery.of(context).size.height;
     setState(() {
       _dragOffset = target;
@@ -119,7 +128,7 @@ class _CommentEditSheetState extends State<_CommentEditSheet> {
     return Stack(
       children: [
         GestureDetector(
-          onTap: () => Navigator.pop(context),
+          onTap: () => _close(),
           child: Container(color: Colors.black54),
         ),
         Align(
@@ -153,7 +162,7 @@ class _CommentEditSheetState extends State<_CommentEditSheet> {
                               const Text('コメント編集', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
                               IconButton(
                                 icon: const Icon(Icons.close, size: 20),
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () => _close(),
                               ),
                             ],
                           ),
@@ -184,7 +193,7 @@ class _CommentEditSheetState extends State<_CommentEditSheet> {
                               ),
                               onPressed: () {
                                 final text = _controller.text;
-                                Navigator.pop(context, text.isEmpty ? <String>[] : text.split('\n'));
+                                _close(text.isEmpty ? <String>[] : text.split('\n'));
                               },
                               child: const Text('決定', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
