@@ -588,7 +588,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                   top: 2,
                   right: 2,
                   child: Icon(
-                    Icons.chat_bubble,
+                    Icons.chat_bubble_rounded,
                     size: 10,
                     color: Colors.blue,
                   ),

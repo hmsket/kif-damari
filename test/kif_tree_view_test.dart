@@ -109,6 +109,29 @@ void main() {
     expect(find.text('120手目'), findsOneWidget);
   });
 
+  testWidgets('コメント付きノードには丸い吹き出しアイコンが付き、コメントなしには付かない', (tester) async {
+    final root = buildNode(0);
+    root.addComment('コメントあり');
+    final child = buildNode(1, moveLabel: '+7776FU');
+    root.addChild(child);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: KifTreeView(
+            rootNode: root,
+            currentNode: child,
+            onNodeSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.chat_bubble_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble), findsNothing);
+  });
+
   testWidgets('削除コールバックがなければ（閲覧モード）×ボタンは出ない', (tester) async {
     final root = buildNode(0);
     final child = buildNode(1, moveLabel: '+7776FU');
