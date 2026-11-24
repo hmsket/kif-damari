@@ -55,7 +55,9 @@ void main() {
   });
 
   testWidgets('上級機能フラグをONにするとドロワーに入口が出る', (tester) async {
-    await AppSettings().set('showAdvancedFeatures', true);
+    await tester.runAsync(
+      () => AppSettings().set('showAdvancedFeatures', true),
+    );
 
     await tester.pumpWidget(const MaterialApp(home: HomeDrawer()));
     await tester.pumpAndSettle();
@@ -65,7 +67,9 @@ void main() {
   });
 
   testWidgets('ドロワーの「局面検索」から検索画面を開ける', (tester) async {
-    await AppSettings().set('showAdvancedFeatures', true);
+    await tester.runAsync(
+      () => AppSettings().set('showAdvancedFeatures', true),
+    );
 
     await tester.pumpWidget(const MaterialApp(home: HomeDrawer()));
     await tester.tap(find.text('局面検索'));
