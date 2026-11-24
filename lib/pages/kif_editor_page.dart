@@ -19,6 +19,7 @@ import 'package:kifdamari/logic/kif_parser.dart';
 import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
+import 'package:kifdamari/widgets/app_popup_menu_style.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/handicap_selector.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
@@ -1038,29 +1039,28 @@ class _KifEditorPageState extends State<KifEditorPage> {
               fit: BoxFit.scaleDown,
               child: MenuAnchor(
                 alignmentOffset: const Offset(0, 0),
-                style: MenuStyle(
-                  shape: WidgetStateProperty.all(
-                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  elevation: WidgetStateProperty.all(8),
-                ),
+                style: AppPopupMenuStyle.menuStyle,
                 menuChildren: [
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.folder_open, size: 20),
                     child: const Text('棋譜ファイルを開く'),
                     onPressed: _openLocalFile,
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.content_paste, size: 20),
                     child: const Text('クリップボードから貼り付け'),
                     onPressed: _pasteFromClipboard,
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.save, size: 20),
                     child: const Text('保存する'),
                     onPressed: _saveKifData,
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.swap_horiz, size: 20),
                     onPressed: kifTree!.canChangeHandicap ? _selectHandicap : null,
                     child: kifTree!.canChangeHandicap
@@ -1068,6 +1068,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                         : Text('手合割：${kifTree!.info['手合割'] ?? '平手'}（変更不可）'),
                   ),
                   MenuItemButton(
+                    style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.account_tree, size: 20),
                     child: const Text('棋譜ツリーを表示'),
                     onPressed: () {
