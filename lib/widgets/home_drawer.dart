@@ -13,250 +13,253 @@ class HomeDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              color: Color(0xFF3B56C4),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    'assets/images/icon.png',
-                    width: 50,
-                    height: 50,
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Color(0xFF3B56C4),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/images/icon.png',
+                      width: 50,
+                      height: 50,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '棋譜だまり',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
+                  const SizedBox(height: 12),
+                  const Text(
+                    '棋譜だまり',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Ver ' + currentVersion,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ver ' + currentVersion,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // 局面管理（③統合ツリーの入口）
-          const SizedBox(height: 8),
-          ListTile(
-            leading: const Icon(Icons.account_tree),
-            title: const Text('統合ツリー'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const IntegratedTreeRootPage(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          // 局面検索（①検索ロジックとパターン編集画面）
-          ListTile(
-            leading: const Icon(Icons.search),
-            title: const Text('局面検索'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PositionSearchPage(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-            child: Text(
-              'アプリについて',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                ],
               ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('設定'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SettingPage(),
+            // 局面管理（③統合ツリーの入口）
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.account_tree),
+              title: const Text('統合ツリー'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const IntegratedTreeRootPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            // 局面検索（①検索ロジックとパターン編集画面）
+            ListTile(
+              leading: const Icon(Icons.search),
+              title: const Text('局面検索'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PositionSearchPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              child: Text(
+                'アプリについて',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
                 ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.menu_book),
-            title: const Text('使い方'),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('設定'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingPage(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.menu_book),
+              title: const Text('使い方'),
+                onTap: () async {
+                Navigator.pop(context);
+                final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-manual');
+                try {
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(
+                      url,
+                    );
+                  } else {
+                    if (context.mounted) {
+                      ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                    }
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                  }
+                }
+              }
+            ),
+            ListTile(
+              leading: const Icon(Icons.info_outlined),
+              title: const Text('バージョン情報'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const VersionInfoPage(),
+                  ),
+                );
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              child: Text(
+                'SNS',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('公式𝕏（旧Twitter）'),
               onTap: () async {
-              Navigator.pop(context);
-              final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-manual');
-              try {
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(
-                    url,
-                  );
-                } else {
+                Navigator.pop(context);
+                final Uri url = Uri.parse('https://x.com/kif_damari');
+                try {
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(
+                      url, 
+                      mode: LaunchMode.externalApplication,
+                    );
+                  } else {
+                    if (context.mounted) {
+                      ShowErrorSnackbar.show(context, "リンクを開けませんでした");
+                    }
+                  }
+                } catch (e) {
                   if (context.mounted) {
-                    ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                    ShowErrorSnackbar.show(context, "エラーが発生しました");
                   }
                 }
-              } catch (e) {
-                if (context.mounted) {
-                  ShowErrorSnackbar.show(context, "ページを開けませんでした");
-                }
-              }
-            }
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outlined),
-            title: const Text('バージョン情報'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const VersionInfoPage(),
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              child: Text(
+                '法的情報',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
                 ),
-              );
-            },
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-            child: Text(
-              'SNS',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
               ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.share),
-            title: const Text('公式𝕏（旧Twitter）'),
-            onTap: () async {
-              Navigator.pop(context);
-              final Uri url = Uri.parse('https://x.com/kif_damari');
-              try {
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(
-                    url, 
-                    mode: LaunchMode.externalApplication,
-                  );
-                } else {
-                  if (context.mounted) {
-                    ShowErrorSnackbar.show(context, "リンクを開けませんでした");
+            ListTile(
+              leading: const Icon(Icons.privacy_tip),
+              title: const Text('プライバシーポリシー'),
+              onTap: () async {
+                Navigator.pop(context);
+                final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-privacy');
+                try {
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(
+                      url,
+                    );
+                  } else {
+                    if (context.mounted) {
+                      ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                    }
                   }
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ShowErrorSnackbar.show(context, "エラーが発生しました");
-                }
-              }
-            },
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-            child: Text(
-              '法的情報',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip),
-            title: const Text('プライバシーポリシー'),
-            onTap: () async {
-              Navigator.pop(context);
-              final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-privacy');
-              try {
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(
-                    url,
-                  );
-                } else {
+                } catch (e) {
                   if (context.mounted) {
                     ShowErrorSnackbar.show(context, "ページを開けませんでした");
                   }
                 }
-              } catch (e) {
-                if (context.mounted) {
-                  ShowErrorSnackbar.show(context, "ページを開けませんでした");
-                }
-              }
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text('利用規約'),
-            onTap: () async {
-              Navigator.pop(context);
-              final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-terms');              
-              try {
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(
-                    url,
-                  );
-                } else {
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('利用規約'),
+              onTap: () async {
+                Navigator.pop(context);
+                final Uri url = Uri.parse('https://sites.google.com/view/kifdamari-terms');              
+                try {
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(
+                      url,
+                    );
+                  } else {
+                    if (context.mounted) {
+                      ShowErrorSnackbar.show(context, "ページを開けませんでした");
+                    }
+                  }
+                } catch (e) {
                   if (context.mounted) {
                     ShowErrorSnackbar.show(context, "ページを開けませんでした");
                   }
                 }
-              } catch (e) {
-                if (context.mounted) {
-                  ShowErrorSnackbar.show(context, "ページを開けませんでした");
-                }
-              }
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.verified_user_outlined),
-            title: const Text('ライセンス'),
-            onTap: () {
-              Navigator.pop(context);
-              showLicensePage(
-                context: context,
-                applicationName: '棋譜だまり',
-                applicationVersion: currentVersion,
-                applicationIcon: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Image.asset(
-                    'assets/images/icon.png',
-                    width: 48,
-                    height: 48,
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('ライセンス'),
+              onTap: () {
+                Navigator.pop(context);
+                showLicensePage(
+                  context: context,
+                  applicationName: '棋譜だまり',
+                  applicationVersion: currentVersion,
+                  applicationIcon: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Image.asset(
+                      'assets/images/icon.png',
+                      width: 48,
+                      height: 48,
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
