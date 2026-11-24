@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:kifdamari/logic/position_searcher.dart';
 import 'package:kifdamari/pages/position_search_page.dart';
+import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/home_drawer.dart';
 
 Finder pieceOnBoard(int gridX, int gridY, String pieceName) =>
@@ -29,7 +33,44 @@ Future<void> pumpAtSize(WidgetTester tester, Size size) async {
 }
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final dir = await Directory.systemTemp.createTemp('kifdamari_drawer_test');
+    Hive.init(dir.path);
+    await Hive.openBox('settings_box');
+  });
+
+  tearDown(() async {
+    await AppSettings().set('showAdvancedFeatures', false);
+  });
+
+  testWidgets('デフォルトではドロワーに上級機能の入口が出ない', (tester) async {
+    expect(AppSettings().showAdvancedFeatures, isFalse);
+
+    await tester.pumpWidget(const MaterialApp(home: HomeDrawer()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('統合ツリー'), findsNothing);
+    expect(find.text('局面検索'), findsNothing);
+  });
+
+  testWidgets('上級機能フラグをONにするとドロワーに入口が出る', (tester) async {
+    await tester.runAsync(
+      () => AppSettings().set('showAdvancedFeatures', true),
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: HomeDrawer()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('統合ツリー'), findsOneWidget);
+    expect(find.text('局面検索'), findsOneWidget);
+  });
+
   testWidgets('ドロワーの「局面検索」から検索画面を開ける', (tester) async {
+    await tester.runAsync(
+      () => AppSettings().set('showAdvancedFeatures', true),
+    );
+
     await tester.pumpWidget(const MaterialApp(home: HomeDrawer()));
     await tester.tap(find.text('局面検索'));
     await tester.pumpAndSettle();
