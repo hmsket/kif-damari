@@ -87,11 +87,17 @@ class AppearanceSidebar extends StatelessWidget {
                             itemBuilder: (context, index) {
                               final appearance = appearances[index];
                               final kif = kifById[appearance.kifId];
+                              final selected = isCurrent(appearance);
 
                               return ListTile(
                                 dense: true,
-                                selected: isCurrent(appearance),
-                                selectedTileColor: Colors.orange[50],
+                                selected: selected,
+                                // 項目の境目が分かるように白と薄いグレーを交互に敷く。
+                                // 選択中の項目は selectedTileColor を優先して見分けられるようにする。
+                                tileColor: index.isEven
+                                    ? Colors.white
+                                    : Colors.grey[100],
+                                selectedTileColor: Colors.orange[100],
                                 title: Text(
                                   (kif?.title.isNotEmpty ?? false) ? kif!.title : '（タイトルなし）',
                                   maxLines: 1,
