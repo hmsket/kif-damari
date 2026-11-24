@@ -1580,6 +1580,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                           child: KifTreeView(
                             rootNode: kifTree!.root,
                             currentNode: kifTree!.currentNode,
+                            showNodeIcons: false, // 編集画面では吹き出し等のアイコンを出さず×ボタンと重ねない
                             onNodeSelected: (selectedNode) {
                               setState(() {
                                 kifTree!.currentNode = selectedNode;

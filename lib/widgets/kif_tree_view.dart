@@ -17,6 +17,9 @@ class KifTreeView extends StatefulWidget {
   // 分岐アイコン（ノード左上）を表示するか。統合ツリー表示では false にする（吹き出しは表示する）
   final bool showBranchIcon;
 
+  // 吹き出し等の局面ノードのアイコンを表示するか。編集画面では false にする（×ボタンとの重なりを避ける）
+  final bool showNodeIcons;
+
   // ノードカードを影なし・背景白にするか。統合ツリー表示では true にする
   // （現在ノードのオレンジ枠など、影・背景以外の区別表現は維持する）
   final bool flatNodeCards;
@@ -28,6 +31,7 @@ class KifTreeView extends StatefulWidget {
     required this.onNodeSelected,
     this.onNodeDeleted, // 💡 編集画面でのみ渡す
     this.showBranchIcon = true,
+    this.showNodeIcons = true,
     this.flatNodeCards = false,
   });
 
@@ -572,7 +576,7 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                 ],
               ),
               // 💡 分岐アイコン（×ボタンと重ならないよう左上に配置）
-              if (hasBranch && !isCurrent && widget.showBranchIcon)
+              if (hasBranch && !isCurrent && widget.showBranchIcon && widget.showNodeIcons)
                 const Positioned(
                   top: 2,
                   left: 2,
@@ -583,7 +587,8 @@ class _KifTreeViewState extends State<KifTreeView> with TickerProviderStateMixin
                   ),
                 ),
               // 💡 コメント付き局面ノードの印（青い吹き出し・右上に配置）
-              if (node.comments.isNotEmpty || node.positionComments.isNotEmpty)
+              if ((node.comments.isNotEmpty || node.positionComments.isNotEmpty) &&
+                  widget.showNodeIcons)
                 const Positioned(
                   top: 2,
                   right: 2,

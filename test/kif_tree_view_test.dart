@@ -152,4 +152,81 @@ void main() {
 
     expect(find.byIcon(Icons.cancel), findsNothing);
   });
+
+  GameNode buildTreeWithComments() {
+    final root = buildNode(0);
+    root.addComment('開始局面のコメント');
+    final first = buildNode(1, moveLabel: '+7776FU');
+    first.addComment('コメントあり');
+    root.addChild(first);
+    final branch = buildNode(1, moveLabel: '+3334FU');
+    branch.addPositionComment('局面メモあり');
+    root.addChild(branch);
+    return first;
+  }
+
+  testWidgets('showNodeIcons が false なら吹き出し・分岐アイコンは出ず×ボタンだけ残る', (tester) async {
+    final current = buildTreeWithComments();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: KifTreeView(
+            rootNode: current.parent!,
+            currentNode: current,
+            showNodeIcons: false,
+            onNodeSelected: (_) {},
+            onNodeDeleted: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.chat_bubble_rounded), findsNothing);
+    expect(find.byIcon(Icons.alt_route), findsNothing);
+    expect(find.byIcon(Icons.cancel), findsNWidgets(2));
+  });
+
+  testWidgets('デフォルトでは吹き出しと分岐アイコンを表示する', (tester) async {
+    final current = buildTreeWithComments();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: KifTreeView(
+            rootNode: current.parent!,
+            currentNode: current,
+            onNodeSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.chat_bubble_rounded), findsNWidgets(3));
+    expect(find.byIcon(Icons.alt_route), findsOneWidget);
+  });
+
+  testWidgets('統合ツリー設定でも吹き出しは従来通り表示する', (tester) async {
+    final current = buildTreeWithComments();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: KifTreeView(
+            rootNode: current.parent!,
+            currentNode: current,
+            showBranchIcon: false,
+            flatNodeCards: true,
+            onNodeSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.chat_bubble_rounded), findsNWidgets(3));
+    expect(find.byIcon(Icons.alt_route), findsNothing);
+  });
 }
