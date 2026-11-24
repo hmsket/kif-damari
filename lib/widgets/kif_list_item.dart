@@ -3,6 +3,7 @@ import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/edit_kif_dialog.dart';
 import 'package:kifdamari/pages/home_page.dart';
 import 'package:kifdamari/pages/kif_viewer_page.dart';
+import 'package:kifdamari/widgets/circular_icon_background.dart';
 import 'package:kifdamari/widgets/kif_item_widget.dart';
 
 class KifListItem extends StatelessWidget {
@@ -28,7 +29,9 @@ class KifListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget? trailingWidget;
     if (mode == AppMode.edit) {
-      trailingWidget = const Icon(Icons.edit, color: Colors.green);
+      trailingWidget = const CircularIconBackground(
+        child: Icon(Icons.edit, color: Colors.green),
+      );
     } else if (mode == AppMode.normal && kif.isPendingSend) {
       trailingWidget = _buildPendingBadge();
     }
@@ -159,7 +162,9 @@ class KifGridItem extends StatelessWidget {
         onChanged: onChanged,
       );
     } else if (mode == AppMode.edit) {
-      return const Icon(Icons.edit, color: Colors.green);
+      return const CircularIconBackground(
+        child: Icon(Icons.edit, color: Colors.green),
+      );
     }
     return const SizedBox.shrink();
   }
