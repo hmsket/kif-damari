@@ -21,6 +21,7 @@ import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/app_popup_menu_style.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
+import 'package:kifdamari/widgets/dial_dot_layout.dart';
 import 'package:kifdamari/widgets/handicap_selector.dart';
 import 'package:kifdamari/widgets/kif_board.dart';
 import 'package:kifdamari/models/board_state.dart';
@@ -1290,36 +1291,53 @@ class _KifEditorPageState extends State<KifEditorPage> {
       child: Transform.rotate(
         angle: _dialRotation,
         child: SizedBox.expand(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // 中心のフラットな円
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFF5F5F5),
-                ),
-              ),
-              // 回転ポインター（ツマミ）
-              Positioned(
-                left: 53,
-                top: 8,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF424242),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final center = constraints.maxWidth / 2;
+              const radius = 45.0;
+              const pointCount = 4;
+              Offset offsetOf(int index, double size) => dialDotPosition(
+                    center: center,
+                    radius: radius,
+                    index: index,
+                    count: pointCount,
+                    size: size,
+                  );
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 中心のフラットな円
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFF5F5F5),
+                    ),
                   ),
-                ),
-              ),
-              // 周囲の目盛りドット
-              Positioned(left: 57.5, top: 102.5, child: _buildDialDot()),
-              Positioned(left: 12.5, top: 57.5, child: _buildDialDot()),
-              Positioned(left: 102.5, top: 57.5, child: _buildDialDot()),
-            ],
+                  // 回転ポインター（ツマミ）
+                  Positioned(
+                    left: offsetOf(0, 14).dx,
+                    top: offsetOf(0, 14).dy,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF424242),
+                      ),
+                    ),
+                  ),
+                  // 周囲の目盛りドット
+                  for (var i = 1; i < pointCount; i++)
+                    Positioned(
+                      left: offsetOf(i, 5).dx,
+                      top: offsetOf(i, 5).dy,
+                      child: _buildDialDot(),
+                    ),
+                ],
+              );
+            },
           ),
         ),
       ),
