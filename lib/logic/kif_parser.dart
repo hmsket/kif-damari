@@ -110,6 +110,7 @@ class KifParser {
     GameNode currentNode = tree.root;
 
     int parsedMoveCount = 0;
+    int parsedInfoCount = 0;
 
     for (var line in lines) {
       final trimmedLine = line.trim();
@@ -208,14 +209,14 @@ class KifParser {
         final value = infoMatch.group(2)!.trim();
         if (!key.startsWith('手数')) {
           tree.info[key] = value;
+          parsedInfoCount++;
         }
       }
     }
 
-    // 💡【判定強化】
-    // 1. 指し手が1手もない場合（ヘッダーだけのテキストやただの文章）はエラーとする
-    // （※開始局面のみで指し手のないKIFファイルを許容したい場合は「parsedMoveCount == 0 && parsedInfoCount == 0」にしてください）
-    if (parsedMoveCount == 0) {
+    // 指し手もヘッダー情報もない場合（ただの文章の貼り付け等）はエラーとする
+    // ヘッダー情報だけの0手KIF（氏名を編集した新規棋譜など）は読み込みを許容する
+    if (parsedMoveCount == 0 && parsedInfoCount == 0) {
       throw const FormatException('有効な指し手データが含まれていません。');
     }
 
