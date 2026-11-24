@@ -410,6 +410,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     _refreshPositionInfoIfNeeded();
     _syncCommentFaceWithPosition();
 
+    final bool showAdvanced = AppSettings().showAdvancedFeatures;
     final double sidebarWidth = MediaQuery.of(context).size.width * 0.85;
 
     return Scaffold(
@@ -488,35 +489,37 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
             ),
           ),
           // 画面左端からの右スワイプで左サイドバーを開く
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 24,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) > 100) {
-                  _openLeftSidebar();
-                }
+          if (showAdvanced)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 24,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragEnd: (details) {
+                  if ((details.primaryVelocity ?? 0) > 100) {
+                    _openLeftSidebar();
+                  }
+                },
+              ),
+            ),
+          // 出現する棋譜の左サイドバー（②の「出現一覧」を共用ウィジェットで再利用）
+          if (showAdvanced)
+            AppearanceSidebar(
+              open: _isLeftSidebarOpen,
+              appearances: _appearances,
+              kifById: _kifById,
+              isCurrent: (appearance) =>
+                  appearance.kifId == _currentKifEntity.id &&
+                  appearance.moveNumber == kifTree!.currentNode.moveNumber,
+              onTap: _handleAppearanceTap,
+              onClose: () {
+                setState(() {
+                  _isLeftSidebarOpen = false;
+                });
               },
             ),
-          ),
-          // 出現する棋譜の左サイドバー（②の「出現一覧」を共用ウィジェットで再利用）
-          AppearanceSidebar(
-            open: _isLeftSidebarOpen,
-            appearances: _appearances,
-            kifById: _kifById,
-            isCurrent: (appearance) =>
-                appearance.kifId == _currentKifEntity.id &&
-                appearance.moveNumber == kifTree!.currentNode.moveNumber,
-            onTap: _handleAppearanceTap,
-            onClose: () {
-              setState(() {
-                _isLeftSidebarOpen = false;
-              });
-            },
-          ),
           if (_isSidebarOpen)
             Positioned.fill(
               child: GestureDetector(
@@ -598,66 +601,64 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
 
   Widget _buildCommentPanel() {
     final settings = AppSettings();
+    final bool showAdvanced = settings.showAdvancedFeatures;
     final node = kifTree!.currentNode;
-    final showPositionMemo = _commentFace == _CommentFace.positionMemo;
+    final showPositionMemo =
+        showAdvanced && _commentFace == _CommentFace.positionMemo;
     final hasPositionMemo = node.joinedPositionMemo.trim().isNotEmpty;
 
-    return GestureDetector(
-      onHorizontalDragStart: (_) => _commentSwipeDx = 0.0,
-      onHorizontalDragUpdate: (details) => _commentSwipeDx += details.delta.dx,
-      onHorizontalDragEnd: _handleCommentSwipeEnd,
-      onHorizontalDragCancel: () => _commentSwipeDx = 0.0,
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.8),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Scrollbar(
+    final Widget content = Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Scrollbar(
+              controller: _commentScrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
                 controller: _commentScrollController,
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  controller: _commentScrollController,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12.0),
-                    child: Linkify(
-                      text: showPositionMemo
-                          ? node.joinedPositionMemo
-                          : node.joinedKifComment,
-                      style: TextStyle(
-                        fontSize: settings.get<double>('fontSize'),
-                      ),
-                      strutStyle: StrutStyle(
-                        fontSize: settings.get<double>('fontSize'),
-                        height: 1.5,
-                        forceStrutHeight: true,
-                      ),
-                      linkStyle: const TextStyle(
-                        color: Colors.blue,
-                        decoration: TextDecoration.none,
-                      ),
-                      onOpen: (link) async {
-                        final url = Uri.parse(link.url);
-                        if (await canLaunchUrl(url)) {
-                          await launchUrl(
-                            url,
-                            mode: LaunchMode.externalApplication,
-                          );
-                        } else {
-                          ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
-                        }
-                      },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Linkify(
+                    text: showPositionMemo
+                        ? node.joinedPositionMemo
+                        : node.joinedKifComment,
+                    style: TextStyle(
+                      fontSize: settings.get<double>('fontSize'),
                     ),
+                    strutStyle: StrutStyle(
+                      fontSize: settings.get<double>('fontSize'),
+                      height: 1.5,
+                      forceStrutHeight: true,
+                    ),
+                    linkStyle: const TextStyle(
+                      color: Colors.blue,
+                      decoration: TextDecoration.none,
+                    ),
+                    onOpen: (link) async {
+                      final url = Uri.parse(link.url);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } else {
+                        ShowErrorSnackbar.show(context, 'リンクを開けませんでした');
+                      }
+                    },
                   ),
                 ),
               ),
             ),
+          ),
+          if (showAdvanced)
             SizedBox(
               height: 20,
               child: Row(
@@ -688,9 +689,20 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
                 ],
               ),
             ),
-          ],
-        ),
+        ],
       ),
+    );
+
+    if (!showAdvanced) {
+      return content;
+    }
+
+    return GestureDetector(
+      onHorizontalDragStart: (_) => _commentSwipeDx = 0.0,
+      onHorizontalDragUpdate: (details) => _commentSwipeDx += details.delta.dx,
+      onHorizontalDragEnd: _handleCommentSwipeEnd,
+      onHorizontalDragCancel: () => _commentSwipeDx = 0.0,
+      child: content,
     );
   }
 
@@ -794,6 +806,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
   }
 
   Widget _buildControlPanel() {
+    final bool showAdvanced = AppSettings().showAdvancedFeatures;
     return Container(
       color: const Color(0XFFF1F1F5),
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
@@ -804,7 +817,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
             flex: 1,
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: _hasOtherKifAppearance
+              child: showAdvanced && _hasOtherKifAppearance
                   ? GestureDetector(
                       onTap: _openLeftSidebar,
                       child: Container(

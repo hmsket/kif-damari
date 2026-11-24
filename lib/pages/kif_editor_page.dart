@@ -1126,7 +1126,8 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   void _showCommentEditDialog() async {
     final node = kifTree!.currentNode;
-    final showPositionMemo = _commentFace == _CommentFace.positionMemo;
+    final showPositionMemo = AppSettings().showAdvancedFeatures &&
+        _commentFace == _CommentFace.positionMemo;
     final oldComment = showPositionMemo ? node.joinedPositionMemo : node.joinedKifComment;
     final result = await showCommentEditDialog(context, oldComment);
     if (result == null || !mounted) return;
@@ -1145,60 +1146,58 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
   Widget _buildCommentPanel() {
     final settings = AppSettings();
+    final bool showAdvanced = settings.showAdvancedFeatures;
     final node = kifTree!.currentNode;
-    final showPositionMemo = _commentFace == _CommentFace.positionMemo;
+    final showPositionMemo =
+        showAdvanced && _commentFace == _CommentFace.positionMemo;
     final String currentText =
         showPositionMemo ? node.joinedPositionMemo : node.joinedKifComment;
     final bool hasPositionMemo = node.joinedPositionMemo.trim().isNotEmpty;
 
-    return GestureDetector(
-      onHorizontalDragStart: (_) => _commentSwipeDx = 0.0,
-      onHorizontalDragUpdate: (details) => _commentSwipeDx += details.delta.dx,
-      onHorizontalDragEnd: _handleCommentSwipeEnd,
-      onHorizontalDragCancel: () => _commentSwipeDx = 0.0,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.8),
+    final Widget content = Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _showCommentEditDialog,
           borderRadius: BorderRadius.circular(8),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _showCommentEditDialog,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: IgnorePointer(
-                      child: SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 12.0),
-                          child: Text(
-                            currentText.isEmpty
-                                ? (showPositionMemo
-                                    ? 'タップしてこの局面のメモを入力'
-                                    : 'タップして棋譜コメントを入力')
-                                : currentText,
-                            style: TextStyle(
-                              fontSize: settings.get<double>('fontSize'),
-                              color: currentText.isEmpty ? Colors.grey[400] : Colors.black87,
-                            ),
-                            strutStyle: StrutStyle(
-                              fontSize: settings.get<double>('fontSize'),
-                              height: 1.5,
-                              forceStrutHeight: true,
-                            ),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 12.0, top: 12.0, right: 12.0, bottom: 0.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: IgnorePointer(
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: Text(
+                          currentText.isEmpty
+                              ? (showPositionMemo
+                                  ? 'タップしてこの局面のメモを入力'
+                                  : 'タップして棋譜コメントを入力')
+                              : currentText,
+                          style: TextStyle(
+                            fontSize: settings.get<double>('fontSize'),
+                            color: currentText.isEmpty ? Colors.grey[400] : Colors.black87,
+                          ),
+                          strutStyle: StrutStyle(
+                            fontSize: settings.get<double>('fontSize'),
+                            height: 1.5,
+                            forceStrutHeight: true,
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
+                if (showAdvanced)
                   SizedBox(
                     height: 20,
                     child: Row(
@@ -1229,12 +1228,23 @@ class _KifEditorPageState extends State<KifEditorPage> {
                       ],
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
       ),
+    );
+
+    if (!showAdvanced) {
+      return content;
+    }
+
+    return GestureDetector(
+      onHorizontalDragStart: (_) => _commentSwipeDx = 0.0,
+      onHorizontalDragUpdate: (details) => _commentSwipeDx += details.delta.dx,
+      onHorizontalDragEnd: _handleCommentSwipeEnd,
+      onHorizontalDragCancel: () => _commentSwipeDx = 0.0,
+      child: content,
     );
   }
 
