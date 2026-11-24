@@ -25,47 +25,49 @@ class SettingPage extends StatelessWidget {
         elevation: 0,
       ),
       backgroundColor: const Color(0XFFF1F1F5),
-      body: ValueListenableBuilder(
-        valueListenable: settings.listenable,
-        builder: (context, box, child) {
-          return ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              _buildSectionTitle('ホーム画面'),
-              
-              KifRewardSetting(settings: settings),
+      body: SafeArea(
+        child: ValueListenableBuilder(
+          valueListenable: settings.listenable,
+          builder: (context, box, child) {
+            return ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                _buildSectionTitle('ホーム画面'),
+                
+                KifRewardSetting(settings: settings),
 
-              ThumbnailSizeSetting(settings: settings),
+                ThumbnailSizeSetting(settings: settings),
 
-              DefaultColorSetting(settings: settings),
+                DefaultColorSetting(settings: settings),
 
-              HomeViewModeSetting(settings: settings),
+                HomeViewModeSetting(settings: settings),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _buildSectionTitle('棋譜追加'),
+                _buildSectionTitle('棋譜追加'),
 
-              KifTemplateSetting(settings: settings),
+                KifTemplateSetting(settings: settings),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _buildSectionTitle('棋譜の保存'),
+                _buildSectionTitle('棋譜の保存'),
 
-              DefaultSaveLocationSetting(settings: settings),
+                DefaultSaveLocationSetting(settings: settings),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _buildSectionTitle('棋譜再生画面'),
+                _buildSectionTitle('棋譜再生画面'),
 
-              FontSizeSetting(settings: settings),
+                FontSizeSetting(settings: settings),
 
-              TreeScrollSpeedSetting(settings: settings),
+                TreeScrollSpeedSetting(settings: settings),
 
-              DialDegreesPerMoveSetting(settings: settings),
+                DialDegreesPerMoveSetting(settings: settings),
 
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
