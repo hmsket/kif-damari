@@ -10,9 +10,17 @@ name: opencode
 # TAILSCALE_EXIT_NODE (スマホの Tailscale IP 100.x.x.x)。
 # スマホ側で Run as exit node の有効化と管理画面での承認が前提。
 #
-# モデルは無料枠のみ・学習に使われないモデルのみで2段フォールバック:
-#   1段目: opencode/glm-5.3-flash-free (GLM-5.3-Flash Free)
-#   2段目: opencode/deepseek-v4.1-flash-free (DeepSeek V4.1 Flash Free)
+# モデルは OpenCode Go (2026-11-24 課金開始) の2段フォールバック:
+#   1段目: opencode-go/deepseek-v4.1-flash (DeepSeek V4.1 Flash, Go)
+#   2段目: opencode-go/hungerg-free (HungerG Free, Go)
+# どちらも学習なし・ZDR (保持0日)。HungerG Free は期間限定の無料モデルで
+# Go の共有枠を消費しない。プロモ終了で消えた場合は2段目が失敗するので、
+# その時は2段目を opencode-go/hy4 (Hy4, Go) に戻すこと。
+# 認証は Secrets の OPENCODE_API_KEY
+# (OpenCode Console で発行した Go の API キー)。
+# 注意: DeepSeek を Go で使うには Console の Settings > Privacy で
+# Regions の Global を有効化しておくこと (未設定だと弾かれる場合がある)。
+# (旧構成は無料枠2段: Hy4 Flash Free → DeepSeek V4.1 Flash Free)
 # 指示は AGENTS.md に集約 (SDK取得・検証コマンド禁止, 検証はCI)。
 # 認証情報は保持する (persist-credentials 既定true): エージェントの git push に必要。
 # PR作成には専用PAT (OPENCODE_PAT) を使う。ただしエージェントの push は
@@ -89,25 +97,27 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads" --jq '.[] | "\(.ref) \(.object.sha)"' | sort > /tmp/refs_before.txt
           wc -l /tmp/refs_before.txt
 
-      - name: Run OpenCode (primary - Hy4 Flash Free)
+      - name: Run OpenCode (primary - DeepSeek V4.1 Flash via Go)
         id: oc_primary
         timeout-minutes: 40
         continue-on-error: true
         uses: anomalyco/opencode/github@latest
         env:
           GITHUB_TOKEN: ${{ secrets.OPENCODE_PAT }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: opencode/hy4-flash-free
+          model: opencode-go/deepseek-v4.1-flash
           use_github_token: true
 
-      - name: Run OpenCode (fallback - DeepSeek V4.1 Flash Free)
+      - name: Run OpenCode (fallback - HungerG Free via Go)
         if: steps.oc_primary.outcome == 'failure'
         timeout-minutes: 40
         uses: anomalyco/opencode/github@latest
         env:
           GITHUB_TOKEN: ${{ secrets.OPENCODE_PAT }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: opencode/deepseek-v4.1-flash-free
+          model: opencode-go/hungerg-free
           use_github_token: true
 
       # push 検知 (ci-build ジョブへの出力)。対象は opencode/ で始まるブランチのみ。
