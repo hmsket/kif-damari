@@ -63,6 +63,17 @@ class KifSavePlanner {
       return KifSavePlan(mode: KifSaveMode.overwriteRemote, targetPath: currentPath);
     }
 
+    if (currentPath.startsWith('file://')) {
+      final localPath = Uri.parse(currentPath).toFilePath();
+      if (await fileExists(localPath)) {
+        return KifSavePlan(
+          mode: KifSaveMode.overwriteLocal,
+          targetPath: currentPath,
+        );
+      }
+      return _newPlan(defaultTreeUri);
+    }
+
     if (await fileExists(currentPath)) {
       return KifSavePlan(mode: KifSaveMode.overwriteLocal, targetPath: currentPath);
     }

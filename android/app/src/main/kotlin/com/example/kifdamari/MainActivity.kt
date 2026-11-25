@@ -14,13 +14,24 @@ import java.io.OutputStream
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.kifdamari/saf"
+    private val INTENT_CHANNEL = "com.kifdamari/intent"
     private val REQUEST_CODE_OPEN = 1001
     private val REQUEST_CODE_OPEN_TREE = 1002
     private var pendingResult: MethodChannel.Result? = null
+    private var intentChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        intentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INTENT_CHANNEL)
+        intentChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialViewUri" -> result.success(extractViewUri(intent))
+                else -> result.notImplemented()
+            }
+        }
+
+        persistReadPermission(intent)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "pickFile" -> {
@@ -125,6 +136,38 @@ class MainActivity: FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        val uri = extractViewUri(intent) ?: return
+        persistReadPermission(intent)
+        intentChannel?.invokeMethod("onViewIntent", uri)
+    }
+
+    /// ACTION_VIEW で渡された content:// / file:// の URI を取り出す。
+    private fun extractViewUri(intent: Intent?): String? {
+        if (intent == null || intent.action != Intent.ACTION_VIEW) return null
+        val uri: Uri = intent.data ?: return null
+        val scheme = uri.scheme ?: return null
+        if (scheme != "content" && scheme != "file") return null
+        return uri.toString()
+    }
+
+    /// 受け取った URI の読み取り権限を可能な範囲で永続化する。
+    private fun persistReadPermission(intent: Intent?) {
+        val uri: Uri = intent?.data ?: return
+        val takeFlags = intent.flags and (
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+        if (takeFlags == 0) return
+        try {
+            contentResolver.takePersistableUriPermission(uri, takeFlags)
+        } catch (e: Exception) {
+            // 永続化に対応していないプロバイダでは、その場限りの権限で読み込む。
         }
     }
 

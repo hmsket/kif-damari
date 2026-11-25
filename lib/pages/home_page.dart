@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/logic/incoming_kif_service.dart';
+import 'package:kifdamari/logic/kif_import_service.dart';
 import 'package:kifdamari/logic/pending_kif_sender.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
+import 'package:kifdamari/pages/kif_viewer_page.dart';
 import 'package:kifdamari/settings/kif_reward_setting.dart';
+import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/widgets/app_popup_menu_style.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
 import 'package:kifdamari/widgets/circular_icon_background.dart';
@@ -38,11 +42,65 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   final Map<int, GlobalKey<KifListWidgetState>> _listKeys = {};
 
+  final List<String> _incomingKifUris = [];
+  bool _isProcessingIncomingKif = false;
+
   @override
   void initState() {
     super.initState();
     _loadTabs();
     _sendPendingKifs();
+    IncomingKifService.listen(_enqueueIncomingKifUri);
+  }
+
+  void _enqueueIncomingKifUri(String uri) {
+    _incomingKifUris.add(uri);
+    _processIncomingKifUris();
+  }
+
+  Future<void> _processIncomingKifUris() async {
+    if (_isProcessingIncomingKif) return;
+    _isProcessingIncomingKif = true;
+    try {
+      while (_incomingKifUris.isNotEmpty) {
+        final uri = _incomingKifUris.removeAt(0);
+        await _openIncomingKif(uri);
+      }
+    } finally {
+      _isProcessingIncomingKif = false;
+    }
+  }
+
+  /// 他のアプリから受け取った棋譜を現在のタブへ登録し、再生画面で開く。
+  Future<void> _openIncomingKif(String uri) async {
+    try {
+      final tabs = await TabDao().getAllTabs();
+      if (tabs.isEmpty) {
+        if (mounted) ShowErrorSnackbar.show(context, '棋譜を登録するタブがありません');
+        return;
+      }
+
+      final currentIndex = _tabController?.index ?? _currentTabIndex;
+      final tabIndex =
+          currentIndex >= 0 && currentIndex < tabs.length ? currentIndex : 0;
+
+      final kif = await const KifImportService().importFromUri(
+        uri: uri,
+        tabId: tabs[tabIndex].id!,
+      );
+
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => KifViewerPage(kifEntity: kif),
+        ),
+      );
+      if (mounted) _refresh();
+    } catch (e) {
+      debugPrint('受信した棋譜ファイルの読み込みエラー: $e');
+      if (mounted) ShowErrorSnackbar.show(context, '棋譜ファイルを開けませんでした');
+    }
   }
 
   /// アプリ起動時に、オフラインで退避した「送信待ち」棋譜の自動送信を試みる。

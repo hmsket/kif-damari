@@ -116,5 +116,30 @@ void main() {
 
       expect(plan.mode, KifSaveMode.newInternal);
     });
+
+    test('file:// URI の取り込み棋譜は元のファイルへ上書きする', () async {
+      const uri = 'file:///storage/emulated/0/Download/1000.kif';
+      final plan = await KifSavePlanner.plan(
+        currentPath: uri,
+        pendingTreeUri: null,
+        defaultTreeUri: 'content://tree/downloads',
+        fileExists: (path) async => path == '/storage/emulated/0/Download/1000.kif',
+      );
+
+      expect(plan.mode, KifSaveMode.overwriteLocal);
+      expect(plan.targetPath, uri);
+      expect(plan.treeUri, isNull);
+    });
+
+    test('file:// URI の元ファイルが消えている場合は新規作成として扱う', () async {
+      final plan = await KifSavePlanner.plan(
+        currentPath: 'file:///storage/emulated/0/Download/1000.kif',
+        pendingTreeUri: null,
+        defaultTreeUri: '',
+        fileExists: (_) async => false,
+      );
+
+      expect(plan.mode, KifSaveMode.newInternal);
+    });
   });
 }
