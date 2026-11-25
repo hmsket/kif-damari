@@ -32,6 +32,7 @@ class KifdamariApp extends StatelessWidget {
       home: const HomePage(),
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: GoogleFonts.notoSansJp().fontFamily,
         textTheme: GoogleFonts.notoSansJpTextTheme(),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E88E5)),
       ),
