@@ -1457,7 +1457,10 @@ class _KifEditorPageState extends State<KifEditorPage> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
-                                child: _buildLargeOverlayDial(),
+                                child: FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: _buildLargeOverlayDial(),
+                                ),
                               ),
                             ),
                           ),
