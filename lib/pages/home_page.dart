@@ -353,6 +353,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ]
                 : <Widget>[
+                if (_currentMode != AppMode.normal)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
