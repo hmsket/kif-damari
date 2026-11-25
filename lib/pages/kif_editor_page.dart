@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:charset_converter/charset_converter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,8 +11,11 @@ import 'package:kifdamari/database/dao/position_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/dialogs/comment_edit_dialog.dart';
 import 'package:kifdamari/dialogs/discard_changes_dialog.dart';
+import 'package:kifdamari/logic/diagram_generator.dart';
+import 'package:kifdamari/logic/handicap_thumbnail_helper.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
 import 'package:kifdamari/logic/kif_save_planner.dart';
+import 'package:kifdamari/logic/thumbnail_manager.dart';
 import 'package:kifdamari/logic/pending_kif_sender.dart';
 import 'package:kifdamari/logic/shogi_rule_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
@@ -1904,6 +1908,32 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
   }
 
+  /// 0手かつ駒落ちの棋譜は、ルート局面から開始局面のサムネイルを生成する。
+  /// 生成できない場合は null を返し、既存の imgPath を維持する。
+  Future<String?> _generateStartThumbnailIfNeeded(KifTree tree) async {
+    if (!HandicapThumbnailHelper.shouldGenerateForStartPosition(
+      totalMoveCount: tree.totalMoveCount,
+      handicapLabel: tree.info['手合割'],
+    )) {
+      return null;
+    }
+
+    try {
+      final uiImage = await DiagramGenerator.generate(tree.root.state);
+      final byteData = await uiImage.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+
+      return await ThumbnailManager.saveThumbnail(
+        _currentEntity.tabId,
+        _currentEntity.kifId,
+        byteData.buffer.asUint8List(),
+      );
+    } catch (e) {
+      debugPrint("サムネイル生成エラー: $e");
+      return null;
+    }
+  }
+
   Future<void> _saveKifData() async {
     if (kifTree == null) return;
 
@@ -1918,6 +1948,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
 
     try {
       final saveResult = await _writeKifFile(kifData);
+      final startThumbnailPath = await _generateStartThumbnailIfNeeded(kifTree!);
 
       final titleText = _generateTitleText();
       final detailText = _generateDetailText();
@@ -1930,7 +1961,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         detail: detailText,
         kifOrder: _currentEntity.kifOrder,
         kifPath: saveResult.kifPath,
-        imgPath: _currentEntity.imgPath,
+        imgPath: startThumbnailPath ?? _currentEntity.imgPath,
         color: _currentEntity.color,
         pendingTreeUri: saveResult.pendingTreeUri,
       );
