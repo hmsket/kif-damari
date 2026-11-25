@@ -35,7 +35,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final labelFinder = find.text('0手目');
+    final labelFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is Text &&
+          widget.data == '0手目' &&
+          widget.style?.fontSize == 11,
+    );
     expect(labelFinder, findsOneWidget);
 
     final gesture = await tester.startGesture(tester.getCenter(labelFinder));
