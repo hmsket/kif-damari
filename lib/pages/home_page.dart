@@ -243,7 +243,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     // 削除モードのときはキャンセルボタンを表示
                     if (_currentMode == AppMode.delete)
                       IconButton(
-                        icon: const Icon(Icons.close, size: 30),
+                        icon: const Icon(Icons.close),
                         tooltip: 'キャンセル',
                         onPressed: () {
                           _updateMode(AppMode.normal);
@@ -260,7 +260,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             _currentMode == AppMode.delete
                                 ? Icons.delete
                                 : Icons.check,
-                            size: 30,
                           ),
                           onPressed: () async {
                             if (_currentMode == AppMode.sort) {
