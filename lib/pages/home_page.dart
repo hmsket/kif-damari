@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
+import 'package:kifdamari/logic/backup_service.dart';
 import 'package:kifdamari/logic/incoming_kif_service.dart';
 import 'package:kifdamari/logic/kif_import_service.dart';
 import 'package:kifdamari/logic/pending_kif_sender.dart';
@@ -56,6 +57,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _loadTabs();
     _sendPendingKifs();
     IncomingKifService.listen(_enqueueIncomingKifUri);
+    BackupService.restoreRevision.addListener(_onRestoreCompleted);
+  }
+
+  /// バックアップからの復元でDBが置き換わった際に、画面を丸ごと読み直す。
+  void _onRestoreCompleted() {
+    if (!mounted) return;
+    final oldController = _tabController;
+    _tabController = null;
+    _listKeys.clear();
+    setState(() {
+      _currentTabIndex = 0;
+      _loadTabs();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      oldController?.dispose();
+    });
   }
 
   void _enqueueIncomingKifUri(String uri) {
@@ -264,6 +281,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    BackupService.restoreRevision.removeListener(_onRestoreCompleted);
     _tabController?.dispose();
     _searchController.dispose();
     super.dispose();
