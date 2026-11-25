@@ -32,7 +32,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('削除モードの詳細リストは選択中のみゴミ箱アイコンを表示する', (tester) async {
+  testWidgets('削除モードの詳細リストはチェックボックスで選択状態を表示する', (tester) async {
     await pumpWidget(
       tester,
       KifListItem(
@@ -43,7 +43,7 @@ void main() {
         onChanged: (_) {},
       ),
     );
-    expect(find.byIcon(Icons.delete), findsOneWidget);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
 
     await pumpWidget(
       tester,
@@ -55,10 +55,10 @@ void main() {
         onChanged: (_) {},
       ),
     );
-    expect(find.byIcon(Icons.delete), findsNothing);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
   });
 
-  testWidgets('削除モードのグリッドは選択中のみゴミ箱アイコンを表示する', (tester) async {
+  testWidgets('削除モードのグリッドはチェックボックスで選択状態を表示する', (tester) async {
     await pumpWidget(
       tester,
       KifGridItem(
@@ -69,7 +69,7 @@ void main() {
         onChanged: (_) {},
       ),
     );
-    expect(find.byIcon(Icons.delete), findsOneWidget);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
 
     await pumpWidget(
       tester,
@@ -81,6 +81,6 @@ void main() {
         onChanged: (_) {},
       ),
     );
-    expect(find.byIcon(Icons.delete), findsNothing);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
   });
 }
