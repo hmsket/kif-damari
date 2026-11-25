@@ -256,7 +256,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       child: IgnorePointer(
                         ignoring: _currentMode == AppMode.delete && !hasSelection,
                         child: IconButton(
-                          icon: const Icon(Icons.check, size: 30),
+                          icon: Icon(
+                            _currentMode == AppMode.delete
+                                ? Icons.delete
+                                : Icons.check,
+                            size: 30,
+                          ),
                           onPressed: () async {
                             if (_currentMode == AppMode.sort) {
                               if (tabs.isEmpty) {
