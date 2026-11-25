@@ -16,6 +16,16 @@ class KifDao {
     return result.map((map) => KifEntity.fromMap(map)).toList();
   }
 
+  /// 全タブの棋譜を取得する（ホームの検索用）。
+  Future<List<KifEntity>> getAllKifs() async {
+    final db = await _db;
+    final result = await db.query(
+      'kif',
+      orderBy: 'tab_id ASC, kif_order ASC',
+    );
+    return result.map((map) => KifEntity.fromMap(map)).toList();
+  }
+
   Future<List<KifEntity>> getByIds(List<int> ids) async {
     final uniqueIds = ids.toSet().toList();
     if (uniqueIds.isEmpty) return [];

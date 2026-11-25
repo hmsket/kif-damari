@@ -24,6 +24,7 @@ import 'package:kifdamari/dialogs/edit_tab_dialog.dart';
 import 'package:kifdamari/dialogs/sort_tab_dialog.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/kif_list_widget.dart';
+import 'package:kifdamari/widgets/kif_search_view.dart';
 
 enum AppMode { normal, edit, sort, delete }
 
@@ -41,6 +42,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int _currentTabIndex = 0;
 
   final Map<int, GlobalKey<KifListWidgetState>> _listKeys = {};
+
+  bool _isSearching = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   final List<String> _incomingKifUris = [];
   bool _isProcessingIncomingKif = false;
@@ -130,6 +135,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     setState(() {
       _currentMode = mode;
     });
+  }
+
+  void _openSearch() {
+    _syncTabIndex();
+    setState(() {
+      _isSearching = true;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+  }
+
+  void _closeSearch() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+  }
+
+  void _clearSearch() {
+    _closeSearch();
   }
 
   void _refresh() {
@@ -238,6 +265,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _tabController?.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -286,15 +314,45 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           drawer: const HomeDrawer(),
           appBar: AppBar(
             backgroundColor: const Color(0XFFFFFFFF),
-            title: Row(
-              children: [
-                if (_currentMode != AppMode.normal) ...[
-                  ModeBadge(mode: _currentMode),
-                ],
-              ],
-            ),
-            actions: [
-              if (_currentMode != AppMode.normal)
+            leading: _isSearching
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: '検索を閉じる',
+                    onPressed: _closeSearch,
+                  )
+                : null,
+            title: _isSearching
+                ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    decoration: const InputDecoration(
+                      hintText: 'タイトル・詳細を検索',
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  )
+                : Row(
+                    children: [
+                      if (_currentMode != AppMode.normal) ...[
+                        ModeBadge(mode: _currentMode),
+                      ],
+                    ],
+                  ),
+            actions: _isSearching
+                ? [
+                    IconButton(
+                      icon: const Icon(Icons.clear),
+                      tooltip: 'クリア',
+                      onPressed: _clearSearch,
+                    ),
+                  ]
+                : [
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -354,6 +412,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ],
                 )
               else ...[
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  tooltip: '検索',
+                  onPressed: _openSearch,
+                ),
                 MenuAnchor(
                   style: AppPopupMenuStyle.menuStyle,
                   builder: (BuildContext context, MenuController controller, Widget? child) {
@@ -435,7 +498,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ]
             ],
-            bottom: tabs.isEmpty
+            bottom: (_isSearching || tabs.isEmpty)
                 ? null
                 : PreferredSize(
                     preferredSize: const Size.fromHeight(48.0),
@@ -490,7 +553,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
           ),
-          bottomNavigationBar: hasSelection
+          bottomNavigationBar: hasSelection && !_isSearching
               ? SafeArea(
                   child: Container(
                     color: Colors.red.shade50,
@@ -514,55 +577,68 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 )
               : null,
           body: SafeArea(
-            child: tabs.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 40.0),
-                      child: OutlinedButton.icon(
-                        onPressed: () => showAddTabDialog(context, _refresh),
-                        icon: const Icon(Icons.add, size: 20),
-                        label: const Text(
-                          'タブを追加する',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
+            child: Stack(
+              children: [
+                // 検索中もタブ表示を保持して、閉じたときに
+                // 元のタブ・スクロール位置へ戻れるようにする。
+                Offstage(
+                  offstage: _isSearching,
+                  child: tabs.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 40.0),
+                            child: OutlinedButton.icon(
+                              onPressed: () => showAddTabDialog(context, _refresh),
+                              icon: const Icon(Icons.add, size: 20),
+                              label: const Text(
+                                'タブを追加する',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black87,
+                                side: BorderSide(
+                                  color: Colors.grey.shade400,
+                                ),
+                                elevation: 0,
+                                shape: const StadiumBorder(),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
                           ),
+                        )
+                      : TabBarView(
+                          controller: _tabController,
+                          physics: hasSelection
+                              ? const NeverScrollableScrollPhysics()
+                              : const BouncingScrollPhysics(),
+                          children: tabs.map((t) {
+                            final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
+                            return KifListWidget(
+                              key: key,
+                              tabId: t.id!,
+                              mode: _currentMode,
+                              onRefresh: _refresh,
+                              onAddKifPressed: () => _onAddKifPressed(context, t.id!),
+                              onSelectionChanged: () {
+                                setState(() {});
+                              },
+                            );
+                          }).toList(),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black87,
-                          side: BorderSide(
-                            color: Colors.grey.shade400,
-                          ),
-                          elevation: 0,
-                          shape: const StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : TabBarView(
-                    controller: _tabController,
-                    physics: hasSelection
-                        ? const NeverScrollableScrollPhysics()
-                        : const BouncingScrollPhysics(),
-                    children: tabs.map((t) {
-                      final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
-                      return KifListWidget(
-                        key: key,
-                        tabId: t.id!,
-                        mode: _currentMode,
-                        onRefresh: _refresh,
-                        onAddKifPressed: () => _onAddKifPressed(context, t.id!),
-                        onSelectionChanged: () {
-                          setState(() {});
-                        },
-                      );
-                    }).toList(),
+                ),
+                if (_isSearching)
+                  Positioned.fill(
+                    child: KifSearchView(query: _searchQuery),
                   ),
+              ],
+            ),
           ),
         );
       },
