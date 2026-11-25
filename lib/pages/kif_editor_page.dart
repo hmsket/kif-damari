@@ -14,6 +14,7 @@ import 'package:kifdamari/dialogs/discard_changes_dialog.dart';
 import 'package:kifdamari/logic/diagram_generator.dart';
 import 'package:kifdamari/logic/handicap_thumbnail_helper.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
+import 'package:kifdamari/logic/kif_file_reader.dart';
 import 'package:kifdamari/logic/kif_save_planner.dart';
 import 'package:kifdamari/logic/thumbnail_manager.dart';
 import 'package:kifdamari/logic/pending_kif_sender.dart';
@@ -199,15 +200,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
     }
 
     try {
-      Uint8List? bytes;
-      if (path.startsWith('content://')) {
-        bytes = await SafHelper.readFileBytes(path);
-      } else {
-        final file = File(path);
-        if (await file.exists()) {
-          bytes = await file.readAsBytes();
-        }
-      }
+      final bytes = await KifFileReader.readBytes(path);
 
       if (bytes != null) {
         String content;
@@ -261,15 +254,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
       final String? targetPath = await SafHelper.pickFile();
       if (targetPath == null || targetPath.isEmpty) return;
 
-      Uint8List? bytes;
-      if (targetPath.startsWith('content://')) {
-        bytes = await SafHelper.readFileBytes(targetPath);
-      } else {
-        final file = File(targetPath);
-        if (await file.exists()) {
-          bytes = await file.readAsBytes();
-        }
-      }
+      final bytes = await KifFileReader.readBytes(targetPath);
 
       if (bytes == null) {
         if (mounted) ShowErrorSnackbar.show(context, 'ファイルの読み込みに失敗しました');
@@ -2032,7 +2017,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         final targetPath = plan.mode == KifSaveMode.overwriteLocal
             ? plan.targetPath!
             : await _newInternalKifPath(kifData.fileName);
-        final file = File(targetPath);
+        final file = File(KifFileReader.toLocalPath(targetPath));
         await file.writeAsBytes(kifData.bytes, flush: true);
         return (kifPath: targetPath, pendingTreeUri: null);
 

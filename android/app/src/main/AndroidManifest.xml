@@ -34,6 +34,47 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 他のアプリ（ファイル管理・メール・ブラウザ等）から .kif を受け取る -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="content"/>
+                <data android:scheme="file"/>
+                <data android:pathPattern=".*\\.kif"/>
+                <data android:pathPattern=".*\\..*\\.kif"/>
+                <data android:pathPattern=".*\\..*\\..*\\.kif"/>
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.kif"/>
+            </intent-filter>
+            <!-- 型が付いた content:// でも、パスに .kif があれば受け取る -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="content"/>
+                <data android:scheme="file"/>
+                <data android:mimeType="*/*"/>
+                <data android:pathPattern=".*\\.kif"/>
+                <data android:pathPattern=".*\\..*\\.kif"/>
+                <data android:pathPattern=".*\\..*\\..*\\.kif"/>
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.kif"/>
+            </intent-filter>
+            <!-- .kif 固有の MIME 型（パスに拡張子が残らないプロバイダ向け） -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:mimeType="application/x-kif"/>
+                <data android:mimeType="application/kif"/>
+                <data android:mimeType="text/x-kif"/>
+            </intent-filter>
+            <!-- 拡張子が未知のファイルは application/octet-stream で渡されることが多い -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:mimeType="application/octet-stream"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -12,8 +12,8 @@ import 'package:kifdamari/database/dao/position_appearance_dao.dart';
 import 'package:kifdamari/database/dao/position_dao.dart';
 import 'package:kifdamari/database/entity/position_appearance_entity.dart';
 import 'package:kifdamari/logic/integrated_tree_service.dart';
+import 'package:kifdamari/logic/kif_file_reader.dart';
 import 'package:kifdamari/logic/kif_parser.dart';
-import 'package:kifdamari/logic/saf_helper.dart';
 import 'package:kifdamari/models/kif_tree.dart';
 import 'package:kifdamari/pages/kif_editor_page.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
@@ -136,15 +136,7 @@ class _KifViewerPageState extends State<KifViewerPage> with TickerProviderStateM
     }
 
     try {
-      Uint8List? bytes;
-      if (path.startsWith('content://')) {
-        bytes = await SafHelper.readFileBytes(path);
-      } else {
-        final file = File(path);
-        if (await file.exists()) {
-          bytes = await file.readAsBytes();
-        }
-      }
+      final bytes = await KifFileReader.readBytes(path);
 
       if (bytes != null) {
         String content;
