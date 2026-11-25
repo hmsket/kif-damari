@@ -345,14 +345,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ],
                   ),
             actions: _isSearching
-                ? [
+                ? <Widget>[
                     IconButton(
                       icon: const Icon(Icons.clear),
                       tooltip: 'クリア',
                       onPressed: _clearSearch,
                     ),
                   ]
-                : [
+                : <Widget>[
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
