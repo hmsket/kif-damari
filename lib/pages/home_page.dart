@@ -353,7 +353,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ]
                 : <Widget>[
-                if (_currentMode != AppMode.normal)
+                if (_currentMode != AppMode.normal) ...[
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -412,7 +412,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ],
                 )
-              else ...[
+              ] else ...[
                 IconButton(
                   icon: const Icon(Icons.search),
                   tooltip: '検索',
