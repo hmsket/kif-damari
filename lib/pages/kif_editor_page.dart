@@ -56,6 +56,7 @@ class KifEditorPage extends StatefulWidget {
 class _KifEditorPageState extends State<KifEditorPage> {
   KifTree? kifTree;
   bool _isLoading = true;
+  bool _isSaving = false;
   bool _isReversed = false;
 
   late KifEntity _currentEntity;
@@ -1054,7 +1055,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     style: AppPopupMenuStyle.itemStyle,
                     leadingIcon: const Icon(Icons.save, size: 20),
                     child: const Text('保存する'),
-                    onPressed: _saveKifData,
+                    onPressed: _isSaving ? null : _saveKifData,
                   ),
                   MenuItemButton(
                     style: AppPopupMenuStyle.itemStyle,
@@ -1372,9 +1373,9 @@ class _KifEditorPageState extends State<KifEditorPage> {
                     IconButton(
                       icon: const Icon(Icons.save),
                       tooltip: '保存',
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.all(4),
-                      onPressed: _saveKifData,
+                       visualDensity: VisualDensity.compact,
+                       padding: const EdgeInsets.all(4),
+                       onPressed: _isSaving ? null : _saveKifData,
                     ),
                     const SizedBox(width: 4),
                   ],
@@ -1920,16 +1921,19 @@ class _KifEditorPageState extends State<KifEditorPage> {
   }
 
   Future<void> _saveKifData() async {
-    if (kifTree == null) return;
+    if (kifTree == null || _isSaving) return;
+
+    setState(() => _isSaving = true);
 
     final memosByNode = _capturePositionMemos(kifTree!);
     await IntegratedTreeService.registerKifTree(kifTree!, kifId: _currentEntity.id);
     _restorePositionMemos(kifTree!, memosByNode);
 
     final kifData = await _prepareKifData();
-    if (kifData == null) return;
-
-    setState(() => _isLoading = true);
+    if (kifData == null) {
+      if (mounted) setState(() => _isSaving = false);
+      return;
+    }
 
     try {
       final saveResult = await _writeKifFile(kifData);
@@ -1981,7 +1985,7 @@ class _KifEditorPageState extends State<KifEditorPage> {
         ShowErrorSnackbar.show(context, '棋譜の保存に失敗しました');
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
