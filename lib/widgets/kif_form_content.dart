@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kifdamari/database/entity/tab_entity.dart';
 import 'package:kifdamari/database/entity/kif_entity.dart';
 import 'package:kifdamari/snackbars/show_error_snackbar.dart';
 import 'package:kifdamari/widgets/app_settings.dart';
@@ -8,13 +7,10 @@ import 'package:kifdamari/widgets/kif_colors.dart';
 
 class KifFormContent extends StatefulWidget {
   final KifEntity? initialKif;
-  final List<TabEntity> tabs;
-  final int initialTabId;
   final String confirmButtonText;
   final String? errorMessage;
   final Function(String? error) onErrorMessageChanged;
   final Future<void> Function({
-    required int tabId,
     required String title,
     required String detail,
     required String? kifPath,
@@ -24,8 +20,6 @@ class KifFormContent extends StatefulWidget {
   const KifFormContent({
     super.key,
     this.initialKif,
-    required this.tabs,
-    required this.initialTabId,
     required this.confirmButtonText,
     required this.errorMessage,
     required this.onErrorMessageChanged,
@@ -40,10 +34,8 @@ class _KifFormContentState extends State<KifFormContent> {
   late final TextEditingController _titleController;
   late final TextEditingController _detailController;
 
-  final FocusNode _tabFocusNode = FocusNode();
   final FocusNode _colorFocusNode = FocusNode();
 
-  late int _selectedTabId;
   late int _selectedColor;
   String? _kfilePath;
 
@@ -55,18 +47,12 @@ class _KifFormContentState extends State<KifFormContent> {
     _titleController = TextEditingController(text: widget.initialKif?.title ?? '');
     _detailController = TextEditingController(text: widget.initialKif?.detail ?? '');
 
-    final tabExists = widget.tabs.any((t) => t.id == widget.initialTabId);
-    _selectedTabId = (tabExists && widget.tabs.isNotEmpty)
-        ? widget.initialTabId
-        : (widget.tabs.isNotEmpty ? widget.tabs.first.id! : 0);
-
     final initialColor = widget.initialKif?.color ?? KifColors.resolveDefaultColor(AppSettings());
     final colorExists = _colorData.any((c) => c['value'] == initialColor);
     _selectedColor = colorExists ? initialColor : colorWhite;
 
     _kfilePath = widget.initialKif?.kifPath;
 
-    _tabFocusNode.addListener(() => setState(() {}));
     _colorFocusNode.addListener(() => setState(() {}));
   }
 
@@ -74,7 +60,6 @@ class _KifFormContentState extends State<KifFormContent> {
   void dispose() {
     _titleController.dispose();
     _detailController.dispose();
-    _tabFocusNode.dispose();
     _colorFocusNode.dispose();
     super.dispose();
   }
@@ -214,108 +199,7 @@ class _KifFormContentState extends State<KifFormContent> {
                       ),
                       const SizedBox(height: 14),
 
-                      // タブ選択プルダウン（横幅を適正に絞りコンパクトに）
-                      if (widget.tabs.isNotEmpty)
-                        ButtonTheme(
-                          alignedDropdown: true,
-                          child: DropdownButtonFormField<int>(
-                            focusNode: _tabFocusNode,
-                            value: _selectedTabId,
-                            borderRadius: BorderRadius.circular(16),
-                            dropdownColor: Colors.white,
-                            focusColor: Colors.transparent,
-                            menuMaxHeight: 320,
-                            itemHeight: 48,
-                            decoration: InputDecoration(
-                              labelText: 'タブ',
-                              labelStyle: TextStyle(
-                                color: _getLabelColor(_tabFocusNode),
-                                fontSize: 13,
-                                fontWeight: (_tabFocusNode.hasFocus || widget.errorMessage != null)
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                              filled: true,
-                              fillColor: const Color(0xFFFAFAFA),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFF222222), width: 1.5),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _selectedTabId = value);
-                              }
-                            },
-                            // 選択済みの表示（入力枠内）
-                            selectedItemBuilder: (context) {
-                              return widget.tabs.map((t) {
-                                return Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    t.title,
-                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                  ),
-                                );
-                              }).toList();
-                            },
-                            // ポップアップリストの各項目
-                            items: widget.tabs.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final t = entry.value;
-                              final isSelected = t.id == _selectedTabId;
-
-                              return DropdownMenuItem<int>(
-                                value: t.id!,
-                                child: Container(
-                                  height: 48,
-                                  alignment: Alignment.centerLeft,
-                                  decoration: BoxDecoration(
-                                    border: index < widget.tabs.length - 1
-                                        ? const Border(
-                                            bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1.0),
-                                          )
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          t.title,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isSelected ? const Color(0xFF222222) : Colors.black87,
-                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (isSelected) ...[
-                                        const SizedBox(width: 8),
-                                        const Icon(
-                                          Icons.check,
-                                          size: 18,
-                                          color: Color(0xFF222222),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      const SizedBox(height: 12),
-
-                      // カラー選択プルダウン
-// カラー選択プルダウン（タブと同様の仕切り線＆スッキリデザイン）
+                      // カラー選択プルダウン（仕切り線＆スッキリデザイン）
                       ButtonTheme(
                         alignedDropdown: true,
                         child: DropdownButtonFormField<int>(
@@ -488,7 +372,6 @@ class _KifFormContentState extends State<KifFormContent> {
                   ElevatedButton(
                     onPressed: () {
                       widget.onSubmit(
-                        tabId: _selectedTabId,
                         title: _titleController.text,
                         detail: _detailController.text,
                         kifPath: _kfilePath,
