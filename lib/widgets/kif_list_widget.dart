@@ -14,6 +14,15 @@ class KifListWidget extends StatefulWidget {
   final VoidCallback? onSelectionChanged;
   final VoidCallback? onAddKifPressed; // ★ コールバックを追加
 
+  /// 並び替えモードでカードのドラッグが始まったときに呼ばれる。
+  final VoidCallback? onSortDragStart;
+
+  /// ドラッグ中のポインタ位置にあるタブ ID を返す。タブ上でなければ null。
+  final int? Function(Offset globalPosition)? onSortDragUpdate;
+
+  /// ドラッグ終了時に呼ばれる。別タブ上で離された場合はそのタブ ID が渡る。
+  final void Function(KifEntity kif, int? targetTabId)? onSortDragEnd;
+
   const KifListWidget({
     super.key,
     required this.tabId,
@@ -21,6 +30,9 @@ class KifListWidget extends StatefulWidget {
     required this.onRefresh,
     this.onSelectionChanged,
     this.onAddKifPressed, // ★ コールバックを追加
+    this.onSortDragStart,
+    this.onSortDragUpdate,
+    this.onSortDragEnd,
   });
 
   @override
@@ -37,6 +49,10 @@ class KifListWidgetState extends State<KifListWidget>
   bool _isFirstLoadDone = false;
 
   final Set<int> _selectedKifIds = {};
+
+  KifEntity? _draggingKif;
+  int? _hoveredTabId;
+  bool _suppressNextReorder = false;
 
   final ScrollController _scrollController = ScrollController();
   double _savedScrollOffset = 0.0;
@@ -155,6 +171,53 @@ class KifListWidgetState extends State<KifListWidget>
     }
   }
 
+  /// 表示中の並び順だけを DB に保存する（再読み込みはしない）。
+  Future<void> persistOrder() async {
+    if (_tempKifs != null) {
+      await KifDao().updateAllKifOrders(_tempKifs!);
+    }
+  }
+
+  void _handleSortDragStart(List<KifEntity> kifs, int index) {
+    if (index < 0 || index >= kifs.length) return;
+    _suppressNextReorder = false;
+    _hoveredTabId = null;
+    _draggingKif = kifs[index];
+    widget.onSortDragStart?.call();
+  }
+
+  void _handleSortPointerMove(PointerMoveEvent event) {
+    if (_draggingKif == null) return;
+    _hoveredTabId = widget.onSortDragUpdate?.call(event.position);
+  }
+
+  void _handleSortPointerUp(PointerUpEvent event) {
+    _finishSortDrag(event.position);
+  }
+
+  void _handleSortPointerCancel(PointerCancelEvent event) {
+    _finishSortDrag(null);
+  }
+
+  void _finishSortDrag(Offset? globalPosition) {
+    final kif = _draggingKif;
+    if (kif == null) return;
+    _draggingKif = null;
+
+    final targetTabId = globalPosition == null
+        ? null
+        : widget.onSortDragUpdate?.call(globalPosition) ?? _hoveredTabId;
+    _hoveredTabId = null;
+
+    if (targetTabId != null && targetTabId != widget.tabId) {
+      // 別タブへのドロップでは、内部の並び替え処理を走らせない。
+      _suppressNextReorder = true;
+      widget.onSortDragEnd?.call(kif, targetTabId);
+    } else {
+      widget.onSortDragEnd?.call(kif, null);
+    }
+  }
+
   Future<void> deleteSelectedKifs() async {
     if (_selectedKifIds.isEmpty) return;
     showDeleteSelectedKifsDialog(context, _selectedKifIds.length, () async {
@@ -267,40 +330,50 @@ class KifListWidgetState extends State<KifListWidget>
 
   /// 並べ替えモード（詳細リスト表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortList(List<KifEntity> kifs) {
-    return ReorderableListView.builder(
-      scrollController: _scrollController,
-      itemCount: kifs.length,
-      buildDefaultDragHandles: false,
-      proxyDecorator: (child, index, animation) {
-        return Material(
-          elevation: 80,
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          child: child,
-        );
-      },
-      onReorder: (oldIndex, newIndex) {
-        setState(() {
-          if (oldIndex < newIndex) newIndex -= 1;
-          final item = kifs.removeAt(oldIndex);
-          kifs.insert(newIndex, item);
-          _tempKifs = List.from(kifs);
-        });
-      },
-      itemBuilder: (context, index) {
-        final kif = kifs[index];
-        // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
-        return ReorderableDelayedDragStartListener(
-          key: ValueKey('sort_${kif.id}'),
-          index: index,
-          child: KifListItem(
-            kif: kif,
-            mode: widget.mode,
-            onRefresh: _loadKifu,
+    return Listener(
+      onPointerMove: _handleSortPointerMove,
+      onPointerUp: _handleSortPointerUp,
+      onPointerCancel: _handleSortPointerCancel,
+      child: ReorderableListView.builder(
+        scrollController: _scrollController,
+        itemCount: kifs.length,
+        buildDefaultDragHandles: false,
+        proxyDecorator: (child, index, animation) {
+          return Material(
+            elevation: 80,
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: child,
+          );
+        },
+        onReorderStart: (index) => _handleSortDragStart(kifs, index),
+        onReorder: (oldIndex, newIndex) {
+          if (_suppressNextReorder) {
+            _suppressNextReorder = false;
+            return;
+          }
+          setState(() {
+            if (oldIndex < newIndex) newIndex -= 1;
+            final item = kifs.removeAt(oldIndex);
+            kifs.insert(newIndex, item);
+            _tempKifs = List.from(kifs);
+          });
+        },
+        itemBuilder: (context, index) {
+          final kif = kifs[index];
+          // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
+          return ReorderableDelayedDragStartListener(
+            key: ValueKey('sort_${kif.id}'),
             index: index,
-          ),
-        );
-      },
+            child: KifListItem(
+              kif: kif,
+              mode: widget.mode,
+              onRefresh: _loadKifu,
+              index: index,
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -377,40 +450,50 @@ class KifListWidgetState extends State<KifListWidget>
 
   /// 並べ替えモード（グリッド表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortGrid(List<KifEntity> kifs) {
-    return ReorderableGridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 200,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.95,
+    return Listener(
+      onPointerMove: _handleSortPointerMove,
+      onPointerUp: _handleSortPointerUp,
+      onPointerCancel: _handleSortPointerCancel,
+      child: ReorderableGridView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 200,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.95,
+        ),
+        itemCount: kifs.length,
+        proxyDecorator: (child, index, animation) {
+          return Material(
+            elevation: 6,
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: child,
+          );
+        },
+        onReorderStart: (index) => _handleSortDragStart(kifs, index),
+        onReorder: (oldIndex, newIndex) {
+          if (_suppressNextReorder) {
+            _suppressNextReorder = false;
+            return;
+          }
+          setState(() {
+            final item = kifs.removeAt(oldIndex);
+            kifs.insert(newIndex, item);
+            _tempKifs = List.from(kifs);
+          });
+        },
+        itemBuilder: (context, index) {
+          final kif = kifs[index];
+          return KifGridItem(
+            key: ValueKey('sort_grid_${kif.id}'),
+            kif: kif,
+            mode: widget.mode,
+            onRefresh: _loadKifu,
+          );
+        },
       ),
-      itemCount: kifs.length,
-      proxyDecorator: (child, index, animation) {
-        return Material(
-          elevation: 6,
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          child: child,
-        );
-      },
-      onReorder: (oldIndex, newIndex) {
-        setState(() {
-          final item = kifs.removeAt(oldIndex);
-          kifs.insert(newIndex, item);
-          _tempKifs = List.from(kifs);
-        });
-      },
-      itemBuilder: (context, index) {
-        final kif = kifs[index];
-        return KifGridItem(
-          key: ValueKey('sort_grid_${kif.id}'),
-          kif: kif,
-          mode: widget.mode,
-          onRefresh: _loadKifu,
-        );
-      },
     );
   }
 }
