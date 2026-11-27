@@ -129,6 +129,58 @@ class KifDao {
     });
   }
 
+  /// 棋譜を別タブの末尾へ移動する。
+  ///
+  /// 移動先では新しい kif_id と kif_order を採番し、元のタブに残った
+  /// 棋譜の kif_order は順序を保ったまま詰め直す。
+  Future<void> moveKifToTab(KifEntity kif, int targetTabId) async {
+    final id = kif.id;
+    if (id == null || kif.tabId == targetTabId) return;
+    final db = await _db;
+    await db.transaction((txn) async {
+      final maxKifIdResult = await txn.rawQuery(
+        'SELECT MAX(kif_id) as max_id FROM kif WHERE tab_id = ?',
+        [targetTabId],
+      );
+      final nextKifId = (maxKifIdResult.first['max_id'] as int? ?? 0) + 1;
+
+      final maxOrderResult = await txn.rawQuery(
+        'SELECT MAX(kif_order) as max_order FROM kif WHERE tab_id = ?',
+        [targetTabId],
+      );
+      final maxOrder = maxOrderResult.first['max_order'] as int?;
+      final nextOrder = maxOrder == null ? 0 : maxOrder + 1;
+
+      await txn.update(
+        'kif',
+        {
+          'tab_id': targetTabId,
+          'kif_id': nextKifId,
+          'kif_order': nextOrder,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      // 元のタブに残った棋譜の並び順を詰め直す。
+      final remaining = await txn.query(
+        'kif',
+        columns: ['id'],
+        where: 'tab_id = ?',
+        whereArgs: [kif.tabId],
+        orderBy: 'kif_order ASC',
+      );
+      for (int i = 0; i < remaining.length; i++) {
+        await txn.update(
+          'kif',
+          {'kif_order': i},
+          where: 'id = ?',
+          whereArgs: [remaining[i]['id']],
+        );
+      }
+    });
+  }
+
   Future<int> getTotalKifCount() async {
     final db = await _db;
     final count = Sqflite.firstIntValue(
