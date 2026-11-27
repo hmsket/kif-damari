@@ -617,13 +617,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black87,
-                                side: BorderSide(
-                                  color: Colors.grey.shade400,
-                                ),
-                                elevation: 0,
-                                shape: const StadiumBorder(),
+                                backgroundColor: Colors.white, // 背景色を白に設定（地グレーとの境界を出す）
+                                foregroundColor: Colors.black87, // 文字・アイコン色を濃いグレー/黒系に設定
+                                side: BorderSide.none, // 枠線なし
+                                elevation: 0, // 影なし（フラットな見た目）
+                                shape: const StadiumBorder(), // カプセル型の丸み
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 20,
                                   vertical: 12,
