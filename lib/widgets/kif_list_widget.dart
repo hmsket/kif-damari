@@ -344,35 +344,11 @@ class KifListWidgetState extends State<KifListWidget>
               }
             });
           }
-          // 棋譜が空のときの表示
-          if (kifs.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 40.0),
-                child: OutlinedButton.icon(
-                  onPressed: widget.onAddKifPressed,
-                  icon: const Icon(Icons.add, size: 20), // ＋アイコン
-                  label: const Text(
-                    '棋譜を追加する',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white, // 背景色を白に設定（地グレーとの境界を出す）
-                    foregroundColor: Colors.black87, // 文字・アイコン色を濃いグレー/黒系に設定
-                    side: BorderSide.none, // 枠線なし
-                    elevation: 0, // 影なし（フラットな見た目）
-                    shape: const StadiumBorder(), // カプセル型の丸み
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ),
-            );
+          // 棋譜が空のときの表示。
+          // 並び替えモードでは空になっても並び替え用のウィジェットを
+          // 作り直さない（_buildSortList / _buildSortGrid 側で表示する）。
+          if (kifs.isEmpty && widget.mode != AppMode.sort) {
+            return _buildEmptyKifState();
           }
           // スクロール可能なウィジェットを組み立てた後のフレームで位置を復元する。
           // 新しい一覧が反映される前（前の一覧を表示中）には復元しない。
@@ -390,51 +366,91 @@ class KifListWidgetState extends State<KifListWidget>
     );
   }
 
+  /// 棋譜が1件もないときの「棋譜を追加する」表示。
+  Widget _buildEmptyKifState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 40.0),
+        child: OutlinedButton.icon(
+          onPressed: widget.onAddKifPressed,
+          icon: const Icon(Icons.add, size: 20), // ＋アイコン
+          label: const Text(
+            '棋譜を追加する',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white, // 背景色を白に設定（地グレーとの境界を出す）
+            foregroundColor: Colors.black87, // 文字・アイコン色を濃いグレー/黒系に設定
+            side: BorderSide.none, // 枠線なし
+            elevation: 0, // 影なし（フラットな見た目）
+            shape: const StadiumBorder(), // カプセル型の丸み
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 並べ替えモード（詳細リスト表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortList(List<KifEntity> kifs) {
+    // 並び替え用のウィジェットは、一覧が空になっても作り直さず同じ位置に
+    // 置き続ける。ドロップ直後に元タブが空になると、ドラッグの終了処理が
+    // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
     return Listener(
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
       onPointerCancel: _handleSortPointerCancel,
-      child: ReorderableListView.builder(
-        scrollController: _scrollController,
-        itemCount: kifs.length,
-        buildDefaultDragHandles: false,
-        proxyDecorator: (child, index, animation) {
-          return Material(
-            elevation: 80,
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            child: child,
-          );
-        },
-        onReorderStart: (index) => _handleSortDragStart(kifs, index),
-        onReorder: (oldIndex, newIndex) {
-          if (_suppressNextReorder) {
-            _suppressNextReorder = false;
-            return;
-          }
-          setState(() {
-            if (oldIndex < newIndex) newIndex -= 1;
-            final item = kifs.removeAt(oldIndex);
-            kifs.insert(newIndex, item);
-            _tempKifs = List.from(kifs);
-          });
-        },
-        itemBuilder: (context, index) {
-          final kif = kifs[index];
-          // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
-          return ReorderableDelayedDragStartListener(
-            key: ValueKey('sort_${kif.id}'),
-            index: index,
-            child: KifListItem(
-              kif: kif,
-              mode: widget.mode,
-              onRefresh: _loadKifu,
-              index: index,
-            ),
-          );
-        },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ReorderableListView.builder(
+            scrollController: _scrollController,
+            itemCount: kifs.length,
+            buildDefaultDragHandles: false,
+            proxyDecorator: (child, index, animation) {
+              return Material(
+                elevation: 80,
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: child,
+              );
+            },
+            onReorderStart: (index) => _handleSortDragStart(kifs, index),
+            onReorder: (oldIndex, newIndex) {
+              if (_suppressNextReorder) {
+                _suppressNextReorder = false;
+                return;
+              }
+              setState(() {
+                if (oldIndex < newIndex) newIndex -= 1;
+                final item = kifs.removeAt(oldIndex);
+                kifs.insert(newIndex, item);
+                _tempKifs = List.from(kifs);
+              });
+            },
+            itemBuilder: (context, index) {
+              final kif = kifs[index];
+              // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
+              return ReorderableDelayedDragStartListener(
+                key: ValueKey('sort_${kif.id}'),
+                index: index,
+                child: KifListItem(
+                  kif: kif,
+                  mode: widget.mode,
+                  onRefresh: _loadKifu,
+                  index: index,
+                ),
+              );
+            },
+          ),
+          if (kifs.isEmpty) _buildEmptyKifState(),
+        ],
       ),
     );
   }
@@ -512,49 +528,58 @@ class KifListWidgetState extends State<KifListWidget>
 
   /// 並べ替えモード（グリッド表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortGrid(List<KifEntity> kifs) {
+    // 並び替え用のウィジェットは、一覧が空になっても作り直さず同じ位置に
+    // 置き続ける。ドロップ直後に元タブが空になると、ドラッグの終了処理が
+    // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
     return Listener(
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
       onPointerCancel: _handleSortPointerCancel,
-      child: ReorderableGridView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 200,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 0.95,
-        ),
-        itemCount: kifs.length,
-        proxyDecorator: (child, index, animation) {
-          return Material(
-            elevation: 6,
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            child: child,
-          );
-        },
-        onReorderStart: (index) => _handleSortDragStart(kifs, index),
-        onReorder: (oldIndex, newIndex) {
-          if (_suppressNextReorder) {
-            _suppressNextReorder = false;
-            return;
-          }
-          setState(() {
-            final item = kifs.removeAt(oldIndex);
-            kifs.insert(newIndex, item);
-            _tempKifs = List.from(kifs);
-          });
-        },
-        itemBuilder: (context, index) {
-          final kif = kifs[index];
-          return KifGridItem(
-            key: ValueKey('sort_grid_${kif.id}'),
-            kif: kif,
-            mode: widget.mode,
-            onRefresh: _loadKifu,
-          );
-        },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ReorderableGridView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 200,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
+            ),
+            itemCount: kifs.length,
+            proxyDecorator: (child, index, animation) {
+              return Material(
+                elevation: 6,
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: child,
+              );
+            },
+            onReorderStart: (index) => _handleSortDragStart(kifs, index),
+            onReorder: (oldIndex, newIndex) {
+              if (_suppressNextReorder) {
+                _suppressNextReorder = false;
+                return;
+              }
+              setState(() {
+                final item = kifs.removeAt(oldIndex);
+                kifs.insert(newIndex, item);
+                _tempKifs = List.from(kifs);
+              });
+            },
+            itemBuilder: (context, index) {
+              final kif = kifs[index];
+              return KifGridItem(
+                key: ValueKey('sort_grid_${kif.id}'),
+                kif: kif,
+                mode: widget.mode,
+                onRefresh: _loadKifu,
+              );
+            },
+          ),
+          if (kifs.isEmpty) _buildEmptyKifState(),
+        ],
       ),
     );
   }
