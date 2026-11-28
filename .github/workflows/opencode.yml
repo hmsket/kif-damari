@@ -3,12 +3,15 @@ name: opencode
 # Issue / PR に /opencode または /oc とコメントすると、OpenCode が
 # GitHub Actions の中で修正してブランチ + PR を作る。
 #
-# 【スマホ出口ノード版】モデル呼び出しの前に Tailscale へ参加し、
-# 本人の Android スマホを出口ノードにして通信をスマホ回線から出す
-# (Actions の共有IPは Zen 無料枠が枯れているため)。
-# 必要な Secrets: TAILSCALE_OAUTH_CLIENT_ID / TAILSCALE_OAUTH_SECRET /
-# TAILSCALE_EXIT_NODE (スマホの Tailscale IP 100.x.x.x)。
-# スマホ側で Run as exit node の有効化と管理画面での承認が前提。
+# 【2026-11-28 Tailscale 出口ノードを廃止】
+# 旧構成はモデル呼び出し前に Tailscale へ参加し、本人の Android スマホを
+# 出口ノードにしていた (Actions の共有IPでは Zen 無料枠が枯れていたため)。
+# OpenCode Go 課金後は枠が API キー紐付けになり IP は無関係なはずなので廃止。
+# スマホ回線経由のダウンロードが途中で切れる事故 (curl 56 で primary が
+# 49秒終了→fallback が長時間ハング) が続いたための変更。
+# もし共有IP起因の枠エラー (429 等) が再発したら、Connect Tailscale と
+# Verify egress IP の2ステップを Setup Flutter の直後に戻すこと。
+# (旧版は GitHub の変更履歴と Muse 側の opencode_current.yml に保存あり)
 #
 # モデルは OpenCode Go (2026-11-24 課金開始) の2段フォールバック:
 #   1段目: opencode-go/deepseek-v4.1-flash (DeepSeek V4.1 Flash, Go)
@@ -72,20 +75,6 @@ jobs:
         with:
           flutter-version: '3.47.9'
           cache: true
-
-      - name: Connect Tailscale (exit node = my phone)
-        timeout-minutes: 3
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
-          args: "--exit-node=${{ secrets.TAILSCALE_EXIT_NODE }}"
-          tags: tag:github-actions
-
-      - name: Verify egress IP (should NOT be a GitHub/Azure IP)
-        run: |
-          tailscale status | grep -i 'exit node' || true
-          echo "Egress IP: $(curl -s https://ifconfig.me)"
 
       # push 検知用スナップショット (opencode アクションは内部で push するため、
       # 前後比較で「この run で push が起きたか」と対象ブランチを判定する)
