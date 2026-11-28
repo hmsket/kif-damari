@@ -71,6 +71,16 @@ class KifListWidgetState extends State<KifListWidget>
   double get _sortListGapExtent =>
       _sortListItemExtent > 0 ? _sortListItemExtent : 80.0;
 
+  static const double _sortGridHorizontalPadding = 24.0;
+  static const SliverGridDelegateWithMaxCrossAxisExtent _sortGridDelegate =
+      SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 200,
+    mainAxisSpacing: 10,
+    crossAxisSpacing: 10,
+    childAspectRatio: 0.95,
+  );
+
+  final GlobalKey _sortGridKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
   double _savedScrollOffset = 0.0;
   double _savedScrollProgress = 0.0;
@@ -266,14 +276,14 @@ class KifListWidgetState extends State<KifListWidget>
     if (kifs.isEmpty) return 0;
 
     final isGrid = _isGridView;
-    final keys = kifs.map((kif) => _itemKey(kif.id!)).toSet();
+    final keys = kifs.map((kif) => _shiftKey(kif.id!)).toSet();
     final renderBoxes = _collectItemRenderBoxes(keys);
     if (renderBoxes.isEmpty) return kifs.length;
 
     if (!isGrid) {
       // 外部ドラッグ用の隙間の高さを、実際のリスト項目に合わせる。
       for (final kif in kifs) {
-        final renderBox = renderBoxes[_itemKey(kif.id!)];
+        final renderBox = renderBoxes[_shiftKey(kif.id!)];
         if (renderBox != null) {
           _sortListItemExtent = renderBox.size.height;
           break;
@@ -283,7 +293,7 @@ class KifListWidgetState extends State<KifListWidget>
 
     int count = 0;
     for (final kif in kifs) {
-      final renderBox = renderBoxes[_itemKey(kif.id!)];
+      final renderBox = renderBoxes[_shiftKey(kif.id!)];
       if (renderBox == null) continue;
       final rect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
       if (isGrid) {
@@ -300,8 +310,43 @@ class KifListWidgetState extends State<KifListWidget>
     return count;
   }
 
-  Key _itemKey(int kifId) =>
-      ValueKey(_isGridView ? 'sort_grid_$kifId' : 'sort_$kifId');
+  Key _shiftKey(int kifId) => ValueKey(
+      _isGridView ? 'sort_grid_shift_$kifId' : 'sort_shift_$kifId');
+
+  double get _sortGridContentWidth {
+    final renderObject = _sortGridKey.currentContext?.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.size.width - _sortGridHorizontalPadding;
+    }
+    return MediaQuery.sizeOf(context).width - _sortGridHorizontalPadding;
+  }
+
+  Offset _gridShiftExtent(int index) {
+    final width = _sortGridContentWidth;
+    if (width <= 0) return Offset.zero;
+
+    final delegate = _sortGridDelegate;
+    int crossAxisCount =
+        (width / (delegate.maxCrossAxisExtent + delegate.crossAxisSpacing))
+            .ceil();
+    if (crossAxisCount < 1) crossAxisCount = 1;
+
+    final usableCrossAxisExtent =
+        width - delegate.crossAxisSpacing * (crossAxisCount - 1);
+    final cellWidth = usableCrossAxisExtent / crossAxisCount;
+    final cellHeight =
+        delegate.mainAxisExtent ?? cellWidth / delegate.childAspectRatio;
+    final crossAxisStride = cellWidth + delegate.crossAxisSpacing;
+    final mainAxisStride = cellHeight + delegate.mainAxisSpacing;
+
+    if (index % crossAxisCount < crossAxisCount - 1) {
+      return Offset(crossAxisStride, 0);
+    }
+    return Offset(
+      -crossAxisStride * (crossAxisCount - 1),
+      mainAxisStride,
+    );
+  }
 
   Map<Key, RenderBox> _collectItemRenderBoxes(Set<Key> keys) {
     final result = <Key, RenderBox>{};
@@ -439,19 +484,12 @@ class KifListWidgetState extends State<KifListWidget>
     );
   }
 
-  /// 別タブから挿入される位置を表示するための、表示上のインデックス変換。
-  int _sortRealIndex(int displayIndex, int? gapIndex) {
-    if (gapIndex != null && displayIndex > gapIndex) return displayIndex - 1;
-    return displayIndex;
-  }
-
   /// 並べ替えモード（詳細リスト表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortList(List<KifEntity> kifs) {
     // 並び替え用のウィジェットは、一覧が空になっても作り直さず同じ位置に
     // 置き続ける。ドロップ直後に元タブが空になると、ドラッグの終了処理が
     // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
     final gapIndex = _externalInsertionIndex;
-    final displayItemCount = kifs.length + (gapIndex != null ? 1 : 0);
     return Listener(
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
@@ -461,7 +499,7 @@ class KifListWidgetState extends State<KifListWidget>
         children: [
           ReorderableListView.builder(
             scrollController: _scrollController,
-            itemCount: displayItemCount,
+            itemCount: kifs.length,
             buildDefaultDragHandles: false,
             proxyDecorator: (child, index, animation) {
               return Material(
@@ -471,8 +509,7 @@ class KifListWidgetState extends State<KifListWidget>
                 child: child,
               );
             },
-            onReorderStart: (index) =>
-                _handleSortDragStart(kifs, _sortRealIndex(index, gapIndex)),
+            onReorderStart: (index) => _handleSortDragStart(kifs, index),
             onReorder: (oldIndex, newIndex) {
               if (_suppressNextReorder) {
                 _suppressNextReorder = false;
@@ -488,24 +525,23 @@ class KifListWidgetState extends State<KifListWidget>
               });
             },
             itemBuilder: (context, index) {
-              if (gapIndex != null && index == gapIndex) {
-                // 挿入先に空の隙間を出し、後続のカードをずらす。
-                return SizedBox(
-                  key: const ValueKey('sort_gap_placeholder'),
-                  height: _sortListGapExtent,
-                );
-              }
-              final realIndex = _sortRealIndex(index, gapIndex);
-              final kif = kifs[realIndex];
+              final kif = kifs[index];
+              final shift = gapIndex != null && index >= gapIndex
+                  ? Offset(0, _sortListGapExtent)
+                  : Offset.zero;
               // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
-              return ReorderableDelayedDragStartListener(
-                key: ValueKey('sort_${kif.id}'),
-                index: index,
-                child: KifListItem(
-                  kif: kif,
-                  mode: widget.mode,
-                  onRefresh: _loadKifu,
-                  index: realIndex,
+              return _AnimatedReorderShift(
+                key: _shiftKey(kif.id!),
+                shift: shift,
+                child: ReorderableDelayedDragStartListener(
+                  key: ValueKey('sort_${kif.id}'),
+                  index: index,
+                  child: KifListItem(
+                    kif: kif,
+                    mode: widget.mode,
+                    onRefresh: _loadKifu,
+                    index: index,
+                  ),
                 ),
               );
             },
@@ -593,7 +629,6 @@ class KifListWidgetState extends State<KifListWidget>
     // 置き続ける。ドロップ直後に元タブが空になると、ドラッグの終了処理が
     // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
     final gapIndex = _externalInsertionIndex;
-    final displayItemCount = kifs.length + (gapIndex != null ? 1 : 0);
     return Listener(
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
@@ -602,15 +637,11 @@ class KifListWidgetState extends State<KifListWidget>
         fit: StackFit.expand,
         children: [
           ReorderableGridView.builder(
+            key: _sortGridKey,
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 200,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.95,
-            ),
-            itemCount: displayItemCount,
+            gridDelegate: _sortGridDelegate,
+            itemCount: kifs.length,
             proxyDecorator: (child, index, animation) {
               return Material(
                 elevation: 6,
@@ -619,8 +650,7 @@ class KifListWidgetState extends State<KifListWidget>
                 child: child,
               );
             },
-            onReorderStart: (index) =>
-                _handleSortDragStart(kifs, _sortRealIndex(index, gapIndex)),
+            onReorderStart: (index) => _handleSortDragStart(kifs, index),
             onReorder: (oldIndex, newIndex) {
               if (_suppressNextReorder) {
                 _suppressNextReorder = false;
@@ -635,25 +665,87 @@ class KifListWidgetState extends State<KifListWidget>
               });
             },
             itemBuilder: (context, index) {
-              if (gapIndex != null && index == gapIndex) {
-                // 挿入先に空のセルを出し、後続のカードをずらす。
-                return const SizedBox(
-                  key: ValueKey('sort_gap_placeholder'),
-                );
-              }
-              final realIndex = _sortRealIndex(index, gapIndex);
-              final kif = kifs[realIndex];
-              return KifGridItem(
-                key: ValueKey('sort_grid_${kif.id}'),
-                kif: kif,
-                mode: widget.mode,
-                onRefresh: _loadKifu,
+              final kif = kifs[index];
+              final shift = gapIndex != null && index >= gapIndex
+                  ? _gridShiftExtent(index)
+                  : Offset.zero;
+              return _AnimatedReorderShift(
+                key: _shiftKey(kif.id!),
+                shift: shift,
+                child: KifGridItem(
+                  key: ValueKey('sort_grid_${kif.id}'),
+                  kif: kif,
+                  mode: widget.mode,
+                  onRefresh: _loadKifu,
+                ),
               );
             },
           ),
           if (kifs.isEmpty) _buildEmptyKifState(),
         ],
       ),
+    );
+  }
+}
+
+class _AnimatedReorderShift extends StatefulWidget {
+  const _AnimatedReorderShift({
+    super.key,
+    required this.shift,
+    required this.child,
+  });
+
+  final Offset shift;
+  final Widget child;
+
+  @override
+  State<_AnimatedReorderShift> createState() => _AnimatedReorderShiftState();
+}
+
+class _AnimatedReorderShiftState extends State<_AnimatedReorderShift>
+    with SingleTickerProviderStateMixin {
+  static const Duration _duration = Duration(milliseconds: 250);
+
+  late final AnimationController _controller;
+  late Offset _startOffset;
+  late Offset _targetOffset;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _duration);
+    _startOffset = widget.shift;
+    _targetOffset = widget.shift;
+  }
+
+  Offset get _currentOffset {
+    if (!_controller.isAnimating) return _targetOffset;
+    final double t = Curves.easeInOut.transform(_controller.value);
+    return Offset.lerp(_startOffset, _targetOffset, t)!;
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedReorderShift oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shift == _targetOffset) return;
+    _startOffset = _currentOffset;
+    _targetOffset = widget.shift;
+    _controller.forward(from: 0.0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) =>
+          Transform.translate(offset: _currentOffset, child: child),
+      child: widget.child,
     );
   }
 }
