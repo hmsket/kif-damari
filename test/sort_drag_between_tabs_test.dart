@@ -271,7 +271,8 @@ Future<void> _dragIntoGapOnTargetTab(
     kifDao.kifsByTab[2]!.map((kif) => kif.title).toList(),
     ['移動先1', '移動元1', '移動先2', '移動先3', '移動先4'],
   );
-  expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+  // タブ切り替え・移動確定時にスナックバーは表示しない。
+  expect(find.text('『タブB』へ移動しました'), findsNothing);
 
   await _drainSnackbar(tester);
 }
@@ -315,7 +316,8 @@ void main() {
     expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isFalse);
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
     expect(find.text('棋譜A'), findsOneWidget);
-    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+    // タブ切り替え・移動確定時にスナックバーは表示しない。
+    expect(find.text('『タブB』へ移動しました'), findsNothing);
 
     await _drainSnackbar(tester);
   });
@@ -343,7 +345,8 @@ void main() {
     expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isFalse);
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
     expect(find.text('棋譜A'), findsOneWidget);
-    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+    // タブ切り替え・移動確定時にスナックバーは表示しない。
+    expect(find.text('『タブB』へ移動しました'), findsNothing);
 
     await _drainSnackbar(tester);
   });
@@ -380,7 +383,8 @@ void main() {
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isFalse);
     expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isTrue);
     expect(find.text('棋譜A'), findsOneWidget);
-    expect(find.text('『タブA』へ移動しました'), findsOneWidget);
+    // タブ切り替え・移動確定時にスナックバーは表示しない。
+    expect(find.text('『タブA』へ移動しました'), findsNothing);
 
     await _drainSnackbar(tester);
   });
@@ -415,7 +419,8 @@ void main() {
     expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isFalse);
     expect(kifDao.kifsByTab[2]!, isEmpty);
     expect(kifDao.kifsByTab[3]!.any((kif) => kif.title == '棋譜A'), isTrue);
-    expect(find.text('『タブC』へ移動しました'), findsOneWidget);
+    // タブ切り替え・移動確定時にスナックバーは表示しない。
+    expect(find.text('『タブC』へ移動しました'), findsNothing);
 
     await _drainSnackbar(tester);
   });
@@ -445,7 +450,8 @@ void main() {
     expect(kifDao.kifsByTab[1]!, isEmpty);
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
     expect(find.text('棋譜A'), findsOneWidget);
-    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+    // タブ切り替え・移動確定時にスナックバーは表示しない。
+    expect(find.text('『タブB』へ移動しました'), findsNothing);
 
     await _drainSnackbar(tester);
   });
@@ -475,7 +481,8 @@ void main() {
     expect(kifDao.kifsByTab[1]!, isEmpty);
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
     expect(find.text('棋譜A'), findsOneWidget);
-    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+    // タブ切り替え・移動確定時にスナックバーは表示しない。
+    expect(find.text('『タブB』へ移動しました'), findsNothing);
 
     await _drainSnackbar(tester);
   });

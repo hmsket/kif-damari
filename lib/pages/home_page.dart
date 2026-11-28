@@ -452,7 +452,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   ]) async {
     final targetTabs = tabs.where((t) => t.id == targetTabId).toList();
     if (targetTabs.isEmpty) return;
-    final targetTab = targetTabs.first;
     final fromTabId = kif.tabId;
     try {
       // 未保存の同一タブ内並び替えを先に確定させ、残りの順序を保つ。
@@ -471,7 +470,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (!mounted) return;
       _listKeys[fromTabId]?.currentState?.refreshFromParent();
       _listKeys[targetTabId]?.currentState?.refreshFromParent();
-      ShowSuccessSnackbar.show(context, '『${targetTab.title}』へ移動しました');
     } catch (e) {
       debugPrint('棋譜のタブ移動に失敗しました: $e');
       if (mounted) ShowErrorSnackbar.show(context, '棋譜を移動できませんでした');
