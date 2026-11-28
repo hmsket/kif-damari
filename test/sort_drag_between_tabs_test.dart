@@ -42,21 +42,35 @@ class _FakeKifDao extends KifDao {
   }
 
   @override
-  Future<void> moveKifToTab(KifEntity kif, int targetTabId) async {
+  Future<void> moveKifToTab(
+    KifEntity kif,
+    int targetTabId, {
+    int? targetIndex,
+  }) async {
+    KifEntity? moved;
     final from = kifsByTab[kif.tabId];
-    from?.removeWhere((item) => item.id == kif.id);
+    if (from != null) {
+      final index = from.indexWhere((item) => item.id == kif.id);
+      if (index >= 0) moved = from.removeAt(index);
+    }
     final target = kifsByTab.putIfAbsent(targetTabId, () => <KifEntity>[]);
-    target.add(KifEntity(
-      id: kif.id,
-      tabId: targetTabId,
-      kifId: target.length + 1,
-      title: kif.title,
-      detail: kif.detail,
-      kifOrder: target.length,
-      kifPath: kif.kifPath,
-      imgPath: kif.imgPath,
-      color: kif.color,
-    ));
+    final insertAt =
+        (targetIndex ?? target.length).clamp(0, target.length).toInt();
+    final source = moved ?? kif;
+    target.insert(
+      insertAt,
+      KifEntity(
+        id: source.id,
+        tabId: targetTabId,
+        kifId: insertAt + 1,
+        title: source.title,
+        detail: source.detail,
+        kifOrder: insertAt,
+        kifPath: source.kifPath,
+        imgPath: source.imgPath,
+        color: source.color,
+      ),
+    );
   }
 
   @override
@@ -85,9 +99,9 @@ KifEntity _kif({
   );
 }
 
-List<TabEntity> _tabs() => [
-      TabEntity(id: 1, title: 'タブA', tabOrder: 0),
-      TabEntity(id: 2, title: 'タブB', tabOrder: 1),
+List<TabEntity> _tabs({int count = 2}) => [
+      for (var i = 0; i < count; i++)
+        TabEntity(id: i + 1, title: 'タブ${String.fromCharCode(65 + i)}', tabOrder: i),
     ];
 
 Map<int, List<KifEntity>> _kifs() => {
@@ -133,16 +147,29 @@ Future<TestGesture> _startLongPressDrag(WidgetTester tester, Finder card) async 
   return gesture;
 }
 
-Future<void> _moveToNextTabAndDrop(
+double get _screenWidth => 400;
+
+Offset _edgePosition(WidgetTester tester, Finder card, {required bool right}) {
+  final y = tester.getCenter(card).dy;
+  final x = right ? _screenWidth - 5 : 5.0;
+  return Offset(x, y);
+}
+
+/// 端ゾーンへ移動し、タブ切り替えが起こるまで待つ。
+Future<void> _hoverAtEdge(
   WidgetTester tester,
-  Finder card,
-  String tabTitle,
-) async {
-  final gesture = await _startLongPressDrag(tester, card);
-  await gesture.moveTo(tester.getCenter(find.text(tabTitle)));
-  await tester.pump(const Duration(milliseconds: 50));
-  await gesture.up();
-  await tester.pumpAndSettle();
+  TestGesture gesture,
+  Offset edge, {
+  int switches = 1,
+}) async {
+  await gesture.moveTo(edge);
+  // 最初の切り替え（約0.5秒）と、2回目以降（約0.7秒間隔）を待つ。
+  await tester.pump(const Duration(milliseconds: 600));
+  for (var i = 1; i < switches; i++) {
+    await tester.pump(const Duration(milliseconds: 800));
+  }
+  // タブ切り替えアニメーションを完了させる。
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 Future<void> _reorderWithinTab(WidgetTester tester) async {
@@ -184,7 +211,7 @@ void main() {
     }
   });
 
-  testWidgets('グリッド: 並び替えモードに入って最初の長押しドラッグで他タブへ移動できる',
+  testWidgets('グリッド: 右端に留まると右のタブへ切り替わり、そのままドロップで移動できる',
       variant: TargetPlatformVariant.only(TargetPlatform.android),
       (tester) async {
     await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
@@ -192,23 +219,27 @@ void main() {
     await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
     expect(find.byType(KifGridItem), findsWidgets);
 
-    final loadsBeforeSort = kifDao.getKifsByTabCallCount;
     await _enterSortMode(tester);
-    expect(kifDao.getKifsByTabCallCount, loadsBeforeSort);
 
-    await _moveToNextTabAndDrop(tester, find.text('棋譜A'), 'タブB');
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: true),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
 
     expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isFalse);
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
-
-    await tester.tap(find.text('タブB'));
-    await tester.pumpAndSettle();
     expect(find.text('棋譜A'), findsOneWidget);
+    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
 
     await _drainSnackbar(tester);
   });
 
-  testWidgets('リスト: 並び替えモードに入って最初の長押しドラッグで他タブへ移動できる',
+  testWidgets('リスト: 右端に留まると右のタブへ切り替わり、そのままドロップで移動できる',
       variant: TargetPlatformVariant.only(TargetPlatform.android),
       (tester) async {
     await tester.runAsync(() => AppSettings().set('homeViewMode', 'list'));
@@ -216,23 +247,99 @@ void main() {
     await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
     expect(find.byType(KifListItem), findsWidgets);
 
-    final loadsBeforeSort = kifDao.getKifsByTabCallCount;
     await _enterSortMode(tester);
-    expect(kifDao.getKifsByTabCallCount, loadsBeforeSort);
 
-    await _moveToNextTabAndDrop(tester, find.text('棋譜A'), 'タブB');
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: true),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
 
     expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isFalse);
     expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
-
-    await tester.tap(find.text('タブB'));
-    await tester.pumpAndSettle();
     expect(find.text('棋譜A'), findsOneWidget);
+    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
 
     await _drainSnackbar(tester);
   });
 
-  testWidgets('グリッド: 同一タブ内の長押しドラッグ並び替えが従来どおりできる',
+  testWidgets('グリッド: 左端に留まると左のタブへ切り替わり、そのままドロップで移動できる',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
+    final kifDao = _FakeKifDao({
+      1: <KifEntity>[],
+      2: [
+        _kif(id: 21, tabId: 2, order: 0, title: '棋譜A'),
+        _kif(id: 22, tabId: 2, order: 1, title: '棋譜B'),
+      ],
+    });
+    await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+
+    // 最初のタブから左へは戻れないため、タブBを開いてから並び替えを始める。
+    await tester.tap(find.text('タブB'));
+    await tester.pumpAndSettle();
+    await _enterSortMode(tester);
+    expect(find.byType(KifGridItem), findsWidgets);
+
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: false),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isFalse);
+    expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isTrue);
+    expect(find.text('棋譜A'), findsOneWidget);
+    expect(find.text('『タブA』へ移動しました'), findsOneWidget);
+
+    await _drainSnackbar(tester);
+  });
+
+  testWidgets('グリッド: 右端に留まり続けると複数のタブを順に送れる',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
+    final kifDao = _FakeKifDao({
+      1: [
+        _kif(id: 11, tabId: 1, order: 0, title: '棋譜A'),
+        _kif(id: 12, tabId: 1, order: 1, title: '棋譜B'),
+      ],
+      2: <KifEntity>[],
+      3: <KifEntity>[],
+    });
+    await _pumpHomePage(tester, _FakeTabDao(_tabs(count: 3)), kifDao);
+    await _enterSortMode(tester);
+
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: true),
+      switches: 2,
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isFalse);
+    expect(kifDao.kifsByTab[2]!, isEmpty);
+    expect(kifDao.kifsByTab[3]!.any((kif) => kif.title == '棋譜A'), isTrue);
+    expect(find.text('『タブC』へ移動しました'), findsOneWidget);
+
+    await _drainSnackbar(tester);
+  });
+
+  testWidgets('グリッド: 端ゾーンに入らない同一タブ内の並び替えではタブが切り替わらない',
       variant: TargetPlatformVariant.only(TargetPlatform.android),
       (tester) async {
     await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
@@ -246,11 +353,13 @@ void main() {
     final titles = kifDao.lastSavedOrder!.map((kif) => kif.title).toList();
     expect(titles.toSet(), {'棋譜A', '棋譜B', '棋譜C'});
     expect(titles, isNot(equals(['棋譜A', '棋譜B', '棋譜C'])));
+    // タブ移動は起きていない。
+    expect(kifDao.kifsByTab[2]!, isEmpty);
 
     await _drainSnackbar(tester);
   });
 
-  testWidgets('リスト: 同一タブ内の長押しドラッグ並び替えが従来どおりできる',
+  testWidgets('リスト: 端ゾーンに入らない同一タブ内の並び替えではタブが切り替わらない',
       variant: TargetPlatformVariant.only(TargetPlatform.android),
       (tester) async {
     await tester.runAsync(() => AppSettings().set('homeViewMode', 'list'));
@@ -264,6 +373,7 @@ void main() {
     final titles = kifDao.lastSavedOrder!.map((kif) => kif.title).toList();
     expect(titles.toSet(), {'棋譜A', '棋譜B', '棋譜C'});
     expect(titles, isNot(equals(['棋譜A', '棋譜B', '棋譜C'])));
+    expect(kifDao.kifsByTab[2]!, isEmpty);
 
     await _drainSnackbar(tester);
   });

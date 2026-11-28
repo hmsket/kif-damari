@@ -20,11 +20,14 @@ class KifListWidget extends StatefulWidget {
   /// 並び替えモードでカードのドラッグが始まったときに呼ばれる。
   final VoidCallback? onSortDragStart;
 
-  /// ドラッグ中のポインタ位置にあるタブ ID を返す。タブ上でなければ null。
-  final int? Function(Offset globalPosition)? onSortDragUpdate;
+  /// ドラッグ中にポインタが移動したときに、グローバル座標で呼ばれる。
+  final void Function(Offset globalPosition)? onSortDragUpdate;
 
-  /// ドラッグ終了時に呼ばれる。別タブ上で離された場合はそのタブ ID が渡る。
-  final void Function(KifEntity kif, int? targetTabId)? onSortDragEnd;
+  /// ドラッグ終了時に呼ばれる。ドロップ位置（キャンセル時は null）が渡る。
+  ///
+  /// 戻り値が true の場合、この一覧側の並び替え処理は行わない
+  /// （タブをまたぐ移動として親が処理する）。
+  final bool Function(KifEntity kif, Offset? globalPosition)? onSortDragEnd;
 
   const KifListWidget({
     super.key,
@@ -55,7 +58,6 @@ class KifListWidgetState extends State<KifListWidget>
   final Set<int> _selectedKifIds = {};
 
   KifEntity? _draggingKif;
-  int? _hoveredTabId;
   bool _suppressNextReorder = false;
 
   final ScrollController _scrollController = ScrollController();
@@ -193,14 +195,13 @@ class KifListWidgetState extends State<KifListWidget>
   void _handleSortDragStart(List<KifEntity> kifs, int index) {
     if (index < 0 || index >= kifs.length) return;
     _suppressNextReorder = false;
-    _hoveredTabId = null;
     _draggingKif = kifs[index];
     widget.onSortDragStart?.call();
   }
 
   void _handleSortPointerMove(PointerMoveEvent event) {
     if (_draggingKif == null) return;
-    _hoveredTabId = widget.onSortDragUpdate?.call(event.position);
+    widget.onSortDragUpdate?.call(event.position);
   }
 
   void _handleSortPointerUp(PointerUpEvent event) {
@@ -216,18 +217,67 @@ class KifListWidgetState extends State<KifListWidget>
     if (kif == null) return;
     _draggingKif = null;
 
-    final targetTabId = globalPosition == null
-        ? null
-        : widget.onSortDragUpdate?.call(globalPosition) ?? _hoveredTabId;
-    _hoveredTabId = null;
-
-    if (targetTabId != null && targetTabId != widget.tabId) {
-      // 別タブへのドロップでは、内部の並び替え処理を走らせない。
+    final suppressInternalReorder =
+        widget.onSortDragEnd?.call(kif, globalPosition) ?? false;
+    if (suppressInternalReorder) {
+      // 別タブへの移動として親が処理するため、内部の並び替えは走らせない。
       _suppressNextReorder = true;
-      widget.onSortDragEnd?.call(kif, targetTabId);
-    } else {
-      widget.onSortDragEnd?.call(kif, null);
     }
+  }
+
+  /// グローバル座標 [globalPosition] にドロップしたときに、この一覧の
+  /// 何番目の位置へ挿入するかを返す。
+  ///
+  /// 一覧がまだ読み込まれていない場合は null（移動先の末尾へ追加）を返す。
+  int? insertionIndexAtGlobal(Offset globalPosition) {
+    final kifs = _tempKifs;
+    if (kifs == null) return null;
+    if (kifs.isEmpty) return 0;
+
+    final isGrid = _isGridView;
+    final keys = kifs.map((kif) => _itemKey(kif.id!)).toSet();
+    final renderBoxes = _collectItemRenderBoxes(keys);
+    if (renderBoxes.isEmpty) return kifs.length;
+
+    int count = 0;
+    for (final kif in kifs) {
+      final renderBox = renderBoxes[_itemKey(kif.id!)];
+      if (renderBox == null) continue;
+      final rect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
+      if (isGrid) {
+        if (globalPosition.dy > rect.bottom) {
+          count++;
+        } else if (globalPosition.dy >= rect.top &&
+            globalPosition.dx > rect.center.dx) {
+          count++;
+        }
+      } else if (globalPosition.dy > rect.center.dy) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Key _itemKey(int kifId) =>
+      ValueKey(_isGridView ? 'sort_grid_$kifId' : 'sort_$kifId');
+
+  Map<Key, RenderBox> _collectItemRenderBoxes(Set<Key> keys) {
+    final result = <Key, RenderBox>{};
+    void visit(Element element) {
+      final key = element.widget.key;
+      if (key != null && keys.contains(key) && !result.containsKey(key)) {
+        final renderObject = element.renderObject;
+        if (renderObject is RenderBox &&
+            renderObject.attached &&
+            renderObject.hasSize) {
+          result[key] = renderObject;
+        }
+      }
+      element.visitChildren(visit);
+    }
+
+    (context as Element).visitChildren(visit);
+    return result;
   }
 
   Future<void> deleteSelectedKifs() async {

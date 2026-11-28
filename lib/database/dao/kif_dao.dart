@@ -129,11 +129,16 @@ class KifDao {
     });
   }
 
-  /// 棋譜を別タブの末尾へ移動する。
+  /// 棋譜を別タブへ移動する。
   ///
-  /// 移動先では新しい kif_id と kif_order を採番し、元のタブに残った
-  /// 棋譜の kif_order は順序を保ったまま詰め直す。
-  Future<void> moveKifToTab(KifEntity kif, int targetTabId) async {
+  /// [targetIndex] を指定すると移動先のその位置へ挿入する。省略した場合は
+  /// 移動先の末尾へ追加する。移動先では新しい kif_id を採番し、並び順を
+  /// 詰め直す。元のタブに残った棋譜の kif_order も順序を保ったまま詰め直す。
+  Future<void> moveKifToTab(
+    KifEntity kif,
+    int targetTabId, {
+    int? targetIndex,
+  }) async {
     final id = kif.id;
     if (id == null || kif.tabId == targetTabId) return;
     final db = await _db;
@@ -144,23 +149,31 @@ class KifDao {
       );
       final nextKifId = (maxKifIdResult.first['max_id'] as int? ?? 0) + 1;
 
-      final maxOrderResult = await txn.rawQuery(
-        'SELECT MAX(kif_order) as max_order FROM kif WHERE tab_id = ?',
-        [targetTabId],
-      );
-      final maxOrder = maxOrderResult.first['max_order'] as int?;
-      final nextOrder = maxOrder == null ? 0 : maxOrder + 1;
-
-      await txn.update(
+      final targetRows = await txn.query(
         'kif',
-        {
-          'tab_id': targetTabId,
-          'kif_id': nextKifId,
-          'kif_order': nextOrder,
-        },
-        where: 'id = ?',
-        whereArgs: [id],
+        columns: ['id'],
+        where: 'tab_id = ?',
+        whereArgs: [targetTabId],
+        orderBy: 'kif_order ASC, id ASC',
       );
+      final orderedIds = targetRows.map((row) => row['id'] as int).toList();
+      final insertAt =
+          (targetIndex ?? orderedIds.length).clamp(0, orderedIds.length).toInt();
+      orderedIds.insert(insertAt, id);
+
+      for (int i = 0; i < orderedIds.length; i++) {
+        final updates = <String, Object?>{'kif_order': i};
+        if (orderedIds[i] == id) {
+          updates['tab_id'] = targetTabId;
+          updates['kif_id'] = nextKifId;
+        }
+        await txn.update(
+          'kif',
+          updates,
+          where: 'id = ?',
+          whereArgs: [orderedIds[i]],
+        );
+      }
 
       // 元のタブに残った棋譜の並び順を詰め直す。
       final remaining = await txn.query(

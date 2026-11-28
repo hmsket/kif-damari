@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kifdamari/database/dao/kif_dao.dart';
@@ -60,10 +62,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int _currentTabIndex = 0;
 
   final Map<int, GlobalKey<KifListWidgetState>> _listKeys = {};
-  final Map<int, GlobalKey> _tabKeys = {};
+  final GlobalKey _listAreaKey = GlobalKey();
+
+  static const double _edgeZoneWidth = 56.0;
+  static const Duration _edgeInitialDelay = Duration(milliseconds: 500);
+  static const Duration _edgeRepeatInterval = Duration(milliseconds: 700);
 
   bool _isSortDragging = false;
-  int? _hoveredTabId;
+  bool _sortTabSwitched = false;
+  int _edgeDirection = 0;
+  Timer? _edgeSwitchTimer;
 
   bool _isSearching = false;
   String _searchQuery = '';
@@ -87,9 +95,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final oldController = _tabController;
     _tabController = null;
     _listKeys.clear();
-    _tabKeys.clear();
     _isSortDragging = false;
-    _hoveredTabId = null;
+    _sortTabSwitched = false;
+    _cancelEdgeTimer();
     setState(() {
       _currentTabIndex = 0;
       _loadTabs();
@@ -217,6 +225,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
   }
 
+  Widget _buildKifList(TabEntity tab, List<TabEntity> tabs) {
+    final key = _listKeys.putIfAbsent(
+      tab.id!,
+      () => GlobalKey<KifListWidgetState>(),
+    );
+    return KifListWidget(
+      key: key,
+      tabId: tab.id!,
+      mode: _currentMode,
+      onRefresh: _refresh,
+      onAddKifPressed: () => _onAddKifPressed(context, tab.id!),
+      kifDao: widget.kifDao,
+      onSelectionChanged: () {
+        setState(() {});
+      },
+      onSortDragStart: _handleSortDragStart,
+      onSortDragUpdate: _handleSortDragUpdate,
+      onSortDragEnd: (kif, globalPosition) =>
+          _handleSortDragEnd(kif, globalPosition, tabs),
+    );
+  }
+
   // 現在のタブにおける選択件数を取得
   int _getSelectedCount(List<TabEntity> tabs) {
     if (tabs.isEmpty || _currentMode != AppMode.delete) return 0;
@@ -226,84 +256,133 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return state?.selectedCount ?? 0;
   }
 
-  /// グローバル座標にあるタブの ID を返す。どのタブ上でもなければ null。
-  ///
-  /// タブのラベル矩形そのものに加えて、隣り合うタブの隙間も最寄りの
-  /// タブとして扱い、ドロップしやすいようにしている。
-  int? _tabIdAtGlobalPosition(Offset globalPosition) {
-    final tabRects = <MapEntry<int, Rect>>[];
-    for (final entry in _tabKeys.entries) {
-      final renderObject = entry.value.currentContext?.findRenderObject();
-      if (renderObject is! RenderBox || !renderObject.attached) continue;
-      final rect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
-      tabRects.add(MapEntry(entry.key, rect));
-    }
-    if (tabRects.isEmpty) return null;
-
-    tabRects.sort((a, b) => a.value.left.compareTo(b.value.left));
-    var top = tabRects.first.value.top;
-    var bottom = tabRects.first.value.bottom;
-    for (final tabRect in tabRects) {
-      if (tabRect.value.top < top) top = tabRect.value.top;
-      if (tabRect.value.bottom > bottom) bottom = tabRect.value.bottom;
-      if (tabRect.value.contains(globalPosition)) return tabRect.key;
-    }
-    if (globalPosition.dy < top || globalPosition.dy > bottom) return null;
-
-    final left = tabRects.first.value.left;
-    final right = tabRects.last.value.right;
-    if (globalPosition.dx < left || globalPosition.dx > right) return null;
-
-    int? nearestTabId;
-    var nearestDistance = double.infinity;
-    for (final tabRect in tabRects) {
-      final distance = (tabRect.value.center.dx - globalPosition.dx).abs();
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestTabId = tabRect.key;
-      }
-    }
-    return nearestTabId;
+  void _cancelEdgeTimer() {
+    _edgeSwitchTimer?.cancel();
+    _edgeSwitchTimer = null;
   }
 
   void _handleSortDragStart() {
     if (_currentMode != AppMode.sort || _isSortDragging) return;
+    _cancelEdgeTimer();
+    _edgeDirection = 0;
+    _sortTabSwitched = false;
     setState(() {
       _isSortDragging = true;
     });
   }
 
-  int? _handleSortDragUpdate(Offset globalPosition) {
-    if (_currentMode != AppMode.sort) return null;
-    final tabId = _tabIdAtGlobalPosition(globalPosition);
-    if (tabId != _hoveredTabId) {
-      setState(() {
-        _hoveredTabId = tabId;
-      });
+  /// ドラッグ中のポインタ位置から、一覧の左右端ゾーンに留まっているかを
+  /// 判定し、タブ切り替えのタイマーを制御する。
+  void _handleSortDragUpdate(Offset globalPosition) {
+    if (_currentMode != AppMode.sort || !_isSortDragging) return;
+
+    final renderObject = _listAreaKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.attached) return;
+    final rect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
+
+    int direction = 0;
+    if (globalPosition.dy >= rect.top && globalPosition.dy <= rect.bottom) {
+      if (globalPosition.dx <= rect.left + _edgeZoneWidth) {
+        direction = -1;
+      } else if (globalPosition.dx >= rect.right - _edgeZoneWidth) {
+        direction = 1;
+      }
     }
-    return tabId;
+
+    if (direction == 0) {
+      _cancelEdgeTimer();
+      _edgeDirection = 0;
+      return;
+    }
+
+    // 同じ方向の端ゾーンに留まっている間は、進行中のタイマーを継続する。
+    if (direction == _edgeDirection && _edgeSwitchTimer != null) return;
+
+    _edgeDirection = direction;
+    _scheduleEdgeSwitch(_edgeInitialDelay, direction);
   }
 
-  void _handleSortDragEnd(KifEntity kif, int? targetTabId, List<TabEntity> tabs) {
-    final shouldMove = _currentMode == AppMode.sort &&
-        targetTabId != null &&
-        targetTabId != kif.tabId;
-    if (_isSortDragging || _hoveredTabId != null) {
+  /// [delay] 後に隣のタブへ切り替え、端ゾーンに留まり続ける限り
+  /// 約0.7秒間隔で次のタブへ送る。
+  void _scheduleEdgeSwitch(Duration delay, int direction) {
+    _cancelEdgeTimer();
+    _edgeSwitchTimer = Timer(delay, () {
+      _edgeSwitchTimer = null;
+      if (!mounted || !_isSortDragging || _edgeDirection != direction) return;
+      final didSwitch = _switchTabInDirection(direction);
+      if (didSwitch) {
+        _scheduleEdgeSwitch(_edgeRepeatInterval, direction);
+      } else {
+        // 先頭／末尾のタブに達したらそれ以上進めない。
+        _edgeDirection = 0;
+      }
+    });
+  }
+
+  bool _switchTabInDirection(int direction) {
+    final controller = _tabController;
+    if (controller == null) return false;
+    final nextIndex = controller.index + direction;
+    if (nextIndex < 0 || nextIndex >= controller.length) return false;
+    controller.animateTo(nextIndex);
+    _sortTabSwitched = true;
+    if (mounted) {
+      setState(() {
+        _currentTabIndex = nextIndex;
+      });
+    }
+    return true;
+  }
+
+  /// 並び替えモードのドラッグ終了を処理する。
+  ///
+  /// 戻り値が true の場合は、呼び出し元の一覧側の並び替え処理を抑止する。
+  bool _handleSortDragEnd(
+    KifEntity kif,
+    Offset? globalPosition,
+    List<TabEntity> tabs,
+  ) {
+    _cancelEdgeTimer();
+    _edgeDirection = 0;
+    final hadSwitched = _sortTabSwitched;
+    _sortTabSwitched = false;
+
+    final wasDragging = _isSortDragging;
+    if (_isSortDragging) {
       setState(() {
         _isSortDragging = false;
-        _hoveredTabId = null;
       });
     }
-    if (!shouldMove) return;
-    _moveKifToTab(kif, targetTabId!, tabs);
+    if (!wasDragging || _currentMode != AppMode.sort) return false;
+
+    // キャンセル時はタブ移動しない（切り替え済みなら内部並び替えのみ抑止）。
+    if (globalPosition == null) return hadSwitched;
+
+    final controller = _tabController;
+    if (controller == null) return false;
+    final index = controller.index;
+    if (index < 0 || index >= tabs.length) return false;
+
+    final targetTab = tabs[index];
+    final targetTabId = targetTab.id;
+    if (targetTabId == null || targetTabId == kif.tabId) {
+      // 同じタブ内での並び替えは従来どおり一覧側に任せる。
+      return hadSwitched;
+    }
+
+    final targetState = _listKeys[targetTabId]?.currentState;
+    final insertionIndex = targetState?.insertionIndexAtGlobal(globalPosition);
+    _moveKifToTab(kif, targetTabId, tabs, insertionIndex);
+    return true;
   }
 
-  /// 並び替えモードで別タブへドロップされた棋譜を、そのタブの末尾へ移動する。
+  /// 並び替えモードで別タブへ移動された棋譜を、指定位置へ挿入する。
   Future<void> _moveKifToTab(
     KifEntity kif,
     int targetTabId,
-    List<TabEntity> tabs,
-  ) async {
+    List<TabEntity> tabs, [
+    int? targetIndex,
+  ]) async {
     final targetTabs = tabs.where((t) => t.id == targetTabId).toList();
     if (targetTabs.isEmpty) return;
     final targetTab = targetTabs.first;
@@ -312,7 +391,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       // 未保存の同一タブ内並び替えを先に確定させ、残りの順序を保つ。
       final fromState = _listKeys[fromTabId]?.currentState;
       await fromState?.persistOrder();
-      await _kifDao.moveKifToTab(kif, targetTabId);
+      // 挿入位置の基準になる移動先の並び順も確定させる。
+      final targetState = _listKeys[targetTabId]?.currentState;
+      if (targetIndex != null) {
+        await targetState?.persistOrder();
+      }
+      await _kifDao.moveKifToTab(
+        kif,
+        targetTabId,
+        targetIndex: targetIndex,
+      );
       if (!mounted) return;
       _listKeys[fromTabId]?.currentState?.refreshFromParent();
       _listKeys[targetTabId]?.currentState?.refreshFromParent();
@@ -403,6 +491,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     BackupService.restoreRevision.removeListener(_onRestoreCompleted);
+    _cancelEdgeTimer();
     _tabController?.dispose();
     _searchController.dispose();
     super.dispose();
@@ -662,60 +751,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           }
                         },
                         tabs: tabs.map((t) {
-                          final tabKey = _tabKeys.putIfAbsent(
-                            t.id!,
-                            () => GlobalKey(),
-                          );
-                          final isDropTarget =
-                              _currentMode == AppMode.sort && _hoveredTabId == t.id;
-                          final isDropTargetCandidate =
-                              _currentMode == AppMode.sort && _isSortDragging;
-                          final Color dropTargetColor;
-                          if (isDropTarget) {
-                            dropTargetColor =
-                                Colors.blue.withValues(alpha: 0.18);
-                          } else if (isDropTargetCandidate) {
-                            dropTargetColor =
-                                Colors.blue.withValues(alpha: 0.06);
-                          } else {
-                            dropTargetColor = Colors.transparent;
-                          }
                           return Tab(
-                            key: tabKey,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 120),
-                              decoration: BoxDecoration(
-                                color: dropTargetColor,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_currentMode == AppMode.delete)
-                                    GestureDetector(
-                                      onTap: () => showDeleteTabDialog(context, t, _refresh),
-                                      child: const Padding(
-                                        padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                        child: CircularIconBackground(
-                                          size: 28,
-                                          child: Icon(Icons.cancel, size: 20, color: Colors.red),
-                                        ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_currentMode == AppMode.delete)
+                                  GestureDetector(
+                                    onTap: () => showDeleteTabDialog(context, t, _refresh),
+                                    child: const Padding(
+                                      padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                      child: CircularIconBackground(
+                                        size: 28,
+                                        child: Icon(Icons.cancel, size: 20, color: Colors.red),
                                       ),
                                     ),
-                                  if (_currentMode == AppMode.edit)
-                                    GestureDetector(
-                                      onTap: () => showEditTabDialog(context, t, _refresh),
-                                      child: const Padding(
-                                        padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
-                                        child: CircularIconBackground(
-                                          size: 28,
-                                          child: Icon(Icons.edit, size: 20, color: Colors.green),
-                                        ),
+                                  ),
+                                if (_currentMode == AppMode.edit)
+                                  GestureDetector(
+                                    onTap: () => showEditTabDialog(context, t, _refresh),
+                                    child: const Padding(
+                                      padding: EdgeInsets.fromLTRB(0, 4, 8, 4),
+                                      child: CircularIconBackground(
+                                        size: 28,
+                                        child: Icon(Icons.edit, size: 20, color: Colors.green),
                                       ),
                                     ),
-                                  Text(t.title),
-                                ],
-                              ),
+                                  ),
+                                Text(t.title),
+                              ],
                             ),
                           );
                         }).toList(),
@@ -754,6 +817,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               : null,
           body: SafeArea(
             child: Stack(
+              key: _listAreaKey,
               children: [
                 // 検索中もタブ表示を保持して、閉じたときに
                 // 元のタブ・スクロール位置へ戻れるようにする。
@@ -787,30 +851,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             ),
                           ),
                         )
-                      : TabBarView(
-                          controller: _tabController,
-                          physics: hasSelection
-                              ? const NeverScrollableScrollPhysics()
-                              : const BouncingScrollPhysics(),
-                          children: tabs.map((t) {
-                            final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
-                            return KifListWidget(
-                              key: key,
-                              tabId: t.id!,
-                              mode: _currentMode,
-                              onRefresh: _refresh,
-                              onAddKifPressed: () => _onAddKifPressed(context, t.id!),
-                              kifDao: widget.kifDao,
-                              onSelectionChanged: () {
-                                setState(() {});
-                              },
-                              onSortDragStart: _handleSortDragStart,
-                              onSortDragUpdate: _handleSortDragUpdate,
-                              onSortDragEnd: (kif, targetTabId) =>
-                                  _handleSortDragEnd(kif, targetTabId, tabs),
-                            );
-                          }).toList(),
-                        ),
+                      : _currentMode == AppMode.sort
+                          // 並び替え中は全タブをレイアウトしたまま切り替える。
+                          // ドラッグ元が画面外でもジオメトリを保てるため、
+                          // カードを掴んだままタブをまたげる。
+                          ? IndexedStack(
+                              index: _tabController!.index,
+                              sizing: StackFit.expand,
+                              children: tabs
+                                  .map((t) => _buildKifList(t, tabs))
+                                  .toList(),
+                            )
+                          : TabBarView(
+                              controller: _tabController,
+                              physics: hasSelection
+                                  ? const NeverScrollableScrollPhysics()
+                                  : const BouncingScrollPhysics(),
+                              children: tabs
+                                  .map((t) => _buildKifList(t, tabs))
+                                  .toList(),
+                            ),
                 ),
                 if (_isSearching)
                   Positioned.fill(
