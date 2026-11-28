@@ -17,8 +17,9 @@ class KifListWidget extends StatefulWidget {
   /// テストから差し替えられる棋譜 DAO。
   final KifDao? kifDao;
 
-  /// 並び替えモードでカードのドラッグが始まったときに呼ばれる。
-  final VoidCallback? onSortDragStart;
+  /// 並び替えモードでカードのドラッグが始まったときに、
+  /// ドラッグ元のタブ ID とともに呼ばれる。
+  final void Function(int tabId)? onSortDragStart;
 
   /// ドラッグ中にポインタが移動したときに、グローバル座標で呼ばれる。
   final void Function(Offset globalPosition)? onSortDragUpdate;
@@ -59,6 +60,16 @@ class KifListWidgetState extends State<KifListWidget>
 
   KifEntity? _draggingKif;
   bool _suppressNextReorder = false;
+
+  /// 別タブからドラッグされてきたカードを、この一覧の何番目に
+  /// 挿入するかを示す。null のときは外部からの挿入表示なし。
+  int? _externalInsertionIndex;
+  double _sortListItemExtent = 0;
+
+  int? get externalInsertionIndex => _externalInsertionIndex;
+
+  double get _sortListGapExtent =>
+      _sortListItemExtent > 0 ? _sortListItemExtent : 80.0;
 
   final ScrollController _scrollController = ScrollController();
   double _savedScrollOffset = 0.0;
@@ -174,6 +185,7 @@ class KifListWidgetState extends State<KifListWidget>
       // 再読み込み中も直前に表示していた一覧を保持する（点滅防止）。
       // 初回読み込み時のみ _tempKifs が null のためスピナーを表示する。
       _kifuFuture = _kifDao.getKifsByTab(widget.tabId);
+      _externalInsertionIndex = null;
     });
   }
 
@@ -196,7 +208,7 @@ class KifListWidgetState extends State<KifListWidget>
     if (index < 0 || index >= kifs.length) return;
     _suppressNextReorder = false;
     _draggingKif = kifs[index];
-    widget.onSortDragStart?.call();
+    widget.onSortDragStart?.call(widget.tabId);
   }
 
   void _handleSortPointerMove(PointerMoveEvent event) {
@@ -225,6 +237,25 @@ class KifListWidgetState extends State<KifListWidget>
     }
   }
 
+  /// 別タブで進行中のドラッグ位置を受け取り、この一覧での挿入位置を
+  /// 更新する。タブ切り替え後もカードがずれて隙間が空くフィードバックを
+  /// 出すために使う。
+  void updateExternalInsertion(Offset globalPosition) {
+    final index = insertionIndexAtGlobal(globalPosition);
+    if (index == _externalInsertionIndex) return;
+    setState(() {
+      _externalInsertionIndex = index;
+    });
+  }
+
+  /// 別タブからのドラッグに対する挿入表示を消す。
+  void clearExternalInsertion() {
+    if (_externalInsertionIndex == null) return;
+    setState(() {
+      _externalInsertionIndex = null;
+    });
+  }
+
   /// グローバル座標 [globalPosition] にドロップしたときに、この一覧の
   /// 何番目の位置へ挿入するかを返す。
   ///
@@ -238,6 +269,17 @@ class KifListWidgetState extends State<KifListWidget>
     final keys = kifs.map((kif) => _itemKey(kif.id!)).toSet();
     final renderBoxes = _collectItemRenderBoxes(keys);
     if (renderBoxes.isEmpty) return kifs.length;
+
+    if (!isGrid) {
+      // 外部ドラッグ用の隙間の高さを、実際のリスト項目に合わせる。
+      for (final kif in kifs) {
+        final renderBox = renderBoxes[_itemKey(kif.id!)];
+        if (renderBox != null) {
+          _sortListItemExtent = renderBox.size.height;
+          break;
+        }
+      }
+    }
 
     int count = 0;
     for (final kif in kifs) {
@@ -397,11 +439,19 @@ class KifListWidgetState extends State<KifListWidget>
     );
   }
 
+  /// 別タブから挿入される位置を表示するための、表示上のインデックス変換。
+  int _sortRealIndex(int displayIndex, int? gapIndex) {
+    if (gapIndex != null && displayIndex > gapIndex) return displayIndex - 1;
+    return displayIndex;
+  }
+
   /// 並べ替えモード（詳細リスト表示）: カードの長押しドラッグで並べ替え
   Widget _buildSortList(List<KifEntity> kifs) {
     // 並び替え用のウィジェットは、一覧が空になっても作り直さず同じ位置に
     // 置き続ける。ドロップ直後に元タブが空になると、ドラッグの終了処理が
     // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
+    final gapIndex = _externalInsertionIndex;
+    final displayItemCount = kifs.length + (gapIndex != null ? 1 : 0);
     return Listener(
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
@@ -411,7 +461,7 @@ class KifListWidgetState extends State<KifListWidget>
         children: [
           ReorderableListView.builder(
             scrollController: _scrollController,
-            itemCount: kifs.length,
+            itemCount: displayItemCount,
             buildDefaultDragHandles: false,
             proxyDecorator: (child, index, animation) {
               return Material(
@@ -421,12 +471,15 @@ class KifListWidgetState extends State<KifListWidget>
                 child: child,
               );
             },
-            onReorderStart: (index) => _handleSortDragStart(kifs, index),
+            onReorderStart: (index) =>
+                _handleSortDragStart(kifs, _sortRealIndex(index, gapIndex)),
             onReorder: (oldIndex, newIndex) {
               if (_suppressNextReorder) {
                 _suppressNextReorder = false;
                 return;
               }
+              // 外部からの挿入表示中は、この一覧自身の並び替えは走らない。
+              if (gapIndex != null) return;
               setState(() {
                 if (oldIndex < newIndex) newIndex -= 1;
                 final item = kifs.removeAt(oldIndex);
@@ -435,7 +488,15 @@ class KifListWidgetState extends State<KifListWidget>
               });
             },
             itemBuilder: (context, index) {
-              final kif = kifs[index];
+              if (gapIndex != null && index == gapIndex) {
+                // 挿入先に空の隙間を出し、後続のカードをずらす。
+                return SizedBox(
+                  key: const ValueKey('sort_gap_placeholder'),
+                  height: _sortListGapExtent,
+                );
+              }
+              final realIndex = _sortRealIndex(index, gapIndex);
+              final kif = kifs[realIndex];
               // カード全体を長押しドラッグの開始領域にする（ハンドルは表示しない）
               return ReorderableDelayedDragStartListener(
                 key: ValueKey('sort_${kif.id}'),
@@ -444,7 +505,7 @@ class KifListWidgetState extends State<KifListWidget>
                   kif: kif,
                   mode: widget.mode,
                   onRefresh: _loadKifu,
-                  index: index,
+                  index: realIndex,
                 ),
               );
             },
@@ -531,6 +592,8 @@ class KifListWidgetState extends State<KifListWidget>
     // 並び替え用のウィジェットは、一覧が空になっても作り直さず同じ位置に
     // 置き続ける。ドロップ直後に元タブが空になると、ドラッグの終了処理が
     // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
+    final gapIndex = _externalInsertionIndex;
+    final displayItemCount = kifs.length + (gapIndex != null ? 1 : 0);
     return Listener(
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
@@ -547,7 +610,7 @@ class KifListWidgetState extends State<KifListWidget>
               crossAxisSpacing: 10,
               childAspectRatio: 0.95,
             ),
-            itemCount: kifs.length,
+            itemCount: displayItemCount,
             proxyDecorator: (child, index, animation) {
               return Material(
                 elevation: 6,
@@ -556,12 +619,15 @@ class KifListWidgetState extends State<KifListWidget>
                 child: child,
               );
             },
-            onReorderStart: (index) => _handleSortDragStart(kifs, index),
+            onReorderStart: (index) =>
+                _handleSortDragStart(kifs, _sortRealIndex(index, gapIndex)),
             onReorder: (oldIndex, newIndex) {
               if (_suppressNextReorder) {
                 _suppressNextReorder = false;
                 return;
               }
+              // 外部からの挿入表示中は、この一覧自身の並び替えは走らない。
+              if (gapIndex != null) return;
               setState(() {
                 final item = kifs.removeAt(oldIndex);
                 kifs.insert(newIndex, item);
@@ -569,7 +635,14 @@ class KifListWidgetState extends State<KifListWidget>
               });
             },
             itemBuilder: (context, index) {
-              final kif = kifs[index];
+              if (gapIndex != null && index == gapIndex) {
+                // 挿入先に空のセルを出し、後続のカードをずらす。
+                return const SizedBox(
+                  key: ValueKey('sort_gap_placeholder'),
+                );
+              }
+              final realIndex = _sortRealIndex(index, gapIndex);
+              final kif = kifs[realIndex];
               return KifGridItem(
                 key: ValueKey('sort_grid_${kif.id}'),
                 kif: kif,
