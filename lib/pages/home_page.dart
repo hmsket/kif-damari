@@ -225,6 +225,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
   }
 
+  Widget _buildKifList(TabEntity tab, List<TabEntity> tabs) {
+    final key = _listKeys.putIfAbsent(
+      tab.id!,
+      () => GlobalKey<KifListWidgetState>(),
+    );
+    return KifListWidget(
+      key: key,
+      tabId: tab.id!,
+      mode: _currentMode,
+      onRefresh: _refresh,
+      onAddKifPressed: () => _onAddKifPressed(context, tab.id!),
+      kifDao: widget.kifDao,
+      onSelectionChanged: () {
+        setState(() {});
+      },
+      onSortDragStart: _handleSortDragStart,
+      onSortDragUpdate: _handleSortDragUpdate,
+      onSortDragEnd: (kif, globalPosition) =>
+          _handleSortDragEnd(kif, globalPosition, tabs),
+    );
+  }
+
   // 現在のタブにおける選択件数を取得
   int _getSelectedCount(List<TabEntity> tabs) {
     if (tabs.isEmpty || _currentMode != AppMode.delete) return 0;
@@ -829,30 +851,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             ),
                           ),
                         )
-                      : TabBarView(
-                          controller: _tabController,
-                          physics: hasSelection
-                              ? const NeverScrollableScrollPhysics()
-                              : const BouncingScrollPhysics(),
-                          children: tabs.map((t) {
-                            final key = _listKeys.putIfAbsent(t.id!, () => GlobalKey<KifListWidgetState>());
-                            return KifListWidget(
-                              key: key,
-                              tabId: t.id!,
-                              mode: _currentMode,
-                              onRefresh: _refresh,
-                              onAddKifPressed: () => _onAddKifPressed(context, t.id!),
-                              kifDao: widget.kifDao,
-                              onSelectionChanged: () {
-                                setState(() {});
-                              },
-                              onSortDragStart: _handleSortDragStart,
-                              onSortDragUpdate: _handleSortDragUpdate,
-                              onSortDragEnd: (kif, globalPosition) =>
-                                  _handleSortDragEnd(kif, globalPosition, tabs),
-                            );
-                          }).toList(),
-                        ),
+                      : _currentMode == AppMode.sort
+                          // 並び替え中は全タブをレイアウトしたまま切り替える。
+                          // ドラッグ元が画面外でもジオメトリを保てるため、
+                          // カードを掴んだままタブをまたげる。
+                          ? IndexedStack(
+                              index: _tabController!.index,
+                              sizing: StackFit.expand,
+                              children: tabs
+                                  .map((t) => _buildKifList(t, tabs))
+                                  .toList(),
+                            )
+                          : TabBarView(
+                              controller: _tabController,
+                              physics: hasSelection
+                                  ? const NeverScrollableScrollPhysics()
+                                  : const BouncingScrollPhysics(),
+                              children: tabs
+                                  .map((t) => _buildKifList(t, tabs))
+                                  .toList(),
+                            ),
                 ),
                 if (_isSearching)
                   Positioned.fill(

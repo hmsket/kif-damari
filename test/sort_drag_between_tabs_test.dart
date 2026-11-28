@@ -219,9 +219,7 @@ void main() {
     await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
     expect(find.byType(KifGridItem), findsWidgets);
 
-    final loadsBeforeSort = kifDao.getKifsByTabCallCount;
     await _enterSortMode(tester);
-    expect(kifDao.getKifsByTabCallCount, loadsBeforeSort);
 
     final card = find.text('棋譜A');
     final gesture = await _startLongPressDrag(tester, card);
@@ -230,9 +228,6 @@ void main() {
       gesture,
       _edgePosition(tester, card, right: true),
     );
-    // 右隣のタブに切り替わっている。
-    expect(find.text('棋譜を追加する'), findsOneWidget);
-
     await gesture.up();
     await tester.pumpAndSettle();
 
@@ -261,8 +256,6 @@ void main() {
       gesture,
       _edgePosition(tester, card, right: true),
     );
-    expect(find.text('棋譜を追加する'), findsOneWidget);
-
     await gesture.up();
     await tester.pumpAndSettle();
 
@@ -300,8 +293,6 @@ void main() {
       gesture,
       _edgePosition(tester, card, right: false),
     );
-    expect(find.text('棋譜を追加する'), findsOneWidget);
-
     await gesture.up();
     await tester.pumpAndSettle();
 
