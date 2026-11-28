@@ -300,11 +300,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       _clearExternalSortInsertion();
       return;
     }
+    // ドラッグ中カードの実体位置。ポインタ位置だけでなくカードの重なりで
+    // 同一タブ内と同じ挿入判定を行うために使う。
+    final draggedRect =
+        _listKeys[sourceTabId]?.currentState?.dragRectAt(globalPosition);
     for (final entry in _listKeys.entries) {
       final state = entry.value.currentState;
       if (state == null) continue;
       if (entry.key == activeTabId) {
-        state.updateExternalInsertion(globalPosition);
+        state.updateExternalInsertion(
+          globalPosition,
+          draggedRect: draggedRect,
+        );
       } else {
         state.clearExternalInsertion();
       }
@@ -434,9 +441,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
 
     final targetState = _listKeys[targetTabId]?.currentState;
+    // ドラッグ中カードの実体位置（挿入位置の判定に使う）。
+    final draggedRect =
+        _listKeys[kif.tabId]?.currentState?.dragRectAt(globalPosition);
     // 切り替え先で表示した位置（隙間）を優先し、無ければ座標から求める。
     final insertionIndex = targetState?.externalInsertionIndex ??
-        targetState?.insertionIndexAtGlobal(globalPosition);
+        targetState?.insertionIndexAtGlobal(
+          globalPosition,
+          draggedRect: draggedRect,
+        );
     _clearExternalSortInsertion();
     _sortSourceTabId = null;
     _moveKifToTab(kif, targetTabId, tabs, insertionIndex);

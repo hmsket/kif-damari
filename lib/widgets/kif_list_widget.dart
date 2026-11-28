@@ -61,6 +61,13 @@ class KifListWidgetState extends State<KifListWidget>
   KifEntity? _draggingKif;
   bool _suppressNextReorder = false;
 
+  /// ドラッグ開始時に掴んだ位置（カード左上からの相対座標）と
+  /// ドラッグ中カードのサイズ。タブをまたぐドラッグでも、同一タブ内の
+  /// Reorderable 標準と同じ「カードの実体」を基準に挿入位置を決めるために使う。
+  Offset? _dragPointerOffset;
+  Size? _dragItemSize;
+  Offset? _pointerDownPosition;
+
   /// 別タブからドラッグされてきたカードを、この一覧の何番目に
   /// 挿入するかを示す。null のときは外部からの挿入表示なし。
   int? _externalInsertionIndex;
@@ -217,8 +224,34 @@ class KifListWidgetState extends State<KifListWidget>
   void _handleSortDragStart(List<KifEntity> kifs, int index) {
     if (index < 0 || index >= kifs.length) return;
     _suppressNextReorder = false;
-    _draggingKif = kifs[index];
+    final kif = kifs[index];
+    _draggingKif = kif;
+
+    // ドラッグ中カードの実体（サイズと掴んだ位置）を覚えておく。
+    // タブをまたいだ後も、この矩形を基準に同一タブ内と同じ挿入判定を行う。
+    Offset? pointerOffset;
+    Size? itemSize;
+    final key = _shiftKey(kif.id!);
+    final renderBox = _collectItemRenderBoxes({key})[key];
+    if (renderBox != null) {
+      final rect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
+      final grab = _pointerDownPosition == null
+          ? rect.size.center(Offset.zero)
+          : _pointerDownPosition! - rect.topLeft;
+      pointerOffset = Offset(
+        grab.dx.clamp(0.0, rect.width).toDouble(),
+        grab.dy.clamp(0.0, rect.height).toDouble(),
+      );
+      itemSize = rect.size;
+    }
+    _dragPointerOffset = pointerOffset;
+    _dragItemSize = itemSize;
+
     widget.onSortDragStart?.call(widget.tabId);
+  }
+
+  void _handleSortPointerDown(PointerDownEvent event) {
+    _pointerDownPosition = event.position;
   }
 
   void _handleSortPointerMove(PointerMoveEvent event) {
@@ -241,17 +274,32 @@ class KifListWidgetState extends State<KifListWidget>
 
     final suppressInternalReorder =
         widget.onSortDragEnd?.call(kif, globalPosition) ?? false;
+    _dragPointerOffset = null;
+    _dragItemSize = null;
     if (suppressInternalReorder) {
       // 別タブへの移動として親が処理するため、内部の並び替えは走らせない。
       _suppressNextReorder = true;
     }
   }
 
+  /// ドラッグ中カードの現在の矩形を返す。ドラッグ開始前は null。
+  ///
+  /// ポインタ位置だけではなくカードの実体位置で挿入判定するために使う。
+  Rect? dragRectAt(Offset globalPosition) {
+    final size = _dragItemSize;
+    final grab = _dragPointerOffset;
+    if (size == null || grab == null) return null;
+    return (globalPosition - grab) & size;
+  }
+
   /// 別タブで進行中のドラッグ位置を受け取り、この一覧での挿入位置を
   /// 更新する。タブ切り替え後もカードがずれて隙間が空くフィードバックを
   /// 出すために使う。
-  void updateExternalInsertion(Offset globalPosition) {
-    final index = insertionIndexAtGlobal(globalPosition);
+  void updateExternalInsertion(Offset globalPosition, {Rect? draggedRect}) {
+    final index = insertionIndexAtGlobal(
+      globalPosition,
+      draggedRect: draggedRect,
+    );
     if (index == _externalInsertionIndex) return;
     setState(() {
       _externalInsertionIndex = index;
@@ -269,12 +317,18 @@ class KifListWidgetState extends State<KifListWidget>
   /// グローバル座標 [globalPosition] にドロップしたときに、この一覧の
   /// 何番目の位置へ挿入するかを返す。
   ///
+  /// [draggedRect] が渡された場合は、ポインタ位置ではなくドラッグ中カードの
+  /// 実体の中心を基準にする。同一タブ内の Reorderable 系はカードの実体同士の
+  /// 重なりで挿入位置を決めているため、カードが既存棋譜と同じ位置にあるときは
+  /// 既存棋譜を優先（挿入位置は既存棋譜の後ろ）する。
+  ///
   /// 一覧がまだ読み込まれていない場合は null（移動先の末尾へ追加）を返す。
-  int? insertionIndexAtGlobal(Offset globalPosition) {
+  int? insertionIndexAtGlobal(Offset globalPosition, {Rect? draggedRect}) {
     final kifs = _tempKifs;
     if (kifs == null) return null;
     if (kifs.isEmpty) return 0;
 
+    final reference = draggedRect?.center ?? globalPosition;
     final isGrid = _isGridView;
     final keys = kifs.map((kif) => _shiftKey(kif.id!)).toSet();
     final renderBoxes = _collectItemRenderBoxes(keys);
@@ -297,13 +351,13 @@ class KifListWidgetState extends State<KifListWidget>
       if (renderBox == null) continue;
       final rect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
       if (isGrid) {
-        if (globalPosition.dy > rect.bottom) {
+        if (reference.dy > rect.bottom) {
           count++;
-        } else if (globalPosition.dy >= rect.top &&
-            globalPosition.dx > rect.center.dx) {
+        } else if (reference.dy >= rect.top &&
+            reference.dx >= rect.center.dx) {
           count++;
         }
-      } else if (globalPosition.dy > rect.center.dy) {
+      } else if (reference.dy >= rect.center.dy) {
         count++;
       }
     }
@@ -491,6 +545,7 @@ class KifListWidgetState extends State<KifListWidget>
     // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
     final gapIndex = _externalInsertionIndex;
     return Listener(
+      onPointerDown: _handleSortPointerDown,
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
       onPointerCancel: _handleSortPointerCancel,
@@ -630,6 +685,7 @@ class KifListWidgetState extends State<KifListWidget>
     // 走る前にウィジェットが破棄され、浮遊表示（Overlay）が残ることがある。
     final gapIndex = _externalInsertionIndex;
     return Listener(
+      onPointerDown: _handleSortPointerDown,
       onPointerMove: _handleSortPointerMove,
       onPointerUp: _handleSortPointerUp,
       onPointerCancel: _handleSortPointerCancel,

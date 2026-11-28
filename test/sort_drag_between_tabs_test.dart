@@ -277,6 +277,65 @@ Future<void> _dragIntoGapOnTargetTab(
   await _drainSnackbar(tester);
 }
 
+/// 端ゾーンで切り替えた先の既存カードと同じ位置（カード中心）へ重ねて
+/// ドロップしたとき、既存カードが優先される（既存カードの後ろへ挿入される）
+/// ことを検証する。同一タブ内の Reorderable 標準挙動に合わせる。
+Future<void> _dragOntoExistingCard(
+  WidgetTester tester,
+  _FakeKifDao kifDao, {
+  required bool isGrid,
+}) async {
+  await tester.runAsync(
+    () => AppSettings().set('homeViewMode', isGrid ? 'grid' : 'list'),
+  );
+  await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+  await _enterSortMode(tester);
+
+  final itemKeyPrefix = isGrid ? 'sort_grid_' : 'sort_';
+  final existingKey = ValueKey('${itemKeyPrefix}22');
+  final nextKey = ValueKey('${itemKeyPrefix}23');
+  final source = find.byKey(ValueKey('${itemKeyPrefix}11'));
+
+  final gesture = await _startLongPressDrag(tester, source);
+  await _hoverAtEdge(
+    tester,
+    gesture,
+    _edgePosition(tester, source, right: true),
+  );
+
+  // 切り替え直後は端ゾーンに留まっているため挿入用の隙間は出ていない。
+  expect(find.text('移動先2'), findsOneWidget);
+  final existingBefore = tester.getRect(find.byKey(existingKey));
+  final nextBefore = tester.getRect(find.byKey(nextKey));
+
+  // 掴んだカードの中心を、既存カード（移動先2）の中心へ重ねる。
+  await gesture.moveTo(existingBefore.center);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 300));
+
+  // 既存カードは動かず、次のカードがずれて隙間が空く＝既存カード優先。
+  final existingAfter = tester.getRect(find.byKey(existingKey));
+  final nextAfter = tester.getRect(find.byKey(nextKey));
+  if (isGrid) {
+    expect(existingAfter.top, closeTo(existingBefore.top, 0.5));
+    expect(existingAfter.left, closeTo(existingBefore.left, 0.5));
+    expect(nextAfter.left, greaterThan(nextBefore.left + 10));
+  } else {
+    expect(existingAfter.top, closeTo(existingBefore.top, 0.5));
+    expect(nextAfter.top, greaterThan(nextBefore.top + 10));
+  }
+
+  await gesture.up();
+  await tester.pumpAndSettle();
+
+  expect(
+    kifDao.kifsByTab[2]!.map((kif) => kif.title).toList(),
+    ['移動先1', '移動先2', '移動元1', '移動先3', '移動先4'],
+  );
+  await _drainSnackbar(tester);
+}
+
 void main() {
   late Directory hiveDir;
 
@@ -569,5 +628,19 @@ void main() {
     expect(kifDao.kifsByTab[2]!, isEmpty);
 
     await _drainSnackbar(tester);
+  });
+
+  testWidgets('グリッド: 切り替え先の既存カードと同じ位置では既存カードが優先される',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    final kifDao = _FakeKifDao(_kifsWithTargets());
+    await _dragOntoExistingCard(tester, kifDao, isGrid: true);
+  });
+
+  testWidgets('リスト: 切り替え先の既存カードと同じ位置では既存カードが優先される',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    final kifDao = _FakeKifDao(_kifsWithTargets());
+    await _dragOntoExistingCard(tester, kifDao, isGrid: false);
   });
 }
