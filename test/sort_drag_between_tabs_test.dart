@@ -339,6 +339,97 @@ void main() {
     await _drainSnackbar(tester);
   });
 
+  testWidgets('グリッド: 1件だけのタブから端ゾーンで切り替えてドロップしても浮遊表示が残らない',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
+    final kifDao = _FakeKifDao({
+      1: [_kif(id: 11, tabId: 1, order: 0, title: '棋譜A')],
+      2: <KifEntity>[],
+    });
+    await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+    await _enterSortMode(tester);
+
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: true),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // 元タブが空になっても、ドロップ後に浮遊表示が残っていないこと。
+    expect(kifDao.kifsByTab[1]!, isEmpty);
+    expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
+    expect(find.text('棋譜A'), findsOneWidget);
+    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+
+    await _drainSnackbar(tester);
+  });
+
+  testWidgets('リスト: 1件だけのタブから端ゾーンで切り替えてドロップしても浮遊表示が残らない',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    await tester.runAsync(() => AppSettings().set('homeViewMode', 'list'));
+    final kifDao = _FakeKifDao({
+      1: [_kif(id: 11, tabId: 1, order: 0, title: '棋譜A')],
+      2: <KifEntity>[],
+    });
+    await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+    await _enterSortMode(tester);
+
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: true),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // 元タブが空になっても、ドロップ後に浮遊表示が残っていないこと。
+    expect(kifDao.kifsByTab[1]!, isEmpty);
+    expect(kifDao.kifsByTab[2]!.any((kif) => kif.title == '棋譜A'), isTrue);
+    expect(find.text('棋譜A'), findsOneWidget);
+    expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+
+    await _drainSnackbar(tester);
+  });
+
+  testWidgets('グリッド: 端ゾーンで切り替えた後にドラッグをキャンセルしても浮遊表示が残らない',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
+    final kifDao = _FakeKifDao({
+      1: [_kif(id: 11, tabId: 1, order: 0, title: '棋譜A')],
+      2: <KifEntity>[],
+    });
+    await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+    await _enterSortMode(tester);
+
+    final card = find.text('棋譜A');
+    final gesture = await _startLongPressDrag(tester, card);
+    await _hoverAtEdge(
+      tester,
+      gesture,
+      _edgePosition(tester, card, right: true),
+    );
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+
+    // キャンセルなので移動していない。
+    expect(kifDao.kifsByTab[1]!.any((kif) => kif.title == '棋譜A'), isTrue);
+    expect(kifDao.kifsByTab[2]!, isEmpty);
+
+    // 元のタブへ戻したときに浮遊表示が重複していないこと。
+    await tester.tap(find.text('タブA'));
+    await tester.pumpAndSettle();
+    expect(find.text('棋譜A'), findsOneWidget);
+  });
+
   testWidgets('グリッド: 端ゾーンに入らない同一タブ内の並び替えではタブが切り替わらない',
       variant: TargetPlatformVariant.only(TargetPlatform.android),
       (tester) async {
