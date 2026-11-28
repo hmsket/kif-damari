@@ -14,6 +14,9 @@ class KifListWidget extends StatefulWidget {
   final VoidCallback? onSelectionChanged;
   final VoidCallback? onAddKifPressed; // ★ コールバックを追加
 
+  /// テストから差し替えられる棋譜 DAO。
+  final KifDao? kifDao;
+
   /// 並び替えモードでカードのドラッグが始まったときに呼ばれる。
   final VoidCallback? onSortDragStart;
 
@@ -30,6 +33,7 @@ class KifListWidget extends StatefulWidget {
     required this.onRefresh,
     this.onSelectionChanged,
     this.onAddKifPressed, // ★ コールバックを追加
+    this.kifDao,
     this.onSortDragStart,
     this.onSortDragUpdate,
     this.onSortDragEnd,
@@ -64,6 +68,8 @@ class KifListWidgetState extends State<KifListWidget>
 
   @override
   bool get wantKeepAlive => true;
+
+  KifDao get _kifDao => widget.kifDao ?? KifDao();
 
   int get selectedCount => _selectedKifIds.length;
 
@@ -141,10 +147,16 @@ class KifListWidgetState extends State<KifListWidget>
   @override
   void didUpdateWidget(KifListWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.mode != widget.mode || oldWidget.tabId != widget.tabId) {
-      if (widget.mode != AppMode.delete) {
-        _selectedKifIds.clear();
-      }
+    if (oldWidget.mode != widget.mode && widget.mode != AppMode.delete) {
+      _selectedKifIds.clear();
+    }
+    // 並び替えモードに入った直後の再読み込みはしない。
+    // 表示中の一覧をそのまま使い続けることで、モード切替直後に長押しした
+    // ドラッグのジェスチャ認識が一覧の差し替えで失われるのを防ぐ。
+    final bool enteringSort =
+        oldWidget.mode != widget.mode && widget.mode == AppMode.sort;
+    if (oldWidget.tabId != widget.tabId ||
+        (oldWidget.mode != widget.mode && !enteringSort)) {
       _loadKifu();
     }
   }
@@ -159,13 +171,13 @@ class KifListWidgetState extends State<KifListWidget>
     setState(() {
       // 再読み込み中も直前に表示していた一覧を保持する（点滅防止）。
       // 初回読み込み時のみ _tempKifs が null のためスピナーを表示する。
-      _kifuFuture = KifDao().getKifsByTab(widget.tabId);
+      _kifuFuture = _kifDao.getKifsByTab(widget.tabId);
     });
   }
 
   Future<void> saveOrder() async {
     if (_tempKifs != null) {
-      await KifDao().updateAllKifOrders(_tempKifs!);
+      await _kifDao.updateAllKifOrders(_tempKifs!);
       _loadKifu(); 
       widget.onRefresh();
     }
@@ -174,7 +186,7 @@ class KifListWidgetState extends State<KifListWidget>
   /// 表示中の並び順だけを DB に保存する（再読み込みはしない）。
   Future<void> persistOrder() async {
     if (_tempKifs != null) {
-      await KifDao().updateAllKifOrders(_tempKifs!);
+      await _kifDao.updateAllKifOrders(_tempKifs!);
     }
   }
 
@@ -221,7 +233,7 @@ class KifListWidgetState extends State<KifListWidget>
   Future<void> deleteSelectedKifs() async {
     if (_selectedKifIds.isEmpty) return;
     showDeleteSelectedKifsDialog(context, _selectedKifIds.length, () async {
-      await KifDao().deleteKifs(_selectedKifIds.toList());
+      await _kifDao.deleteKifs(_selectedKifIds.toList());
       _selectedKifIds.clear();
       widget.onSelectionChanged?.call();
       _loadKifu();

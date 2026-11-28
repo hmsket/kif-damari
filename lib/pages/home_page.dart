@@ -30,13 +30,30 @@ import 'package:kifdamari/widgets/kif_search_view.dart';
 enum AppMode { normal, edit, sort, delete }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  /// テストから差し替えられるタブ DAO。
+  final TabDao? tabDao;
+
+  /// テストから差し替えられる棋譜 DAO。
+  final KifDao? kifDao;
+
+  /// テストでフォント取得を避けるためのフラグ。
+  final bool useGoogleFonts;
+
+  const HomePage({
+    super.key,
+    this.tabDao,
+    this.kifDao,
+    this.useGoogleFonts = true,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+  TabDao get _tabDao => widget.tabDao ?? TabDao();
+  KifDao get _kifDao => widget.kifDao ?? KifDao();
+
   late Future<List<TabEntity>> _tabsFuture;
   AppMode _currentMode = AppMode.normal;
   TabController? _tabController; 
@@ -103,7 +120,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   /// 他のアプリから受け取った棋譜を現在のタブへ登録し、再生画面で開く。
   Future<void> _openIncomingKif(String uri) async {
     try {
-      final tabs = await TabDao().getAllTabs();
+      final tabs = await _tabDao.getAllTabs();
       if (tabs.isEmpty) {
         if (mounted) ShowErrorSnackbar.show(context, '棋譜を登録するタブがありません');
         return;
@@ -145,7 +162,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _loadTabs() {
-    _tabsFuture = TabDao().getAllTabs();
+    _tabsFuture = _tabDao.getAllTabs();
   }
 
   void _syncTabIndex() {
@@ -295,7 +312,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       // 未保存の同一タブ内並び替えを先に確定させ、残りの順序を保つ。
       final fromState = _listKeys[fromTabId]?.currentState;
       await fromState?.persistOrder();
-      await KifDao().moveKifToTab(kif, targetTabId);
+      await _kifDao.moveKifToTab(kif, targetTabId);
       if (!mounted) return;
       _listKeys[fromTabId]?.currentState?.refreshFromParent();
       _listKeys[targetTabId]?.currentState?.refreshFromParent();
@@ -316,7 +333,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Future<void> _onAddKifPressed(BuildContext context, int tabId) async {
-    final dao = KifDao();
+    final dao = _kifDao;
     final settings = AppSettings();
     
     final currentKifCount = await dao.getTotalKifCount();
@@ -633,8 +650,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         tabAlignment: TabAlignment.start,
                         labelColor: Colors.black, 
                         unselectedLabelColor: Colors.grey[600], 
-                        labelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.bold),
-                        unselectedLabelStyle: GoogleFonts.notoSansJp(fontWeight: FontWeight.normal),
+                        labelStyle: widget.useGoogleFonts
+                            ? GoogleFonts.notoSansJp(fontWeight: FontWeight.bold)
+                            : const TextStyle(fontWeight: FontWeight.bold),
+                        unselectedLabelStyle: widget.useGoogleFonts
+                            ? GoogleFonts.notoSansJp(fontWeight: FontWeight.normal)
+                            : const TextStyle(fontWeight: FontWeight.normal),
                         onTap: (index) {
                           if (hasSelection && index != _currentTabIndex) {
                             _tabController?.animateTo(_currentTabIndex);
@@ -714,11 +735,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         const SizedBox(width: 8),
                         Text(
                           '$selectedCount件選択中、他のタブには移動できません',
-                          style: GoogleFonts.notoSansJp(
-                            color: Colors.red.shade800,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                          style: widget.useGoogleFonts
+                              ? GoogleFonts.notoSansJp(
+                                  color: Colors.red.shade800,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                )
+                              : TextStyle(
+                                  color: Colors.red.shade800,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
                         ),
                       ],
                     ),
@@ -773,6 +800,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               mode: _currentMode,
                               onRefresh: _refresh,
                               onAddKifPressed: () => _onAddKifPressed(context, t.id!),
+                              kifDao: widget.kifDao,
                               onSelectionChanged: () {
                                 setState(() {});
                               },
