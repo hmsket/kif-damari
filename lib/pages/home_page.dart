@@ -28,6 +28,7 @@ import 'package:kifdamari/dialogs/sort_tab_dialog.dart';
 import 'package:kifdamari/snackbars/show_success_snackbar.dart';
 import 'package:kifdamari/widgets/kif_list_widget.dart';
 import 'package:kifdamari/widgets/kif_search_view.dart';
+import 'package:kifdamari/widgets/sort_tab_slide_view.dart';
 
 enum AppMode { normal, edit, sort, delete }
 
@@ -937,12 +938,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           ),
                         )
                       : _currentMode == AppMode.sort
-                          // 並び替え中は全タブをレイアウトしたまま切り替える。
+                          // 並び替え中は全タブをレイアウトしたまま、
+                          // タブ切り替え時は横方向へスライドさせる。
                           // ドラッグ元が画面外でもジオメトリを保てるため、
                           // カードを掴んだままタブをまたげる。
-                          ? IndexedStack(
-                              index: _tabController!.index,
-                              sizing: StackFit.expand,
+                          ? SortTabSlideView(
+                              controller: _tabController!,
                               children: tabs
                                   .map((t) => _buildKifList(t, tabs))
                                   .toList(),
