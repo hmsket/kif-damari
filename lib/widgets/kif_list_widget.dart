@@ -180,13 +180,16 @@ class KifListWidgetState extends State<KifListWidget>
     if (oldWidget.mode != widget.mode && widget.mode != AppMode.delete) {
       _selectedKifIds.clear();
     }
-    // 並び替えモードに入った直後の再読み込みはしない。
+    // 並び替えモードの出入りでは再読み込みをしない。
     // 表示中の一覧をそのまま使い続けることで、モード切替直後に長押しした
-    // ドラッグのジェスチャ認識が一覧の差し替えで失われるのを防ぐ。
+    // ドラッグのジェスチャ認識が一覧の差し替えで失われるのを防ぎ、
+    // 保存（確定）時に一覧が再構築されて点滅するのも防ぐ。
     final bool enteringSort =
         oldWidget.mode != widget.mode && widget.mode == AppMode.sort;
+    final bool leavingSort =
+        oldWidget.mode == AppMode.sort && widget.mode != AppMode.sort;
     if (oldWidget.tabId != widget.tabId ||
-        (oldWidget.mode != widget.mode && !enteringSort)) {
+        (oldWidget.mode != widget.mode && !enteringSort && !leavingSort)) {
       _loadKifu();
     }
   }
@@ -206,12 +209,12 @@ class KifListWidgetState extends State<KifListWidget>
     });
   }
 
+  /// 表示中の並び順を DB に保存する。
+  ///
+  /// 保存は永続化だけを行い、一覧の再読み込みはしない。表示中の内容と
+  /// スクロール位置をそのまま保つことで、確定時の点滅を防ぐ。
   Future<void> saveOrder() async {
-    if (_tempKifs != null) {
-      await _kifDao.updateAllKifOrders(_tempKifs!);
-      _loadKifu(); 
-      widget.onRefresh();
-    }
+    await persistOrder();
   }
 
   /// 表示中の並び順だけを DB に保存する（再読み込みはしない）。
