@@ -113,6 +113,21 @@ Map<int, List<KifEntity>> _kifs() => {
       2: <KifEntity>[],
     };
 
+/// 移動先のタブにもカードがある状態。切り替え先で「カードとカードの間」へ
+/// 挿入できることを検証するために使う。
+Map<int, List<KifEntity>> _kifsWithTargets() => {
+      1: [
+        _kif(id: 11, tabId: 1, order: 0, title: '移動元1'),
+        _kif(id: 12, tabId: 1, order: 1, title: '移動元2'),
+      ],
+      2: [
+        _kif(id: 21, tabId: 2, order: 0, title: '移動先1'),
+        _kif(id: 22, tabId: 2, order: 1, title: '移動先2'),
+        _kif(id: 23, tabId: 2, order: 2, title: '移動先3'),
+        _kif(id: 24, tabId: 2, order: 3, title: '移動先4'),
+      ],
+    };
+
 Future<void> _pumpHomePage(
   WidgetTester tester,
   _FakeTabDao tabDao,
@@ -193,6 +208,72 @@ Future<void> _reorderWithinTab(WidgetTester tester) async {
 Future<void> _drainSnackbar(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 3));
   await tester.pumpAndSettle();
+}
+
+/// 端ゾーンでタブを切り替えた後、遷移先のカード間にホバーすると
+/// 挿入位置に隙間が空き、その位置へドロップできることを検証する。
+Future<void> _dragIntoGapOnTargetTab(
+  WidgetTester tester,
+  _FakeKifDao kifDao, {
+  required bool isGrid,
+}) async {
+  await tester.runAsync(
+    () => AppSettings().set('homeViewMode', isGrid ? 'grid' : 'list'),
+  );
+  await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+  await _enterSortMode(tester);
+
+  final source = find.text('移動元1');
+  final gesture = await _startLongPressDrag(tester, source);
+  await _hoverAtEdge(
+    tester,
+    gesture,
+    _edgePosition(tester, source, right: true),
+  );
+
+  // タブBが表示され、まだ挿入用の隙間は出ていない。
+  expect(find.text('移動先1'), findsOneWidget);
+  final itemKeyPrefix = isGrid ? 'sort_grid_' : 'sort_';
+  final firstKey = ValueKey('${itemKeyPrefix}21');
+  final secondKey = ValueKey('${itemKeyPrefix}22');
+  final firstBeforeRect = tester.getRect(find.byKey(firstKey));
+  final secondBeforeRect = tester.getRect(find.byKey(secondKey));
+
+  final insertion = isGrid
+      ? Offset(
+          (firstBeforeRect.center.dx + secondBeforeRect.center.dx) / 2,
+          firstBeforeRect.center.dy,
+        )
+      : Offset(
+          _screenWidth / 2,
+          (firstBeforeRect.center.dy + secondBeforeRect.center.dy) / 2,
+        );
+  await gesture.moveTo(insertion);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 300));
+
+  // 挿入位置より後ろのカードがずれて隙間が空く。
+  final secondAfterRect = tester.getRect(find.byKey(secondKey));
+  expect(secondAfterRect.top, greaterThan(secondBeforeRect.top + 10));
+  if (isGrid) {
+    expect(secondAfterRect.left, lessThan(secondBeforeRect.left));
+  }
+
+  await gesture.up();
+  await tester.pumpAndSettle();
+
+  expect(
+    kifDao.kifsByTab[1]!.map((kif) => kif.title).toList(),
+    ['移動元2'],
+  );
+  expect(
+    kifDao.kifsByTab[2]!.map((kif) => kif.title).toList(),
+    ['移動先1', '移動元1', '移動先2', '移動先3', '移動先4'],
+  );
+  expect(find.text('『タブB』へ移動しました'), findsOneWidget);
+
+  await _drainSnackbar(tester);
 }
 
 void main() {
@@ -428,6 +509,20 @@ void main() {
     await tester.tap(find.text('タブA'));
     await tester.pumpAndSettle();
     expect(find.text('棋譜A'), findsOneWidget);
+  });
+
+  testWidgets('グリッド: 端ゾーンで切り替えた先のカード間で挿入フィードバックが出て、その位置にドロップできる',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    final kifDao = _FakeKifDao(_kifsWithTargets());
+    await _dragIntoGapOnTargetTab(tester, kifDao, isGrid: true);
+  });
+
+  testWidgets('リスト: 端ゾーンで切り替えた先のカード間で挿入フィードバックが出て、その位置にドロップできる',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    final kifDao = _FakeKifDao(_kifsWithTargets());
+    await _dragIntoGapOnTargetTab(tester, kifDao, isGrid: false);
   });
 
   testWidgets('グリッド: 端ゾーンに入らない同一タブ内の並び替えではタブが切り替わらない',

@@ -73,6 +73,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int _edgeDirection = 0;
   Timer? _edgeSwitchTimer;
 
+  /// ドラッグ元のタブ ID（端ゾーンで切り替えた後も保持する）。
+  int? _sortSourceTabId;
+
+  /// 現在表示しているタブ ID（外部ドラッグの挿入表示先の判定に使う）。
+  int? _activeTabId;
+
   bool _isSearching = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -97,6 +103,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _listKeys.clear();
     _isSortDragging = false;
     _sortTabSwitched = false;
+    _sortSourceTabId = null;
+    _activeTabId = null;
     _cancelEdgeTimer();
     setState(() {
       _currentTabIndex = 0;
@@ -261,14 +269,46 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _edgeSwitchTimer = null;
   }
 
-  void _handleSortDragStart() {
+  void _handleSortDragStart(int tabId) {
     if (_currentMode != AppMode.sort || _isSortDragging) return;
     _cancelEdgeTimer();
     _edgeDirection = 0;
     _sortTabSwitched = false;
+    _sortSourceTabId = tabId;
+    _clearExternalSortInsertion();
     setState(() {
       _isSortDragging = true;
     });
+  }
+
+  /// 現在のタブ以外の一覧に残っている、外部ドラッグの挿入表示を消す。
+  void _clearExternalSortInsertion() {
+    for (final key in _listKeys.values) {
+      key.currentState?.clearExternalInsertion();
+    }
+  }
+
+  /// 別タブへ切り替えた後のドラッグ位置を、表示中の一覧へ伝えて
+  /// 挿入位置の隙間を出させる。ドラッグ元の一覧では通常の
+  /// Reorderable のフィードバックに任せる。
+  void _updateExternalSortInsertion(Offset globalPosition) {
+    final sourceTabId = _sortSourceTabId;
+    final activeTabId = _activeTabId;
+    if (sourceTabId == null ||
+        activeTabId == null ||
+        activeTabId == sourceTabId) {
+      _clearExternalSortInsertion();
+      return;
+    }
+    for (final entry in _listKeys.entries) {
+      final state = entry.value.currentState;
+      if (state == null) continue;
+      if (entry.key == activeTabId) {
+        state.updateExternalInsertion(globalPosition);
+      } else {
+        state.clearExternalInsertion();
+      }
+    }
   }
 
   /// ドラッグ中のポインタ位置から、一覧の左右端ゾーンに留まっているかを
@@ -292,8 +332,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (direction == 0) {
       _cancelEdgeTimer();
       _edgeDirection = 0;
+      // 端ゾーンを離れたら、切り替え先のタブで挿入位置を表示する。
+      _updateExternalSortInsertion(globalPosition);
       return;
     }
+
+    // 端ゾーンではタブ切り替えを優先し、挿入表示は出さない。
+    _clearExternalSortInsertion();
 
     // 同じ方向の端ゾーンに留まっている間は、進行中のタイマーを継続する。
     if (direction == _edgeDirection && _edgeSwitchTimer != null) return;
@@ -353,25 +398,47 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _isSortDragging = false;
       });
     }
-    if (!wasDragging || _currentMode != AppMode.sort) return false;
+    if (!wasDragging || _currentMode != AppMode.sort) {
+      _clearExternalSortInsertion();
+      _sortSourceTabId = null;
+      return false;
+    }
 
     // キャンセル時はタブ移動しない（切り替え済みなら内部並び替えのみ抑止）。
-    if (globalPosition == null) return hadSwitched;
+    if (globalPosition == null) {
+      _clearExternalSortInsertion();
+      _sortSourceTabId = null;
+      return hadSwitched;
+    }
 
     final controller = _tabController;
-    if (controller == null) return false;
+    if (controller == null) {
+      _clearExternalSortInsertion();
+      _sortSourceTabId = null;
+      return false;
+    }
     final index = controller.index;
-    if (index < 0 || index >= tabs.length) return false;
+    if (index < 0 || index >= tabs.length) {
+      _clearExternalSortInsertion();
+      _sortSourceTabId = null;
+      return false;
+    }
 
     final targetTab = tabs[index];
     final targetTabId = targetTab.id;
     if (targetTabId == null || targetTabId == kif.tabId) {
       // 同じタブ内での並び替えは従来どおり一覧側に任せる。
+      _clearExternalSortInsertion();
+      _sortSourceTabId = null;
       return hadSwitched;
     }
 
     final targetState = _listKeys[targetTabId]?.currentState;
-    final insertionIndex = targetState?.insertionIndexAtGlobal(globalPosition);
+    // 切り替え先で表示した位置（隙間）を優先し、無ければ座標から求める。
+    final insertionIndex = targetState?.externalInsertionIndex ??
+        targetState?.insertionIndexAtGlobal(globalPosition);
+    _clearExternalSortInsertion();
+    _sortSourceTabId = null;
     _moveKifToTab(kif, targetTabId, tabs, insertionIndex);
     return true;
   }
@@ -536,6 +603,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             }
           });
         }
+
+        final activeIndex = _tabController!.index;
+        _activeTabId = tabs.isNotEmpty &&
+                activeIndex >= 0 &&
+                activeIndex < tabs.length
+            ? tabs[activeIndex].id
+            : null;
 
         return Scaffold(
           backgroundColor: const Color(0XFFF1F1F5),
