@@ -630,6 +630,50 @@ void main() {
     await _drainSnackbar(tester);
   });
 
+  testWidgets('グリッド: 並び替えの確定時に一覧を再読み込みしない',
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (tester) async {
+    await tester.runAsync(() => AppSettings().set('homeViewMode', 'grid'));
+    final kifDao = _FakeKifDao(_kifs());
+    await _pumpHomePage(tester, _FakeTabDao(_tabs()), kifDao);
+    await _enterSortMode(tester);
+
+    final start = tester.getCenter(find.text('棋譜A'));
+    final target = tester.getCenter(find.text('棋譜C'));
+    final gesture = await _startLongPressDrag(tester, find.text('棋譜A'));
+    for (var i = 1; i <= 10; i++) {
+      await gesture.moveTo(Offset.lerp(start, target, i / 10)!);
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // 確定前の表示位置と一覧の再取得回数を覚えておく。
+    final rectsBeforeSave = {
+      for (final title in ['棋譜A', '棋譜B', '棋譜C'])
+        title: tester.getRect(find.text(title)),
+    };
+    final callsBeforeSave = kifDao.getKifsByTabCallCount;
+
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pumpAndSettle();
+
+    // 確定時に一覧を DB から読み直さない（再構築による点滅を防ぐ）。
+    expect(kifDao.getKifsByTabCallCount, callsBeforeSave);
+    // 並び順は永続化され、表示中の内容と位置も変わらない。
+    expect(kifDao.lastSavedOrder, isNotNull);
+    expect(
+      kifDao.lastSavedOrder!.map((kif) => kif.title).toList(),
+      isNot(equals(['棋譜A', '棋譜B', '棋譜C'])),
+    );
+    for (final entry in rectsBeforeSave.entries) {
+      expect(tester.getRect(find.text(entry.key)), entry.value);
+    }
+
+    await _drainSnackbar(tester);
+  });
+
   testWidgets('グリッド: 切り替え先の既存カードと同じ位置では既存カードが優先される',
       variant: TargetPlatformVariant.only(TargetPlatform.android),
       (tester) async {
